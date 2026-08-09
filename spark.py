@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """Spark -- build a game by snapping tiles together. No typing code.
 
-    python3 ~/spark/spark.py                 open the menu
-    python3 ~/spark/spark.py edit            open the drag-and-drop editor
-    python3 ~/spark/spark.py export          refresh tiles.json for offline/Pages use
-    python3 ~/spark/spark.py games/chase.json  open the menu on that game
-    python3 ~/spark/spark.py play games/chase.json [ticks]   skip to playing
+    python3 spark.py                       open the menu
+    python3 spark.py edit [port]           open the drag-and-drop editor (8765)
+    python3 spark.py play games/chase.json [ticks]   skip straight to playing
+    python3 spark.py status                print the Github/Browser/Local line
+    python3 spark.py export                refresh tiles.json and games/index.json
+    python3 spark.py games/chase.json      open the menu on that game
+
+See README.md for the guide and CHANGELOG.md for what changed when.
 """
 
 import sys

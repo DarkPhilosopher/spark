@@ -2,49 +2,101 @@
 
 Build a game by snapping tiles together. You never type code.
 
+> **What changed and when:** [CHANGELOG.md](CHANGELOG.md), in the same folder as
+> this file. Every change to Spark is written down in both files.
+
 A game is a cast of **characters**. Each character has a **brain**, and a brain
 is a list of rows. Every row reads the same way:
 
     WHEN something is true   DO something
 
-That is the entire idea, and it is the same idea Kodu and Project Spark used.
-Twelve tiles crossed with nine tiles is a hundred-odd sentences you can write
-without knowing any Python.
+That is the whole idea, and it is the idea Kodu and Project Spark used. Nine
+WHEN tiles crossed with eleven DO tiles is ninety-nine different sentences, and
+rows can hold more than one tile each, so the real number is much larger.
+
+---
+
+## Contents
+
+- [Where Spark lives](#where-spark-lives)
+- [Start it](#start-it)
+- [Knowing where you are](#knowing-where-you-are)
+- [The tiles](#the-tiles)
+- [How a brain runs](#how-a-brain-runs)
+- [Every command](#every-command)
+- [Where things live](#where-things-live)
+- [What a game file looks like](#what-a-game-file-looks-like)
+- [Putting it on GitHub](#putting-it-on-github)
+- [Inventing a new tile](#inventing-a-new-tile)
+- [When something goes wrong](#when-something-goes-wrong)
+
+---
+
+## Where Spark lives
+
+    /data/data/com.termux/files/home/spark
+
+That folder is Termux's home directory, so **from Termux** you can call it
+`~/spark`. Inside the PRoot Linux distro `~` means `/root` instead, so there you
+need the full path. Everything below writes `spark.py`, meaning "run it from
+inside the spark folder":
+
+    cd ~/spark            # from Termux
+    python3 spark.py
+
+Both Pythons on this phone run Spark — Termux's own (`python`) and the one
+inside PRoot (`python3`). Nothing else needs installing.
+
+---
 
 ## Start it
 
-Two ways to build, both editing the same `games/*.json` files.
+There are three ways in. All of them edit the same `games/*.json` files, so you
+can start a game in one and finish it in another.
 
-**Drag and drop, in your browser** (nicer on a phone):
+### 1. Drag and drop, in your browser
 
-    python3 ~/spark/spark.py edit
+    python3 spark.py edit
 
-Then open <http://127.0.0.1:8765> if it does not open by itself. Tap a tile in
-the palette to drop it into the highlighted row; tap a placed tile to change its
-numbers; drag one to move it to another row or onto the bin. Press **save** and
-the file lands in `games/`. Ctrl-C in the terminal stops the server. It listens
-on 127.0.0.1 only, so nothing off your phone can reach it.
+Then open <http://127.0.0.1:8765> if it does not open by itself.
 
-**From GitHub Pages**, once this repo is pushed: open your Pages link on any
-device. Same editor, no Termux needed. Games save into the browser straight
-away; tap ⚙ and paste a fine-grained token (Contents: read and write, this repo
-only) and saving also commits `games/*.json` for real.
+- **Tap** a tile in the palette at the bottom — it drops into the highlighted
+  row. The WHEN / DO tabs choose which half of the row it lands in.
+- **Tap** a tile you have already placed to change its numbers, or remove it.
+- **Drag** a placed tile to move it to another row, or onto the red bin.
+- **save** writes the file into `games/`.
+- Ctrl-C in the terminal stops the server.
 
-One catch: opening `index.html` as a `file://` path does not work — browsers
-refuse to let a local page read its sibling files. Use `spark.py edit` for
-offline; that is what it is for.
+It listens on `127.0.0.1` only, which means nothing outside your phone can
+reach it, even on shared wifi.
 
-**Numbered menus, in the terminal** (works with no browser):
+### 2. From GitHub Pages
 
-    python3 ~/spark/spark.py
+Once the repo is pushed, open your Pages link on any device. Same editor, no
+Termux needed, works on a laptop or someone else's phone.
 
-To watch the demo first:
+Games save into the browser immediately. If you want them saved into the repo
+for real, tap ⚙ and fill in your GitHub user, the repo, the branch, and a
+fine-grained token with **Contents: read and write** on that one repo. Then
+every save also commits `games/*.json`. See
+[Putting it on GitHub](#putting-it-on-github).
 
-    python3 ~/spark/spark.py play games/chase.json
+### 3. Numbered menus, in the terminal
 
-Arrow keys move, space shoots, `q` quits. Eat five apples to win; the bugs bite.
+    python3 spark.py
 
-Then open `chase` from the menu and change it — that is the fastest way in.
+No browser involved. Every choice is a number you type. Slower than dragging,
+but it works anywhere, including over a phone keyboard with one thumb.
+
+### See the demo first
+
+    python3 spark.py play games/chase.json
+
+Arrow keys move, space shoots, `q` quits. Eat five apples to win; two bugs chase
+you and bite. Then open `chase` in either editor and change something — that is
+the fastest way to understand the whole system.
+
+---
 
 ## Knowing where you are
 
@@ -52,59 +104,184 @@ Every menu screen, and the browser header, starts with the same line:
 
     Spark exe  Github F  Browser F  Local T
 
-- **Github** — a remote is set and every commit is pushed. `F` means either no
-  remote yet, or you have commits sitting unpushed.
-- **Browser** — an editor page has talked to the local server in the last 90
-  seconds. In the browser this is always `T`, since you are in one.
-- **Local** — the Python engine is on this device, so you can play and edit
-  with no internet.
+| Flag | `T` means |
+|---|---|
+| **Github** | a remote is set **and** every commit is pushed. `F` means no remote yet, or you have commits sitting unpushed. |
+| **Browser** | an editor page has spoken to the local server within the last 90 seconds. In the browser this is always `T`, because you are in one. |
+| **Local** | the Python engine is on this device, so you can play and edit with no internet at all. |
 
-Ask any time with `python3 spark.py status`.
+Ask any time:
+
+    python3 spark.py status
+
+---
 
 ## The tiles
 
-WHEN (sensors)                  DO (actions)
-------------------------------  ------------------------------
-always                          move up/down/left/right/random/toward it/away/forward
-key <key> is pressed            shoot <direction>
-I see <kind> within <n>         say "<text>"
-I am touching <kind>            change the score by <n>
-every <n> ticks                 hurt it/self by <n>
-my health is below <n>          heal myself by <n>
-the score is at least <n>       make a new <kind>
-<n>% of the time                make it/self disappear
-I am at the edge                jump to a random empty square
-                                win / lose
+| WHEN (sensors) | DO (actions) |
+|---|---|
+| always | move — up, down, left, right, random, toward it, away from it, forward |
+| key `<key>` is pressed | shoot `<direction>` |
+| I see `<kind>` within `<n>` | say "`<text>`" |
+| I am touching `<kind>` | change the score by `<n>` |
+| every `<n>` ticks | hurt it / self by `<n>` |
+| my health is below `<n>` | heal myself by `<n>` |
+| the score is at least `<n>` | make a new `<kind>` |
+| `<n>`% of the time | make it / self disappear |
+| I am at the edge of the world | jump to a random empty square |
+| | win the game |
+| | lose the game |
 
-**"it"** is whatever the WHEN tile found. `WHEN I see apple within 6 DO move
-toward it` works because the seeing tile hands the apple to the moving tile.
-That one word is what makes the tiles stick together.
+`<kind>` is the name of one of your characters, or **anything**, which matches
+all of them.
 
-Rows run top to bottom, every tick, and every row that fires gets to act. Put
-`every 2 ticks` in front of a chase to make a slow enemy.
+### The word "it"
+
+**"it"** is whatever the WHEN tile found.
+
+    WHEN I see apple within 6   DO move toward it
+
+The seeing tile finds an apple and hands it to the moving tile. That one word is
+what makes tiles stick together instead of just sitting next to each other. The
+tiles that produce an "it" are *I see* and *I am touching*; the ones that use it
+are *move toward/away from it*, *hurt it*, and *make it disappear*.
+
+If a row has no sensor that found something, "it" is empty and those actions do
+nothing rather than misfiring.
+
+---
+
+## How a brain runs
+
+Six times a second (the speed is yours to change), for each character:
+
+1. Read the brain rows from top to bottom.
+2. A row fires when **all** of its WHEN tiles are true. Two WHEN tiles on one
+   row means *and*.
+3. When a row fires, **all** of its DO tiles run.
+4. Keep going. Every row that fires gets to act, not just the first one.
+
+That last point is worth knowing: put `every 2 ticks` in front of a chase to
+make a slow enemy, because otherwise the enemy moves as often as you do.
+
+Some other rules worth knowing:
+
+- A character with **role: player** ends the game if all of them die. Everything
+  else is scenery, enemies or pickups.
+- A **solid** character blocks others from walking through it. Walls are solid.
+- Health starts wherever you set it; at zero the character disappears.
+- Bullets are a character called `shot` that Spark provides. They fly forward,
+  hurt the first thing they touch, and vanish at the edge. They never hit
+  whoever fired them.
+
+---
+
+## Every command
+
+| Command | What it does |
+|---|---|
+| `python3 spark.py` | the terminal menus |
+| `python3 spark.py edit` | the browser editor on port 8765 |
+| `python3 spark.py edit 9000` | same, on a port you choose |
+| `python3 spark.py play games/chase.json` | play a game straight away |
+| `python3 spark.py play games/chase.json 200` | run 200 ticks with no display, for testing |
+| `python3 spark.py status` | print the Github / Browser / Local line |
+| `python3 spark.py export` | rewrite `tiles.json` and `games/index.json` |
+| `python3 spark.py games/chase.json` | open the menus with that game already loaded |
+| `node tests/store.test.js` | check the editor's save and load logic |
+| `python3 tests/check_docs.py` | check this README still matches the code |
+
+---
 
 ## Where things live
 
-    spark.py            the launcher
-    index.html          the drag-and-drop editor (works served or on Pages)
-    tiles.json          the tile list, baked out for when no server is running
-    games/*.json        your games, one file each
-    games/index.json    the listing the static page reads
-    engine/tiles.py     the tile library  <- add new pieces here
-    engine/world.py     the grid and the rule engine
-    engine/builder.py   the terminal menus
-    engine/runner.py    keyboard and drawing
-    engine/server.py    serves the editor, reads and writes games/
-    engine/status.py    works out the Github / Browser / Local flags
-    tests/store.test.js checks the editor's save/load logic (run: node tests/store.test.js)
+    spark.py             the launcher — every command above goes through it
+    index.html           the drag-and-drop editor (served locally or by Pages)
+    README.md            this guide
+    CHANGELOG.md         what changed and when
+    tiles.json           the tile list, written out for when no server is running
+    games/*.json         your games, one file each
+    games/index.json     the list of games, for when no server is running
+    engine/tiles.py      the tile library      <- add new pieces here
+    engine/world.py      the grid, the characters, and the rule engine
+    engine/brain.py      reading and writing game files
+    engine/builder.py    the terminal menus
+    engine/runner.py     the keyboard and the drawing
+    engine/server.py     serves the editor, reads and writes games/
+    engine/status.py     works out the Github / Browser / Local flags
+    tests/store.test.js  17 checks on the editor's save and load logic
+    tests/check_docs.py  fails if this README has drifted from the code
 
-`tiles.json` is generated. After adding a tile, run `python3 spark.py export`
-and commit it, or the Pages copy will not show the new tile. Starting the
-local server rewrites it for you.
+Two files are **generated** — do not edit them by hand:
+
+- `tiles.json` and `games/index.json`. Run `python3 spark.py export` after
+  adding a tile, and commit the result, or the GitHub Pages copy will not show
+  it. Starting the local server rewrites them for you.
+
+One file is ignored by git: `.spark-state.json`, which is how the server tells
+the terminal that a browser is connected.
+
+---
+
+## What a game file looks like
+
+You never have to read this — both editors write it for you — but it is plain
+text, and knowing the shape makes the whole thing less mysterious.
+
+```json
+{
+  "name": "chase",
+  "world": { "width": 30, "height": 14, "wrap": false, "speed": 6 },
+  "characters": [
+    {
+      "kind": "hero",
+      "glyph": "@",
+      "color": "cyan",
+      "health": 3,
+      "count": 1,
+      "solid": false,
+      "role": "player",
+      "brain": [
+        { "when": [ { "tile": "key",   "args": { "key": "up" } } ],
+          "do":   [ { "tile": "move",  "args": { "dir": "up" } } ] }
+      ]
+    }
+  ]
+}
+```
+
+- **glyph** is the single letter drawn on the grid, **count** is how many exist
+  when the game starts, **speed** is ticks per second, **wrap** makes walking
+  off one edge bring you back on the other.
+- Each brain row is `{"when": [...], "do": [...]}`, and each tile inside is
+  `{"tile": "<id>", "args": {...}}`. That is the entire format.
+
+---
+
+## Putting it on GitHub
+
+Two separate things, and it is worth keeping them apart in your head:
+
+1. **Publishing the editor** so you can open it from a web address. Push the
+   repo, turn on GitHub Pages, and the Pages link serves `index.html`. This
+   needs a **public** repo — Pages on a private repo requires a paid plan.
+2. **Saving games back into the repo from the browser.** That is the ⚙ button
+   and the token, and it is entirely optional.
+
+**About the token.** Make a fine-grained one, scoped to that single repo, with
+Contents: read and write and nothing else. It is stored in your browser, which
+means anyone holding your unlocked phone can read it. ⚙ → *forget token*
+removes it. Never paste a classic token with wide access.
+
+Publishing the editor does **not** stop it working offline. The local server and
+the Pages copy are the same file behaving differently depending on whether a
+server answers it.
+
+---
 
 ## Inventing a new tile
 
-One function. It appears on the menus by itself — nothing else to edit.
+One function. It appears on the menus and in the browser palette by itself.
 
 ```python
 @sensor("richer_than", "the score is above {value}",
@@ -113,9 +290,47 @@ def s_richer(obj, world, a):
     return world.score > a["value"]
 ```
 
-A sensor returns `True`/`False`, or returns a character to hand it along as
-"it". An action takes `(obj, world, args, it)` and changes something.
+- The first line is the tile's id, then the sentence shown on the menus. Every
+  `{name}` in that sentence must match a `Param`, or the label will not fill in.
+- A **sensor** returns `True`/`False`, or returns a character to hand it along
+  as "it".
+- An **action** takes `(obj, world, args, it)` and changes something.
 
-Your new tile appears in the terminal menus **and** in the browser palette by
-itself — the editor asks the server for the tile list at startup and draws
-whatever it finds, so there is no HTML to keep in sync.
+Then run `python3 spark.py export` so the offline and Pages copies know about
+it, and add it to the tile table above and to `CHANGELOG.md`.
+
+The reason there is no HTML to edit: the editor asks for the tile list at
+startup — from the server if there is one, from `tiles.json` if not — and draws
+whatever it finds. `engine/tiles.py` is the only place tiles are defined.
+
+---
+
+## When something goes wrong
+
+**The page says it cannot read `tiles.json`.**
+You opened `index.html` by tapping the file itself. Browsers forbid a `file://`
+page from reading the files next to it, and that cannot be worked around. Use
+`python3 spark.py edit`, or the Pages link.
+
+**A new tile is missing from the browser editor.**
+Run `python3 spark.py export`, then reload. If it is missing on GitHub Pages,
+you also need to commit and push the new `tiles.json`.
+
+**Saving says "this browser" when you expected a commit.**
+The token is missing, expired, or lacks Contents: read and write on that repo.
+The message after a failed commit says what GitHub complained about. Your game
+is safe either way — it saved in the browser first.
+
+**Github shows `F` when you think you have pushed.**
+Either there is no remote yet, or there are commits you have not pushed. Check
+with `git status -sb`.
+
+**The keyboard does nothing while playing.**
+The game needs a real terminal. Playing through a pipe, or with output
+redirected, runs the world without reading keys — which is what
+`play games/chase.json 200` deliberately does.
+
+**A character will not move.**
+Check the row order and whether something solid is in the way. Remember that a
+row with no WHEN tile never fires, and one with no DO tile does nothing; the
+editor shows both as *never fires* and *does nothing*.
