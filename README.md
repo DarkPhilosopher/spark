@@ -58,10 +58,17 @@ inside PRoot (`python3`). Nothing else needs installing.
 
 ## Start it
 
-**Never used it before? Start here:**
+**One-time setup**, so you can type one word instead of a path:
 
     cd ~/spark
-    python3 spark.py tutorial
+    python3 spark.py install
+
+After that, `spark` on its own starts it from anywhere in Termux. Every command
+below can drop the `python3 spark.py` and just say `spark`.
+
+**Never used it before? Start here:**
+
+    spark tutorial
 
 Ten short lessons in the terminal that build a real game one row at a time. You
 pick the tiles yourself and play what you have built four times along the way.
@@ -74,9 +81,14 @@ files, so you can start a game in one and finish it in another.
 
 ### 1. Drag and drop, in your browser
 
-    python3 spark.py edit
+    spark edit
 
 Then open <http://127.0.0.1:8765> if it does not open by itself.
+
+Or, if you are already in the menus, **type `browser`** at any prompt. It starts
+the editor beside the menus and opens it, and you keep both — they share the
+same `games/` folder, so save in one and re-open the game in the other to see
+the change.
 
 - **Tap** a tile in the palette at the bottom — it drops into the highlighted
   row. The WHEN / DO tabs choose which half of the row it lands in.
@@ -196,8 +208,12 @@ Some other rules worth knowing:
 
 ## Every command
 
+Once `python3 spark.py install` has been run, every one of these works as plain
+`spark ...` too.
+
 | Command | What it does |
 |---|---|
+| `python3 spark.py install` | make `spark` work as a command (do this once) |
 | `python3 spark.py tutorial` | ten guided lessons that build your first game |
 | `python3 spark.py` | the terminal menus |
 | `python3 spark.py edit` | the browser editor on port 8765 |
@@ -236,6 +252,7 @@ Some other rules worth knowing:
     engine/brain.py      reading and writing game files
     engine/builder.py    the terminal menus
     engine/tutorial.py   the ten guided lessons
+    engine/launcher.py   writes the `spark` command into your bin folders
     engine/runner.py     the keyboard and the drawing
     engine/server.py     serves the editor, reads and writes games/
     engine/status.py     works out the Github / Browser / Local flags

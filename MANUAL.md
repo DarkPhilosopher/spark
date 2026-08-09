@@ -91,6 +91,14 @@ no packages, no internet needed to run.
 is `~/spark`. Inside the PRoot Linux distro `~` means `/root`, so use the full
 path there.
 
+**The `spark` command.** Run `python3 spark.py install` once and a small script
+is written into Termux's `bin` folder (and into `/usr/local/bin` inside PRoot,
+which needs a different first line because Android has no `/bin/sh`). After
+that, typing `spark` anywhere starts it, and `spark edit`, `spark tutorial` and
+the rest all work. The script only finds Spark, picks whichever Python is
+installed, and hands over — if you ever move the spark folder, run install
+again.
+
 ---
 
 ## Controls: playing a game
@@ -122,8 +130,15 @@ Everything is a numbered list. Type the number, press enter.
 |---|---|
 | a number | choose that item |
 | `0` or enter | go back, or done, or quit at the top level |
+| `browser` or `b` | open the drag-and-drop editor, at any prompt |
 | enter on a question | accept the `[default]` shown in brackets |
 | Ctrl-C | leave Spark |
+
+Typing **browser** starts the editor server next to the menus and opens your
+browser at it. You keep both: the menus stay where they were, and both editors
+read and write the same `games/` folder. They do not watch each other, so after
+saving in one, re-open the game in the other to see the change. The server stops
+when you leave Spark.
 
 The screens, in order of depth:
 
@@ -175,10 +190,12 @@ Tap **world settings** to open width, height, speed, edge wrapping, and the
 
 ## Every command
 
-Run these from inside the spark folder (`cd ~/spark` in Termux).
+Run these from inside the spark folder (`cd ~/spark` in Termux) — or from
+anywhere, as plain `spark ...`, once you have run the install command.
 
 | Command | Does |
 |---|---|
+| `python3 spark.py install` | write the `spark` command into Termux's bin folder |
 | `python3 spark.py tutorial` | ten guided lessons, offline, building a real game |
 | `python3 spark.py` | open the terminal menus |
 | `python3 spark.py games/chase.json` | open the menus with that game loaded |

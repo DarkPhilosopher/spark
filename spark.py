@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Spark -- build a game by snapping tiles together. No typing code.
 
+    python3 spark.py install               make `spark` work as a command
     python3 spark.py tutorial              learn it by building a game, offline
     python3 spark.py                       open the menu
     python3 spark.py edit [port]           open the drag-and-drop editor (8765)
@@ -65,6 +66,18 @@ def main():
             print("  %s %s %s  (%s)" % (game, arrow, where, what))
         if not results:
             print("nothing to " + args[0])
+        return
+    if args and args[0] == "install":
+        from engine import launcher
+        done, failed = launcher.install()
+        for path, where in done:
+            print("  installed %s  (for %s)" % (path, where))
+        for path, err in failed:
+            print("  could not write %s: %s" % (path, err))
+        if done:
+            print("\n  now just type:  spark")
+        else:
+            print("\n  nowhere writable found; keep using: python3 spark.py")
         return
     if args and args[0] == "tutorial":
         from engine import tutorial

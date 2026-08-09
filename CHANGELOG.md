@@ -12,6 +12,33 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ---
 
+## 0.8.0 — 2026-08-09
+
+Getting in and out of Spark with one word each.
+
+### Added
+
+- **`python3 spark.py install`** — writes a small `spark` script into Termux's
+  bin folder, so from then on you type `spark` from anywhere instead of a path.
+  It also writes one inside the PRoot distro, which needs a different first line
+  because Android has no `/bin/sh`. Every command works the short way after
+  that: `spark tutorial`, `spark edit`, `spark host`.
+- **Typing `browser` at any menu prompt** opens the drag-and-drop editor. It
+  starts the server on its own thread, so the menus stay exactly where they
+  were and you have both editors at once, sharing the same `games/` folder.
+  `b` works too.
+- The main menu now says so, rather than leaving you to guess.
+
+### Changed
+
+- The server can be started quietly, without printing its banner, which is what
+  lets the menus open it without scribbling over the screen.
+- Asking for the browser twice reuses the server already running instead of
+  trying to claim the port again, and says plainly what to do if the port is
+  taken by something else.
+
+---
+
 ## 0.7.0 — 2026-08-09
 
 A way in for someone who has never done this before.

@@ -38,6 +38,7 @@ MAY_LOOK = ("owner", "edit", "play", "watch")
 # true, so the owner has to present a key printed in the terminal instead.
 OWNER_KEY = ""
 LOOPBACK_IS_OWNER = True
+OWNER_URL = ""          # the address that makes you the owner, once serving
 
 
 def export_static():
@@ -263,8 +264,9 @@ class Handler(BaseHTTPRequestHandler):
         return self.send_json({"deleted": name})
 
 
-def serve(port=8765, open_browser=True, bind="127.0.0.1", public=False):
-    global OWNER_KEY, LOOPBACK_IS_OWNER
+def serve(port=8765, open_browser=True, bind="127.0.0.1", public=False,
+          quiet=False):
+    global OWNER_KEY, LOOPBACK_IS_OWNER, OWNER_URL
     export_static()
     status.note_server(port)
     shared = bind not in ("127.0.0.1", "localhost")
@@ -275,39 +277,41 @@ def serve(port=8765, open_browser=True, bind="127.0.0.1", public=False):
     with ThreadingHTTPServer((bind, port), Handler) as httpd:
         local = "http://127.0.0.1:%d/" % port
         owner_url = local + "#owner=" + OWNER_KEY
-        print(status.line())
+        OWNER_URL = owner_url
+        say = (lambda *a: None) if quiet else print
+        say(status.line())
         if shared:
-            print("You are hosting. Open this on THIS phone to be in charge:")
-            print("  " + owner_url)
-            print("Others on this wifi go to " + lan_address(port))
-            print("and type an invite code. Make codes from the host panel.")
+            say("You are hosting. Open this on THIS phone to be in charge:")
+            say("  " + owner_url)
+            say("Others on this wifi go to " + lan_address(port))
+            say("and type an invite code. Make codes from the host panel.")
         else:
-            print("Spark editor running at " + local)
-            print("only this phone can reach it -- use `spark.py host` to share")
+            say("Spark editor running at " + local)
+            say("only this phone can reach it -- use `spark.py host` to share")
         link = None
         if public:
             from . import tunnel
             if not tunnel.available():
-                print("\n" + tunnel.advice() + "\n")
+                say("\n" + tunnel.advice() + "\n")
             else:
-                print("opening a public address, this takes a moment...")
+                say("opening a public address, this takes a moment...")
                 link = tunnel.Tunnel(port)
                 address = link.start()
                 if address:
-                    print("anyone anywhere can join at " + address)
-                    print("(that address dies when you stop Spark)")
+                    say("anyone anywhere can join at " + address)
+                    say("(that address dies when you stop Spark)")
                 else:
-                    print("the tunnel did not come up; wifi still works")
+                    say("the tunnel did not come up; wifi still works")
                     link = None
 
-        print("games folder: %s" % brain.GAMES_DIR)
-        print("press ctrl-c to stop")
+        say("games folder: %s" % brain.GAMES_DIR)
+        say("press ctrl-c to stop")
         if open_browser:
             try:
                 subprocess.run(["termux-open-url", owner_url], timeout=5,
                                capture_output=True)
             except (FileNotFoundError, subprocess.SubprocessError):
-                print("(open that address in your browser)")
+                say("(open that address in your browser)")
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:

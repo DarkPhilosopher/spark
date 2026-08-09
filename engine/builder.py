@@ -43,22 +43,101 @@ def ask_yes(prompt, default=False):
 
 
 def menu(options, prompt="pick a number", allow_back=True, back_label="back"):
-    """Show a numbered list. Returns the index, or None for back/blank."""
+    """Show a numbered list. Returns the index, or None for back/blank.
+
+    Typing `browser` at any menu opens the drag-and-drop editor instead.
+    """
     for i, label in enumerate(options, 1):
         print(" %2d. %s" % (i, label))
     if allow_back:
         print("  0. %s" % back_label)
     while True:
         answer = ask(prompt, "0" if allow_back else None)
+        if answer.strip().lower() in ("browser", "b"):
+            open_browser_editor()
+            continue
         if answer in ("", "0") and allow_back:
             return None
         if answer.isdigit() and 1 <= int(answer) <= len(options):
             return int(answer) - 1
-        print("  pick one of the numbers shown")
+        print("  pick one of the numbers shown, or type browser")
 
 
 def kinds_in(project):
     return [c["kind"] for c in project.get("characters", [])] + ["anything"]
+
+
+# --------------------------------------------------------------------------
+# opening the browser editor without leaving the menus
+# --------------------------------------------------------------------------
+
+_server_thread = None
+
+
+def open_browser_editor(share=False):
+    """Start the editor server alongside the menus and open it.
+
+    It runs on its own thread so the terminal stays usable -- you can have
+    both editors open at once. They read and write the same games/ folder.
+    """
+    global _server_thread
+    import subprocess
+    import threading
+    import time
+    from . import server
+
+    header("Browser editor")
+    if _server_thread is None or not _server_thread.is_alive():
+        server.OWNER_URL = ""
+        _server_thread = threading.Thread(
+            target=server.serve,
+            kwargs={"bind": "0.0.0.0" if share else "127.0.0.1",
+                    "open_browser": False, "quiet": True},
+            daemon=True)
+        _server_thread.start()
+        for _ in range(40):                     # wait for it to claim the port
+            if server.OWNER_URL:
+                break
+            time.sleep(0.05)
+
+    if not server.OWNER_URL:
+        print(" could not start it -- is something already on port 8765?")
+        print(" try:  python3 spark.py edit 9000")
+        ask("press enter")
+        return
+
+    print(" Open on this phone:\n")
+    print("   " + server.OWNER_URL + "\n")
+    if share:
+        print(" Others on this wifi: " + server.lan_address(8765) + "\n")
+    opened = False
+    try:
+        subprocess.run(["termux-open-url", server.OWNER_URL], timeout=5,
+                       capture_output=True)
+        opened = True
+    except (FileNotFoundError, subprocess.SubprocessError):
+        pass
+    print(wrap_note(
+        "Opening your browser now." if opened else
+        "Type that address into your browser -- termux-open-url is not "
+        "installed here, so I cannot open it for you."))
+    print(wrap_note(
+        "Both editors are live at once and share the games/ folder. Save in "
+        "one, then re-open the game in the other to see the change. The "
+        "server stops when you leave Spark."))
+    ask("press enter")
+
+
+def wrap_note(text, width=44):
+    words, line, out = text.split(), "", []
+    for word in words:
+        if len(line) + len(word) + 1 > width:
+            out.append(" " + line)
+            line = word
+        else:
+            line = (line + " " + word).strip()
+    out.append(" " + line)
+    return "\n".join(out) + "\n"
 
 
 # --------------------------------------------------------------------------
@@ -354,6 +433,7 @@ def main_menu(project=None):
             print(" nothing open yet\n")
             options = ["learn how (guided, about ten minutes)",
                        "start a new game", "open a game"]
+        print(" (type browser at any prompt for the drag-and-drop editor)\n")
         choice = menu(options, "pick a number", back_label="quit")
         if choice is None:
             print("bye")
