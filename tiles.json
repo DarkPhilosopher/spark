@@ -1,0 +1,309 @@
+{
+  "sensors": [
+    {
+      "id": "always",
+      "label": "always",
+      "params": []
+    },
+    {
+      "id": "key",
+      "label": "key {key} is pressed",
+      "params": [
+        {
+          "name": "key",
+          "prompt": "Which key?",
+          "kind": "choice",
+          "choices": [
+            "up",
+            "down",
+            "left",
+            "right",
+            "space",
+            "w",
+            "a",
+            "s",
+            "d",
+            "e",
+            "f"
+          ],
+          "default": "up"
+        }
+      ]
+    },
+    {
+      "id": "see",
+      "label": "I see {kind} within {range}",
+      "params": [
+        {
+          "name": "kind",
+          "prompt": "See what?",
+          "kind": "kind",
+          "choices": [],
+          "default": "anything"
+        },
+        {
+          "name": "range",
+          "prompt": "How many squares away?",
+          "kind": "int",
+          "choices": [],
+          "default": 6
+        }
+      ]
+    },
+    {
+      "id": "touch",
+      "label": "I am touching {kind}",
+      "params": [
+        {
+          "name": "kind",
+          "prompt": "Touching what?",
+          "kind": "kind",
+          "choices": [],
+          "default": "anything"
+        }
+      ]
+    },
+    {
+      "id": "timer",
+      "label": "every {every} ticks",
+      "params": [
+        {
+          "name": "every",
+          "prompt": "How many ticks between firings?",
+          "kind": "int",
+          "choices": [],
+          "default": 4
+        }
+      ]
+    },
+    {
+      "id": "health_below",
+      "label": "my health is below {value}",
+      "params": [
+        {
+          "name": "value",
+          "prompt": "Below what health?",
+          "kind": "int",
+          "choices": [],
+          "default": 2
+        }
+      ]
+    },
+    {
+      "id": "score_at_least",
+      "label": "the score is at least {value}",
+      "params": [
+        {
+          "name": "value",
+          "prompt": "What score?",
+          "kind": "int",
+          "choices": [],
+          "default": 10
+        }
+      ]
+    },
+    {
+      "id": "chance",
+      "label": "{percent}% of the time",
+      "params": [
+        {
+          "name": "percent",
+          "prompt": "Percent chance (0-100)?",
+          "kind": "int",
+          "choices": [],
+          "default": 25
+        }
+      ]
+    },
+    {
+      "id": "at_edge",
+      "label": "I am at the edge of the world",
+      "params": []
+    }
+  ],
+  "actions": [
+    {
+      "id": "move",
+      "label": "move {dir}",
+      "params": [
+        {
+          "name": "dir",
+          "prompt": "Move which way?",
+          "kind": "choice",
+          "choices": [
+            "up",
+            "down",
+            "left",
+            "right",
+            "random",
+            "toward it",
+            "away from it",
+            "forward"
+          ],
+          "default": "toward it"
+        }
+      ]
+    },
+    {
+      "id": "shoot",
+      "label": "shoot {dir}",
+      "params": [
+        {
+          "name": "dir",
+          "prompt": "Shoot which way?",
+          "kind": "choice",
+          "choices": [
+            "up",
+            "down",
+            "left",
+            "right",
+            "random",
+            "toward it",
+            "away from it",
+            "forward"
+          ],
+          "default": "forward"
+        }
+      ]
+    },
+    {
+      "id": "say",
+      "label": "say \"{text}\"",
+      "params": [
+        {
+          "name": "text",
+          "prompt": "Say what?",
+          "kind": "text",
+          "choices": [],
+          "default": "hello!"
+        }
+      ]
+    },
+    {
+      "id": "score",
+      "label": "change the score by {amount}",
+      "params": [
+        {
+          "name": "amount",
+          "prompt": "Change score by how much?",
+          "kind": "int",
+          "choices": [],
+          "default": 1
+        }
+      ]
+    },
+    {
+      "id": "damage",
+      "label": "hurt {target} by {amount}",
+      "params": [
+        {
+          "name": "target",
+          "prompt": "Hurt whom?",
+          "kind": "choice",
+          "choices": [
+            "it",
+            "self"
+          ],
+          "default": "it"
+        },
+        {
+          "name": "amount",
+          "prompt": "By how much?",
+          "kind": "int",
+          "choices": [],
+          "default": 1
+        }
+      ]
+    },
+    {
+      "id": "heal",
+      "label": "heal myself by {amount}",
+      "params": [
+        {
+          "name": "amount",
+          "prompt": "By how much?",
+          "kind": "int",
+          "choices": [],
+          "default": 1
+        }
+      ]
+    },
+    {
+      "id": "spawn",
+      "label": "make a new {kind}",
+      "params": [
+        {
+          "name": "kind",
+          "prompt": "Make what?",
+          "kind": "kind",
+          "choices": [],
+          "default": "apple"
+        }
+      ]
+    },
+    {
+      "id": "vanish",
+      "label": "make {target} disappear",
+      "params": [
+        {
+          "name": "target",
+          "prompt": "Who disappears?",
+          "kind": "choice",
+          "choices": [
+            "it",
+            "self"
+          ],
+          "default": "it"
+        }
+      ]
+    },
+    {
+      "id": "teleport",
+      "label": "jump to a random empty square",
+      "params": []
+    },
+    {
+      "id": "win",
+      "label": "win the game",
+      "params": []
+    },
+    {
+      "id": "lose",
+      "label": "lose the game",
+      "params": []
+    }
+  ],
+  "colors": [
+    "white",
+    "red",
+    "green",
+    "yellow",
+    "blue",
+    "magenta",
+    "cyan",
+    "grey"
+  ],
+  "directions": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "random",
+    "toward it",
+    "away from it",
+    "forward"
+  ],
+  "keys": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "space",
+    "w",
+    "a",
+    "s",
+    "d",
+    "e",
+    "f"
+  ]
+}

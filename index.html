@@ -1,0 +1,697 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Spark editor</title>
+<style>
+  :root{
+    --bg:#14161a; --panel:#1d2026; --panel2:#252932; --line:#333945;
+    --ink:#e8eaed; --dim:#9aa3b2; --when:#4a86c7; --do:#c98a3c;
+    --accent:#4dd0e1; --bad:#d0554f;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:15px/1.4 system-ui,-apple-system,"Roboto",sans-serif;
+       padding-bottom:44vh;-webkit-text-size-adjust:100%}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;
+     color:var(--dim);margin:18px 12px 8px}
+  button{font:inherit;color:inherit;background:var(--panel2);
+         border:1px solid var(--line);border-radius:9px;padding:9px 12px}
+  button:active{filter:brightness(1.35)}
+  input,select{font:inherit;color:inherit;background:var(--panel2);
+               border:1px solid var(--line);border-radius:8px;padding:9px;width:100%}
+
+  header{position:sticky;top:0;z-index:5;background:var(--panel);
+         border-bottom:1px solid var(--line);padding:8px;
+         display:flex;gap:6px;align-items:center}
+  header select{width:auto;flex:1;min-width:0}
+  #status{font-size:12px;color:var(--accent);padding:0 12px;height:16px}
+  #where{font:12px/1.6 ui-monospace,monospace;color:var(--dim);padding:6px 12px 0;
+         letter-spacing:.03em}
+  #where b{font-weight:700}
+  #where .t{color:#5dd97f} #where .f{color:#6b7280}
+
+  .strip{display:flex;gap:6px;overflow-x:auto;padding:0 12px 4px}
+  .cast{white-space:nowrap;background:var(--panel2);border:1px solid var(--line);
+        border-radius:20px;padding:7px 13px}
+  .cast.on{border-color:var(--accent);color:var(--accent)}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+         margin:0 8px;padding:10px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .field{font-size:12px;color:var(--dim);display:block;margin-bottom:3px}
+  details summary{padding:8px 12px;color:var(--dim);font-size:13px}
+
+  .row{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+       margin:0 8px 8px;padding:6px;display:flex;gap:6px;align-items:flex-start}
+  .row.on{border-color:var(--accent)}
+  .row .body{flex:1;min-width:0}
+  .row .side{display:flex;gap:5px;flex-wrap:wrap;align-items:center;
+             min-height:40px;padding:3px;border-radius:8px}
+  .row .side.over{background:#2f3a44;outline:1px dashed var(--accent)}
+  .tag{font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--dim);
+       padding:0 2px}
+  .rowbtns{display:flex;flex-direction:column;gap:4px}
+  .rowbtns button{padding:5px 8px;font-size:12px}
+
+  .chip{border-radius:8px;padding:8px 10px;font-size:13px;line-height:1.15;
+        border:1px solid transparent;touch-action:none;max-width:100%}
+  .chip.when{background:#24384d;border-color:var(--when)}
+  .chip.do{background:#42341f;border-color:var(--do)}
+  .chip.ghost{position:fixed;z-index:99;pointer-events:none;opacity:.9;
+              box-shadow:0 6px 18px #0009}
+  .chip.lifted{opacity:.3}
+  .empty{color:var(--dim);font-size:12px;padding:9px 4px}
+
+  #palette{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--panel);
+           border-top:1px solid var(--line);max-height:42vh;display:flex;
+           flex-direction:column;padding-bottom:env(safe-area-inset-bottom)}
+  #tabs{display:flex;gap:6px;padding:8px}
+  #tabs button{flex:1}
+  #tabs button.on{border-color:var(--accent);color:var(--accent)}
+  #tiles{overflow-y:auto;padding:0 8px 10px;display:flex;flex-wrap:wrap;gap:6px}
+  #tiles .chip{cursor:pointer}
+  #hint{padding:0 12px 8px;font-size:12px;color:var(--dim)}
+
+  #trash{position:fixed;left:50%;transform:translateX(-50%);bottom:46vh;z-index:98;
+         background:var(--bad);border-radius:22px;padding:10px 20px;display:none}
+  #trash.on{display:block}
+  #trash.over{outline:3px solid #fff}
+
+  dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);
+         border-radius:14px;padding:14px;width:min(92vw,420px)}
+  dialog::backdrop{background:#000b}
+  dialog h3{margin:0 0 10px;font-size:15px}
+  .note{font-size:12px;color:var(--dim);margin-bottom:10px}
+  .dlgbtns{display:flex;gap:8px;margin-top:14px}
+  .dlgbtns button{flex:1}
+  .danger{border-color:var(--bad);color:#ff9a94}
+</style>
+</head>
+<body>
+
+<header>
+  <select id="games" aria-label="open a game"></select>
+  <button id="gear" title="commit saves to GitHub" hidden>⚙</button>
+  <button id="new">new</button>
+  <button id="save">save</button>
+</header>
+<div id="where">Spark exe</div>
+<div id="status"></div>
+
+<h2>characters</h2>
+<div class="strip" id="cast"></div>
+<div class="panel" id="props"></div>
+
+<details>
+  <summary>world settings</summary>
+  <div class="panel" id="world"></div>
+</details>
+
+<h2>brain <span id="whose"></span></h2>
+<div id="rows"></div>
+<div style="padding:0 8px 20px"><button id="addrow" style="width:100%">+ add a row</button></div>
+
+<div id="trash">drop here to delete</div>
+
+<div id="palette">
+  <div id="tabs">
+    <button data-side="when" class="on">WHEN (sensors)</button>
+    <button data-side="do">DO (actions)</button>
+  </div>
+  <div id="hint">tap a tile to add it to the highlighted row - drag a placed tile to move it</div>
+  <div id="tiles"></div>
+</div>
+
+<dialog id="dlg"><form method="dialog" id="dlgform"></form></dialog>
+
+<script>
+"use strict";
+
+let catalog = null, project = null, charIdx = 0, rowIdx = 0, side = "when";
+const $ = s => document.querySelector(s);
+const el = (tag, cls, text) => { const n = document.createElement(tag);
+  if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+const chars = () => project.characters;
+const cur = () => chars()[charIdx] || null;
+const kinds = () => chars().map(c => c.kind).concat("anything");
+const tileDef = (s, id) => (s === "when" ? catalog.sensors : catalog.actions)
+                             .find(t => t.id === id);
+
+// the same three flags the terminal prints above its prompts
+function renderWhere() {
+  const onPages = /github\.io$/i.test(location.hostname) ||
+                  /github/i.test(location.hostname);
+  const flags = {Github: onPages || !!ghConfig(),
+                 Browser: true,
+                 Local: store.mode === "server"};
+  const box = $("#where");
+  box.textContent = "Spark exe  ";
+  for (const [name, on] of Object.entries(flags)) {
+    box.append(name + " ");
+    box.append(el("b", on ? "t" : "f", on ? "T" : "F"));
+    box.append("  ");
+  }
+}
+
+function say(msg) { $("#status").textContent = msg;
+  clearTimeout(say.t); say.t = setTimeout(() => $("#status").textContent = "", 4000); }
+
+// tile label with its arguments filled in -- mirrors Tile.describe in tiles.py
+function describe(s, use) {
+  const def = tileDef(s, use.tile);
+  if (!def) return use.tile;
+  let text = def.label;
+  for (const p of def.params)
+    text = text.replaceAll("{" + p.name + "}",
+                           use.args[p.name] ?? p.default ?? "");
+  return text;
+}
+
+function blankProject(name) {
+  return { name, world:{width:30,height:14,wrap:false,speed:6},
+           characters:[ newChar("hero","@") ] };
+}
+function newChar(kind, glyph) {
+  return { kind, glyph, color:"white", health:1, count:1,
+           solid:false, role:"prop", brain:[] };
+}
+
+// ---------------------------------------------------------------- rendering
+
+function renderCast() {
+  const box = $("#cast"); box.textContent = "";
+  chars().forEach((c, i) => {
+    const b = el("button", "cast" + (i === charIdx ? " on" : ""),
+                 c.glyph + "  " + c.kind);
+    b.onclick = () => { charIdx = i; rowIdx = 0; renderAll(); };
+    box.append(b);
+  });
+  const add = el("button", "cast", "+ character");
+  add.onclick = () => {
+    const name = prompt("name it (one word)", "thing" + chars().length);
+    if (!name) return;
+    if (chars().some(c => c.kind === name)) return say("that name is taken");
+    chars().push(newChar(name, name[0]));
+    charIdx = chars().length - 1; rowIdx = 0; renderAll();
+  };
+  box.append(add);
+}
+
+function field(label, node) {
+  const wrap = el("div");
+  wrap.append(el("label", "field", label), node);
+  return wrap;
+}
+function input(type, value, onchange, attrs) {
+  const n = el("input"); n.type = type; n.value = value;
+  Object.assign(n, attrs || {});
+  n.onchange = () => onchange(type === "number" ? Number(n.value) : n.value);
+  return n;
+}
+function select(options, value, onchange) {
+  const n = el("select");
+  for (const o of options) {
+    const opt = el("option", null, String(o));
+    opt.value = o; if (String(o) === String(value)) opt.selected = true;
+    n.append(opt);
+  }
+  n.onchange = () => onchange(n.value);
+  return n;
+}
+
+function renderProps() {
+  const box = $("#props"); box.textContent = "";
+  const c = cur();
+  if (!c) { box.append(el("div", "empty", "add a character to begin")); return; }
+  const grid = el("div", "grid");
+  grid.append(
+    field("name", input("text", c.kind, v => {
+      const name = v.trim(); if (name) { c.kind = name; renderAll(); } })),
+    field("drawn as", input("text", c.glyph,
+      v => { c.glyph = (v || "?").slice(0, 1); renderAll(); }, {maxLength:1})),
+    field("colour", select(catalog.colors, c.color, v => { c.color = v; })),
+    field("health", input("number", c.health, v => c.health = Math.max(1, v), {min:1})),
+    field("how many at start",
+          input("number", c.count, v => c.count = Math.max(0, v), {min:0})),
+    field("role", select(["player","prop"], c.role, v => c.role = v)));
+  box.append(grid);
+
+  const solid = el("button", null, c.solid ? "solid: blocks others"
+                                           : "solid: walk through");
+  solid.style.marginTop = "8px";
+  solid.onclick = () => { c.solid = !c.solid; renderProps(); };
+  const del = el("button", "danger", "delete " + c.kind);
+  del.style.marginTop = "8px";
+  del.onclick = () => {
+    if (!confirm("delete " + c.kind + "?")) return;
+    chars().splice(charIdx, 1); charIdx = 0; rowIdx = 0; renderAll();
+  };
+  const bar = el("div", "grid"); bar.append(solid, del);
+  box.append(bar);
+}
+
+function renderWorld() {
+  const box = $("#world"); box.textContent = "";
+  const w = project.world, grid = el("div", "grid");
+  grid.append(
+    field("width", input("number", w.width, v => w.width = Math.min(70, Math.max(5, v)))),
+    field("height", input("number", w.height, v => w.height = Math.min(20, Math.max(5, v)))),
+    field("speed (ticks/sec)", input("number", w.speed ?? 6,
+                                     v => w.speed = Math.min(30, Math.max(1, v)))),
+    field("edges wrap", select(["no","yes"], w.wrap ? "yes" : "no",
+                               v => w.wrap = (v === "yes"))));
+  box.append(grid);
+}
+
+function chipFor(s, use, r, i) {
+  const chip = el("div", "chip " + s, describe(s, use));
+  chip.dataset.row = r; chip.dataset.side = s; chip.dataset.i = i;
+  chip.addEventListener("pointerdown", e => startDrag(e, chip));
+  return chip;
+}
+
+function renderRows() {
+  const box = $("#rows"); box.textContent = "";
+  const c = cur();
+  $("#whose").textContent = c ? "of " + c.kind : "";
+  if (!c) return;
+  if (!c.brain.length)
+    box.append(el("div", "empty", "  no rows yet - tap “+ add a row”, then tap a tile below"));
+
+  c.brain.forEach((row, r) => {
+    const node = el("div", "row" + (r === rowIdx ? " on" : ""));
+    node.onclick = () => { rowIdx = r; renderRows(); };
+    const body = el("div", "body");
+
+    for (const s of ["when", "do"]) {
+      const line = el("div", "side");
+      line.dataset.row = r; line.dataset.side = s;
+      line.append(el("span", "tag", s.toUpperCase()));
+      row[s].forEach((use, i) => line.append(chipFor(s, use, r, i)));
+      if (!row[s].length) line.append(el("span", "empty",
+        s === "when" ? "never fires" : "does nothing"));
+      body.append(line);
+    }
+
+    const btns = el("div", "rowbtns");
+    const up = el("button", null, "↑");
+    up.onclick = ev => { ev.stopPropagation();
+      if (r > 0) { const b = c.brain; [b[r-1], b[r]] = [b[r], b[r-1]];
+                   rowIdx = r - 1; renderRows(); } };
+    const del = el("button", null, "✕");
+    del.onclick = ev => { ev.stopPropagation(); c.brain.splice(r, 1);
+                          rowIdx = Math.max(0, rowIdx - 1); renderRows(); };
+    btns.append(up, del);
+    node.append(body, btns);
+    box.append(node);
+  });
+}
+
+function renderPalette() {
+  const box = $("#tiles"); box.textContent = "";
+  const defs = side === "when" ? catalog.sensors : catalog.actions;
+  for (const def of defs) {
+    const chip = el("div", "chip " + side, def.label);
+    chip.onclick = () => addTile(def);
+    box.append(chip);
+  }
+}
+
+function renderAll() { renderWhere(); renderCast(); renderProps(); renderWorld();
+                       renderRows(); renderPalette(); }
+
+// ---------------------------------------------------------------- editing
+
+function addTile(def) {
+  const c = cur();
+  if (!c) return say("add a character first");
+  if (!c.brain.length) c.brain.push({when:[], do:[]});
+  rowIdx = Math.min(rowIdx, c.brain.length - 1);
+  const args = {};
+  for (const p of def.params) args[p.name] = p.default;
+  const use = {tile: def.id, args};
+  c.brain[rowIdx][side].push(use);
+  renderRows();
+  if (def.params.length) openParams(side, use, rowIdx, c.brain[rowIdx][side].length - 1);
+}
+
+function openParams(s, use, r, i) {
+  const def = tileDef(s, use.tile), form = $("#dlgform");
+  form.textContent = "";
+  form.append(el("h3", null, describe(s, use)));
+
+  for (const p of def.params) {
+    let node;
+    if (p.kind === "int")
+      node = input("number", use.args[p.name] ?? p.default,
+                   v => use.args[p.name] = v);
+    else if (p.kind === "choice")
+      node = select(p.choices, use.args[p.name] ?? p.default,
+                    v => use.args[p.name] = v);
+    else if (p.kind === "kind")
+      node = select(kinds(), use.args[p.name] ?? p.default,
+                    v => use.args[p.name] = v);
+    else
+      node = input("text", use.args[p.name] ?? p.default ?? "",
+                   v => use.args[p.name] = v);
+    form.append(field(p.prompt, node));
+  }
+
+  const btns = el("div", "dlgbtns");
+  const remove = el("button", "danger", "remove tile");
+  remove.type = "button";
+  remove.onclick = () => { cur().brain[r][s].splice(i, 1);
+                           $("#dlg").close(); renderRows(); };
+  const done = el("button", null, "done");
+  done.type = "button";
+  done.onclick = () => { $("#dlg").close(); renderRows(); };
+  btns.append(remove, done);
+  form.append(btns);
+  $("#dlg").showModal();
+}
+
+// --------------------------------------------------- dragging placed tiles
+
+let drag = null, swallowClick = false;
+
+function startDrag(e, chip) {
+  drag = {chip, x:e.clientX, y:e.clientY, live:false,
+          from:{r:+chip.dataset.row, s:chip.dataset.side, i:+chip.dataset.i}};
+  window.addEventListener("pointermove", onDragMove);
+  window.addEventListener("pointerup", onDragEnd, {once:true});
+  window.addEventListener("pointercancel", onDragEnd, {once:true});
+}
+
+function onDragMove(e) {
+  if (!drag) return;
+  if (!drag.live) {
+    if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 8) return;
+    drag.live = true;
+    drag.ghost = drag.chip.cloneNode(true);
+    drag.ghost.classList.add("ghost");
+    document.body.append(drag.ghost);
+    drag.chip.classList.add("lifted");
+    $("#trash").classList.add("on");
+  }
+  e.preventDefault();
+  drag.ghost.style.left = (e.clientX - 40) + "px";
+  drag.ghost.style.top  = (e.clientY - 22) + "px";
+
+  const under = document.elementFromPoint(e.clientX, e.clientY);
+  const zone = under && under.closest(".side");
+  const bin  = under && under.closest("#trash");
+  document.querySelectorAll(".side.over").forEach(n => n.classList.remove("over"));
+  $("#trash").classList.toggle("over", !!bin);
+  if (zone && zone.dataset.side === drag.from.s) zone.classList.add("over");
+}
+
+function onDragEnd(e) {
+  window.removeEventListener("pointermove", onDragMove);
+  if (!drag) return;
+  const d = drag; drag = null;
+  if (!d.live) return;                       // a plain tap: open the params
+  swallowClick = true;                       // ...but a drag must not open it
+  d.ghost.remove();
+  d.chip.classList.remove("lifted");
+  $("#trash").classList.remove("on", "over");
+  document.querySelectorAll(".side.over").forEach(n => n.classList.remove("over"));
+
+  const under = document.elementFromPoint(e.clientX, e.clientY);
+  const zone = under && under.closest(".side");
+  const bin  = under && under.closest("#trash");
+  const brain = cur().brain;
+  const [moved] = brain[d.from.r][d.from.s].splice(d.from.i, 1);
+
+  if (!bin && zone && zone.dataset.side === d.from.s)
+    brain[+zone.dataset.row][zone.dataset.side].push(moved);
+  else if (!bin)
+    brain[d.from.r][d.from.s].splice(d.from.i, 0, moved);   // put it back
+  renderRows();
+}
+
+// chips answer a tap by opening their parameters
+document.addEventListener("click", e => {
+  if (swallowClick) { swallowClick = false; return; }
+  const chip = e.target.closest("#rows .chip");
+  if (!chip) return;
+  const r = +chip.dataset.row, s = chip.dataset.side, i = +chip.dataset.i;
+  openParams(s, cur().brain[r][s][i], r, i);
+});
+
+// ------------------------------------------------- where games are kept
+//
+// Two backends behind one interface. With the Python server running we read
+// and write games/ directly. Opened as a plain static page -- GitHub Pages,
+// or a file on the phone -- we fall back to files the server baked out, keep
+// edits in the browser, and optionally commit them through the GitHub API.
+
+const LS_GAME = "spark:game:", LS_GH = "spark:github";
+
+const store = {
+  mode: "static",
+
+  async init() {
+    try {
+      const res = await fetch("api/tiles", {cache: "no-store"});
+      if (res.ok) { this.mode = "server"; return await res.json(); }
+    } catch (e) { /* no server here -- static it is */ }
+    this.mode = "static";
+    // A missing file 404s; opening index.html straight off the SD card makes
+    // fetch throw outright, because file:// pages may not read siblings.
+    let res;
+    try {
+      res = await fetch("tiles.json", {cache: "no-store"});
+    } catch (e) {
+      throw new Error("cannot read tiles.json — open this page through " +
+                      "`python3 spark.py edit` or the GitHub Pages link, " +
+                      "not as a file:// path");
+    }
+    if (!res.ok) throw new Error("tiles.json missing — run: python3 spark.py export");
+    return await res.json();
+  },
+
+  localNames() {
+    return Object.keys(localStorage)
+      .filter(k => k.startsWith(LS_GAME))
+      .map(k => k.slice(LS_GAME.length));
+  },
+
+  async listGames() {
+    if (this.mode === "server")
+      return await (await fetch("api/games")).json();
+    let shipped = [];
+    try {
+      const res = await fetch("games/index.json", {cache: "no-store"});
+      if (res.ok) shipped = await res.json();
+    } catch (e) { /* fine, browser copies only */ }
+    return [...new Set([...shipped, ...this.localNames()])].sort();
+  },
+
+  async loadGame(name) {
+    if (this.mode === "server") {
+      const res = await fetch("api/game?name=" + encodeURIComponent(name));
+      return res.ok ? await res.json() : null;
+    }
+    const mine = localStorage.getItem(LS_GAME + name);   // your edits win
+    if (mine) return JSON.parse(mine);
+    try {
+      const res = await fetch("games/" + encodeURIComponent(name) + ".json",
+                              {cache: "no-store"});
+      return res.ok ? await res.json() : null;
+    } catch (e) { return null; }
+  },
+
+  async saveGame(proj) {
+    const safe = String(proj.name || "").replace(/[^A-Za-z0-9 _-]/g, "").trim();
+    if (!safe) return {error: "give the game a name"};
+    proj.name = safe;
+
+    if (this.mode === "server") {
+      const res = await fetch("api/game", {method: "POST",
+        headers: {"Content-Type": "application/json"}, body: JSON.stringify(proj)});
+      const out = await res.json();
+      return res.ok ? {where: "games/" + safe + ".json"} : {error: out.error};
+    }
+
+    localStorage.setItem(LS_GAME + safe, JSON.stringify(proj));
+    const gh = ghConfig();
+    if (!gh) return {where: "this browser"};
+    try {
+      await ghPut("games/" + safe + ".json", JSON.stringify(proj, null, 2),
+                  "spark: save " + safe, gh);
+      const names = await this.listGames();
+      await ghPut("games/index.json", JSON.stringify(names, null, 2),
+                  "spark: update game list", gh);
+      return {where: "this browser + " + gh.owner + "/" + gh.repo};
+    } catch (e) {
+      return {where: "this browser", warn: "GitHub: " + e.message};
+    }
+  },
+};
+
+// ---- committing to GitHub from the phone, via a fine-grained token --------
+
+function ghConfig() {
+  try {
+    const c = JSON.parse(localStorage.getItem(LS_GH) || "null");
+    return (c && c.owner && c.repo && c.token) ? c : null;
+  } catch (e) { return null; }
+}
+
+function b64(text) {
+  const bytes = new TextEncoder().encode(text);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+async function ghPut(path, text, message, gh) {
+  const url = "https://api.github.com/repos/" + gh.owner + "/" + gh.repo +
+              "/contents/" + path;
+  const headers = {Authorization: "Bearer " + gh.token,
+                   Accept: "application/vnd.github+json"};
+  const branch = gh.branch || "main";
+
+  let sha;                                   // updating a file needs its sha
+  const head = await fetch(url + "?ref=" + branch, {headers});
+  if (head.ok) sha = (await head.json()).sha;
+
+  const res = await fetch(url, {method: "PUT", headers,
+    body: JSON.stringify({message, content: b64(text), branch,
+                          ...(sha ? {sha} : {})})});
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({}));
+    throw new Error(detail.message || ("HTTP " + res.status));
+  }
+}
+
+function openGitHubSettings() {
+  const gh = JSON.parse(localStorage.getItem(LS_GH) || "{}");
+  const form = $("#dlgform");
+  form.textContent = "";
+  form.append(el("h3", null, "commit saves to GitHub"));
+  form.append(el("div", "note",
+    "Optional. Games always save in this browser. Add a fine-grained token " +
+    "with Contents: read and write on this one repo, and saving also commits " +
+    "games/*.json. The token is stored in this browser only — anyone with " +
+    "the phone unlocked can read it."));
+
+  const fields = {};
+  for (const [key, label, ph] of [["owner","github user","your-username"],
+                                  ["repo","repo","spark"],
+                                  ["branch","branch","main"],
+                                  ["token","token (ghp_... )","paste here"]]) {
+    const n = el("input");
+    n.type = key === "token" ? "password" : "text";
+    n.value = gh[key] || (key === "branch" ? "main" : "");
+    n.placeholder = ph;
+    fields[key] = n;
+    form.append(field(label, n));
+  }
+
+  const btns = el("div", "dlgbtns");
+  const clear = el("button", "danger", "forget token");
+  clear.type = "button";
+  clear.onclick = () => { localStorage.removeItem(LS_GH); $("#dlg").close();
+                          say("token forgotten"); };
+  const done = el("button", null, "done");
+  done.type = "button";
+  done.onclick = () => {
+    const next = {};
+    for (const k in fields) next[k] = fields[k].value.trim();
+    localStorage.setItem(LS_GH, JSON.stringify(next));
+    $("#dlg").close();
+    say(ghConfig() ? "saves will also commit to " + next.owner + "/" + next.repo
+                   : "saving in this browser only");
+  };
+  btns.append(clear, done);
+  form.append(btns);
+  $("#dlg").showModal();
+}
+
+// ---------------------------------------------------------------- wiring up
+
+async function loadGames(pick) {
+  const names = await store.listGames();
+  const sel = $("#games"); sel.textContent = "";
+  for (const n of names) {
+    const o = el("option", null, n); o.value = n;
+    if (n === pick) o.selected = true;
+    sel.append(o);
+  }
+  if (pick && !names.includes(pick)) {
+    const o = el("option", null, pick + " (unsaved)");
+    o.value = pick; o.selected = true; sel.append(o);
+  }
+}
+
+async function openGame(name) {
+  const loaded = await store.loadGame(name);
+  if (!loaded) return say("could not open " + name);
+  project = loaded;
+  project.characters ||= []; project.world ||= {};
+  for (const c of project.characters) {
+    c.brain ||= [];
+    for (const row of c.brain) { row.when ||= []; row.do ||= []; }
+  }
+  charIdx = 0; rowIdx = 0; renderAll();
+  say("opened " + name);
+}
+
+$("#games").onchange = e => openGame(e.target.value);
+
+$("#new").onclick = async () => {
+  const name = prompt("name your game", "mygame");
+  if (!name) return;
+  project = blankProject(name.trim());
+  charIdx = 0; rowIdx = 0;
+  await loadGames(project.name);
+  renderAll();
+  say("new game - press save to write it to games/");
+};
+
+$("#save").onclick = async () => {
+  const out = await store.saveGame(project);
+  if (out.error) return say(out.error);
+  await loadGames(project.name);
+  say("saved to " + out.where + (out.warn ? " — " + out.warn : ""));
+};
+
+$("#gear").onclick = openGitHubSettings;
+
+$("#addrow").onclick = () => {
+  const c = cur();
+  if (!c) return say("add a character first");
+  c.brain.push({when:[], do:[]});
+  rowIdx = c.brain.length - 1;
+  renderRows();
+};
+
+for (const tab of document.querySelectorAll("#tabs button"))
+  tab.onclick = () => {
+    side = tab.dataset.side;
+    document.querySelectorAll("#tabs button").forEach(b => b.classList.remove("on"));
+    tab.classList.add("on");
+    renderPalette();
+  };
+
+(async function boot() {
+  try {
+    catalog = await store.init();
+  } catch (e) {
+    $("#status").textContent = e.message;
+    return;
+  }
+  const names = await store.listGames();
+  await loadGames(names[0]);
+  if (names.length) await openGame(names[0]);
+  else { project = blankProject("mygame"); renderAll(); }
+  $("#gear").hidden = (store.mode === "server");
+  say(store.mode === "server" ? "saving to games/ on this phone"
+                              : "saving in this browser");
+})();
+</script>
+</body>
+</html>
