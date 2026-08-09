@@ -12,6 +12,26 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ---
 
+## 0.6.1 — 2026-08-09
+
+### Added
+
+- **cloudflared is now installed** on this phone, in both Termux and the PRoot
+  distro, so `spark.py host --public` works without further setup. Confirmed
+  end to end: the public address served the editor, and a stranger asking for
+  the game list through it was refused, which is the owner-key fix doing its job
+  from the far side of the internet.
+
+### Fixed
+
+- The instructions said `pkg install cloudflared`. That is wrong here: `pkg`
+  refuses to run as root, which is what you are inside the PRoot distro. The
+  documents and the message Spark prints when no tunnel is found now give the
+  method that actually works — fetching the `aarch64` binary from Cloudflare's
+  releases.
+
+---
+
 ## 0.6.0 — 2026-08-09
 
 Other people. Spark can now be shared — a world several of you are in at once,

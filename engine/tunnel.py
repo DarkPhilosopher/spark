@@ -7,8 +7,11 @@ addresses, forwarding anything that arrives back down to Spark.
 Spark does not ship one and cannot install one. It looks for a tunnel you have
 already installed, runs it, and reads the address out of its output.
 
-    cloudflared   pkg install cloudflared   no account needed for a quick link
-    ngrok         pkg install ngrok         needs a free account and a token
+    cloudflared   no account needed, gives you a throwaway address
+    ngrok         needs a free account and a token
+
+See MANUAL.md for how to install cloudflared -- `pkg install` refuses to run as
+root, so inside the PRoot distro the binary has to be fetched directly.
 """
 
 import re
@@ -33,9 +36,12 @@ def available():
 
 
 def advice():
-    return ("No tunnel program found. Install one first:\n"
-            "    pkg install cloudflared     (no account needed)\n"
-            "    pkg install ngrok           (free account, then `ngrok config`)\n"
+    return ("No tunnel program found. Install cloudflared:\n"
+            "    curl -L -o ~/../usr/bin/cloudflared \\\n"
+            "      https://github.com/cloudflare/cloudflared/releases/latest"
+            "/download/cloudflared-linux-arm64\n"
+            "    chmod +x ~/../usr/bin/cloudflared\n"
+            "(MANUAL.md has the full instructions, including for PRoot.)\n"
             "Without one, others can still join over your wifi.")
 
 

@@ -40,7 +40,7 @@ no packages, no internet needed to run.
 |---|---|---|
 | Any browser | the drag-and-drop editor, and joining a shared game | the terminal menus do everything the browser does, except joining someone else's world |
 | A wifi network you and your friend are both on | live multiplayer | see the tunnel row below |
-| `cloudflared` or `ngrok` | live multiplayer with someone far away | wifi play still works; Spark tells you if neither is installed |
+| `cloudflared` or `ngrok` | live multiplayer with someone far away | wifi play still works; Spark tells you if neither is installed. cloudflared **is** installed on this phone |
 | `termux-api` package + Termux:API app | making `spark.py edit` open the browser for you | it prints the address for you to open yourself |
 | `git` and `gh` | putting Spark on GitHub | everything local still works |
 | `node` | running `tests/store.test.js` | the other test, `check_docs.py`, is Python |
@@ -257,14 +257,29 @@ immediately.
 
     python3 spark.py host --public
 
-This needs a tunnel program, which Spark does not include and cannot install:
+This needs a tunnel program. **cloudflared is already installed on this phone**,
+in both Termux and the PRoot distro, so this should work as-is.
 
-    pkg install cloudflared     no account needed, easiest
-    pkg install ngrok           free account, then run `ngrok config`
+If you ever need to install it again, note that `pkg install` refuses to run as
+root, which is what you are inside the PRoot distro. Fetch the binary instead —
+this phone is `aarch64`:
 
-Spark runs whichever it finds and prints an address anyone in the world can
-open. It changes every time and stops working when you stop Spark. If neither is
-installed, Spark says so and carries on serving your wifi.
+    # for Termux
+    curl -L -o $PREFIX/bin/cloudflared \
+      https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64
+    chmod +x $PREFIX/bin/cloudflared
+
+    # for the PRoot distro
+    curl -L -o /usr/local/bin/cloudflared \
+      https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64
+    chmod +x /usr/local/bin/cloudflared
+
+Check it with `cloudflared --version`.
+
+Spark runs whichever tunnel it finds and prints an address anyone in the world
+can open, like `https://butter-illinois-residents-ended.trycloudflare.com`. It
+is different every time and stops working the moment you stop Spark. If no
+tunnel is installed, Spark says so and carries on serving your wifi.
 
 Why this is needed: your phone has no address the internet can dial. A tunnel
 borrows one from a company's server and forwards it to you. That is the only way

@@ -310,10 +310,12 @@ Revoke a code at any time. Anyone who joined with it is removed with it.
 
     python3 spark.py host --public
 
-That needs a tunnel program installed already — `pkg install cloudflared` is the
-easy one. Spark runs it and prints an address that works from anywhere. Without
-one, it says so and wifi still works. Your phone has no address the internet can
-dial by itself; that is how mobile networks are, not something Spark can fix.
+That needs a tunnel program, and **cloudflared is already installed here**, so it
+should just work. Spark runs it and prints an address anyone in the world can
+open. Without one, it says so and wifi still works. Your phone has no address the
+internet can dial by itself; that is how mobile networks are, not something Spark
+can fix. [MANUAL.md](MANUAL.md) has installation instructions if you ever need
+them again — `pkg install` will not do it, because it refuses to run as root.
 
 **Two things worth knowing.** When you share, being on the phone is no longer
 enough to make you the owner — you must open the link with the key in it, which
