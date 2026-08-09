@@ -352,14 +352,19 @@ def main_menu(project=None):
                        "start a new game", "open a game"]
         else:
             print(" nothing open yet\n")
-            options = ["start a new game", "open a game"]
+            options = ["learn how (guided, about ten minutes)",
+                       "start a new game", "open a game"]
         choice = menu(options, "pick a number", back_label="quit")
         if choice is None:
             print("bye")
             return
         label = options[choice]
 
-        if label == "play it":
+        if label == "learn how (guided, about ten minutes)":
+            from . import tutorial
+            saved = tutorial.run()
+            project = brain.load(saved)
+        elif label == "play it":
             runner.play(project)
         elif label == "characters and their brains":
             characters_screen(project)

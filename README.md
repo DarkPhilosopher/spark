@@ -58,8 +58,19 @@ inside PRoot (`python3`). Nothing else needs installing.
 
 ## Start it
 
-There are three ways in. All of them edit the same `games/*.json` files, so you
-can start a game in one and finish it in another.
+**Never used it before? Start here:**
+
+    cd ~/spark
+    python3 spark.py tutorial
+
+Ten short lessons in the terminal that build a real game one row at a time. You
+pick the tiles yourself and play what you have built four times along the way.
+It takes about ten minutes, runs entirely on your phone with no internet, and
+leaves you with a game saved in `games/`. It is also the first item on the main
+menu, as *learn how*.
+
+Otherwise, there are three ways in. All of them edit the same `games/*.json`
+files, so you can start a game in one and finish it in another.
 
 ### 1. Drag and drop, in your browser
 
@@ -187,6 +198,7 @@ Some other rules worth knowing:
 
 | Command | What it does |
 |---|---|
+| `python3 spark.py tutorial` | ten guided lessons that build your first game |
 | `python3 spark.py` | the terminal menus |
 | `python3 spark.py edit` | the browser editor on port 8765 |
 | `python3 spark.py edit 9000` | same, on a port you choose |
@@ -223,6 +235,7 @@ Some other rules worth knowing:
     engine/world.py      the grid, the characters, and the rule engine
     engine/brain.py      reading and writing game files
     engine/builder.py    the terminal menus
+    engine/tutorial.py   the ten guided lessons
     engine/runner.py     the keyboard and the drawing
     engine/server.py     serves the editor, reads and writes games/
     engine/status.py     works out the Github / Browser / Local flags

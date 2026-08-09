@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Spark -- build a game by snapping tiles together. No typing code.
 
+    python3 spark.py tutorial              learn it by building a game, offline
     python3 spark.py                       open the menu
     python3 spark.py edit [port]           open the drag-and-drop editor (8765)
     python3 spark.py host [port]           same, but open to others on this wifi
@@ -64,6 +65,10 @@ def main():
             print("  %s %s %s  (%s)" % (game, arrow, where, what))
         if not results:
             print("nothing to " + args[0])
+        return
+    if args and args[0] == "tutorial":
+        from engine import tutorial
+        tutorial.run()
         return
     if args and args[0] == "status":
         from engine import status

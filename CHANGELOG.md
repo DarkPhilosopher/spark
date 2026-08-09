@@ -12,6 +12,30 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ---
 
+## 0.7.0 — 2026-08-09
+
+A way in for someone who has never done this before.
+
+### Added
+
+- **`python3 spark.py tutorial`** — ten guided lessons in the terminal that
+  build a real, playable game one row at a time. Runs entirely on the phone:
+  no browser, no wifi, no GitHub, nothing to install.
+- It is also the first item on the main menu, worded as **learn how**, because
+  somebody meeting Spark for the first time has no reason to know a command
+  exists.
+- The lessons **ask you which tile does the job** rather than telling you.
+  A wrong answer is explained and you try again; nothing is scored and nothing
+  is lost. Being handed the answer teaches nothing.
+- It **offers to play what you have built** at four points along the way, so
+  each idea is felt rather than described.
+- Lesson 6 is about the word **"it"** alone, since that is the single idea that
+  makes tiles connect to each other, and it is the thing people miss.
+- At the end you **name the game and keep it**, saved into `games/` like any
+  other and openable in either editor.
+
+---
+
 ## 0.6.1 — 2026-08-09
 
 ### Added

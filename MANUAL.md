@@ -7,6 +7,7 @@ turning on the browser interface and GitHub.
 
 ## Contents
 
+- [The tutorial](#the-tutorial)
 - [System requirements](#system-requirements)
 - [Controls: playing a game](#controls-playing-a-game)
 - [Controls: the terminal menus](#controls-the-terminal-menus)
@@ -20,6 +21,45 @@ turning on the browser interface and GitHub.
 - [What each of the three connections gives you](#what-each-of-the-three-connections-gives-you)
 
 ---
+
+## The tutorial
+
+    cd ~/spark
+    python3 spark.py tutorial
+
+Or pick **learn how** from the main menu. It needs nothing but Termux and
+Python — no browser, no wifi, no GitHub account. Everything happens on the
+phone.
+
+Ten lessons, about ten minutes:
+
+| # | Lesson | What you end up with |
+|---|---|---|
+| 1 | What a game is here | the WHEN / DO idea |
+| 2 | Your character | a hero, drawn how you like |
+| 3 | Making it move | four rows wired to the arrow keys |
+| 4 | Something to collect | five apples |
+| 5 | Picking them up | a scoring row with three DO tiles |
+| 6 | The most important word: it | why tiles connect at all |
+| 7 | Winning | an ending |
+| 8 | An enemy | a bug that chases you |
+| 9 | Getting hurt | a chase with consequences |
+| 10 | It is yours now | the game saved under your own name |
+
+How it works:
+
+- **You choose the tiles.** Each lesson asks which tile does the job, from
+  three plausible options. A wrong answer is explained and you try again —
+  nothing is lost and nothing is scored.
+- **You play as you go.** At four points it offers to run what you have built
+  so far. Press `q` to come back. Answer `n` to skip.
+- **It leaves you a real game.** At the end you name it and it is saved into
+  `games/` like any other, openable in the menus or the drag-and-drop editor.
+- **Stopping.** Ctrl-C leaves at any point. Nothing is saved until lesson 10,
+  so starting again is no loss.
+
+Run it as many times as you like — give the game a different name each time and
+they all keep.
 
 ## System requirements
 
@@ -87,8 +127,9 @@ Everything is a numbered list. Type the number, press enter.
 
 The screens, in order of depth:
 
-1. **Main menu** — play, characters, world settings, save, rename, send to
-   GitHub, new game, open a game.
+1. **Main menu** — with nothing open: *learn how* (the tutorial), new game, open
+   a game. With a game open: play, characters, world settings, save, rename,
+   send to GitHub, invite someone to play, new game, open a game.
 2. **Characters** — add a character, or pick one to edit.
 3. **One character** — its brain, its letter, colour, health, how many start,
    player or prop, solid or walk-through, delete.
@@ -138,6 +179,7 @@ Run these from inside the spark folder (`cd ~/spark` in Termux).
 
 | Command | Does |
 |---|---|
+| `python3 spark.py tutorial` | ten guided lessons, offline, building a real game |
 | `python3 spark.py` | open the terminal menus |
 | `python3 spark.py games/chase.json` | open the menus with that game loaded |
 | `python3 spark.py edit` | start the browser editor on port 8765 |
