@@ -12,6 +12,66 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ---
 
+## 0.6.0 — 2026-08-09
+
+Other people. Spark can now be shared — a world several of you are in at once,
+or a repo someone else can edit.
+
+### Added
+
+- **`python3 spark.py host`** — the editor, but open to everyone on your wifi.
+  It prints the address they type in. `spark.py edit` is unchanged and still
+  only listens to this phone.
+- **A shared world.** The host runs the game; everyone else's browser draws it
+  and sends keypresses. Each person drives their own character, so two people
+  can move at the same time without treading on each other.
+- **Invite codes with permissions.** The host makes a code and says what it is
+  worth:
+  - **edit** — change games and save them, and play
+  - **play** — join the world and press keys, nothing else
+  - **watch** — see the world, press nothing
+  A code can also say which character that person drives, either their own copy
+  of the player character or a named one. Codes can be revoked, which also
+  removes anyone who used them.
+- **Where to make codes:** the terminal main menu → *invite someone to play*,
+  or the 👥 button in the browser.
+- **On-screen controls** for the shared game, so a phone with no keyboard can
+  play.
+- **`python3 spark.py host --public`** — runs a tunnel program you have already
+  installed (cloudflared or ngrok) and prints an address anyone in the world can
+  use. If neither is installed it says so plainly and carries on over wifi.
+- **`python3 spark.py people`** — who else can reach your GitHub repo, and
+  `python3 spark.py people NAME` to let another GitHub user in as an editor
+  (push access) or with `--player` as a reader.
+- **Two test files**: `check_permissions.py` (36 checks) and
+  `check_multiplayer.py` (12 checks).
+
+### Changed
+
+- A character can now be driven by a named player. Solo play is untouched: a
+  character nobody has claimed still answers to the keyboard in front of it.
+
+### Fixed
+
+- **A hole worth understanding.** Spark decided you were the owner if your
+  request came from the phone itself. That is fine while only the phone can
+  reach it — but a tunnel forwards the whole internet through the phone, so
+  every stranger would have arrived looking like the owner and could have
+  deleted your games. Now, whenever Spark is shared, being on the phone proves
+  nothing: the owner has to present a key that is printed in the terminal at
+  startup and put in the link it opens for you.
+
+### Known limits
+
+- Live play needs everyone on the same wifi, or a tunnel. A phone has no address
+  the internet can dial on its own; that is a fact about mobile networks, not
+  something Spark can fix.
+- The tunnel address changes every time you start it, and dies when you stop.
+- Guests are trusted not to hammer the server; there is no rate limiting. Do not
+  hand codes to people you would not hand your phone to.
+
+---
+
 ## 0.5.0 — 2026-08-09
 
 Moving single worlds between the phone and GitHub, and renaming what you have

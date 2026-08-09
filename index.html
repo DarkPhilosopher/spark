@@ -84,6 +84,23 @@
   dialog::backdrop{background:#000b}
   dialog h3{margin:0 0 10px;font-size:15px}
   .note{font-size:12px;color:var(--dim);margin-bottom:10px}
+
+  /* ---- shared world ---- */
+  #stage{display:none;padding:0 8px}
+  #stage.on{display:block}
+  #grid{font:12px/1.05 ui-monospace,monospace;white-space:pre;overflow-x:auto;
+        background:#0d0f12;border:1px solid var(--line);border-radius:10px;
+        padding:8px;letter-spacing:1px}
+  #hud{display:flex;gap:12px;font-size:12px;color:var(--dim);padding:6px 2px}
+  #hud b{color:var(--ink)}
+  #pad{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-width:260px;
+       margin:10px auto}
+  #pad button{padding:16px 0;font-size:18px}
+  #pad .wide{grid-column:1/4}
+  #people{font-size:12px;color:var(--dim);padding:4px 2px}
+  .pill{display:inline-block;background:var(--panel2);border:1px solid var(--line);
+        border-radius:12px;padding:2px 9px;margin:2px 4px 2px 0;font-size:12px}
+  .code{font:16px/1.4 ui-monospace,monospace;letter-spacing:.18em;color:var(--accent)}
   .dlgbtns{display:flex;gap:8px;margin-top:14px}
   .dlgbtns button{flex:1}
   .danger{border-color:var(--bad);color:#ff9a94}
@@ -94,11 +111,26 @@
 <header>
   <select id="games" aria-label="open a game"></select>
   <button id="gear" title="commit saves to GitHub" hidden>⚙</button>
+  <button id="people-btn" title="share and multiplayer" hidden>👥</button>
   <button id="new">new</button>
   <button id="save">save</button>
 </header>
 <div id="where">Spark exe</div>
 <div id="status"></div>
+
+<div id="stage">
+  <div id="hud"></div>
+  <div id="grid"></div>
+  <div id="people"></div>
+  <div id="pad">
+    <span></span><button data-key="up">▲</button><span></span>
+    <button data-key="left">◀</button>
+    <button data-key="space">●</button>
+    <button data-key="right">▶</button>
+    <span></span><button data-key="down">▼</button><span></span>
+    <button class="wide" id="leave">leave the game</button>
+  </div>
+</div>
 
 <h2>characters</h2>
 <div class="strip" id="cast"></div>
@@ -495,8 +527,11 @@ const store = {
   },
 
   async listGames() {
-    if (this.mode === "server")
-      return await (await fetch("api/games")).json();
+    if (this.mode === "server") {
+      const res = await api("api/games");
+      if (res.status === 403) return null;    // a guest, not an editor
+      return await res.json();
+    }
     let shipped = [];
     try {
       const res = await fetch("games/index.json", {cache: "no-store"});
@@ -507,7 +542,7 @@ const store = {
 
   async loadGame(name) {
     if (this.mode === "server") {
-      const res = await fetch("api/game?name=" + encodeURIComponent(name));
+      const res = await api("api/game?name=" + encodeURIComponent(name));
       return res.ok ? await res.json() : null;
     }
     const mine = localStorage.getItem(LS_GAME + name);   // your edits win
@@ -521,7 +556,7 @@ const store = {
 
   async deleteGame(name) {
     if (this.mode === "server")
-      await fetch("api/game?name=" + encodeURIComponent(name), {method: "DELETE"});
+      await api("api/game?name=" + encodeURIComponent(name), {method: "DELETE"});
     localStorage.removeItem(LS_GAME + name);
   },
 
@@ -531,7 +566,7 @@ const store = {
     proj.name = safe;
 
     if (this.mode === "server") {
-      const res = await fetch("api/game", {method: "POST",
+      const res = await api("api/game", {method: "POST",
         headers: {"Content-Type": "application/json"}, body: JSON.stringify(proj)});
       const out = await res.json();
       return res.ok ? {where: "games/" + safe + ".json"} : {error: out.error};
@@ -633,6 +668,246 @@ function openGitHubSettings() {
   $("#dlg").showModal();
 }
 
+// ------------------------------------------------------------ shared world
+//
+// The host runs the world; everyone else sends keys and draws what comes back.
+// Who you are is decided by the invite code you typed, and the server enforces
+// it -- hiding a button here is only tidiness, never the actual protection.
+
+const LS_TOKEN = "spark:token", LS_OWNER = "spark:ownerkey";
+
+let me = {role: "owner", name: "host"};   // until told otherwise
+let livePoll = null, pressed = new Set();
+
+function ownerKey() {
+  const fromUrl = /[#&]owner=([\w-]+)/.exec(location.hash || "");
+  if (fromUrl) {
+    localStorage.setItem(LS_OWNER, fromUrl[1]);
+    history.replaceState(null, "", location.pathname + location.search);
+    return fromUrl[1];
+  }
+  return localStorage.getItem(LS_OWNER) || "";
+}
+
+function authHeaders() {
+  const headers = {};
+  const token = localStorage.getItem(LS_TOKEN);
+  const key = ownerKey();
+  if (token) headers["X-Spark-Token"] = token;
+  if (key) headers["X-Spark-Owner"] = key;
+  return headers;
+}
+
+async function api(path, options = {}) {
+  return fetch(path, {...options,
+    headers: {...(options.headers || {}), ...authHeaders()}});
+}
+
+function amEditor() { return me.role === "owner" || me.role === "edit"; }
+
+function showStage(on) {
+  $("#stage").classList.toggle("on", on);
+  for (const id of ["#rows", "#props", "#palette", "#addrow", "#cast"])
+    document.querySelectorAll(id).forEach(n => n.style.display = on ? "none" : "");
+  document.querySelectorAll("details").forEach(n => n.style.display = on ? "none" : "");
+  document.querySelectorAll("h2").forEach(n => n.style.display = on ? "none" : "");
+  $("#save").hidden = on || !amEditor();
+  $("#new").hidden = on || !amEditor();
+  $("#games").hidden = on || !amEditor();
+}
+
+function drawWorld(snap) {
+  if (!snap.w) { $("#grid").textContent = "waiting for the host to start a game"; return; }
+  const grid = Array.from({length: snap.h}, () => Array(snap.w).fill(" "));
+  for (const [x, y, glyph] of snap.things)
+    if (y >= 0 && y < snap.h && x >= 0 && x < snap.w) grid[y][x] = glyph;
+  $("#grid").textContent = grid.map(row => row.join("")).join("\n");
+
+  const you = snap.you || {};
+  $("#hud").textContent = "";
+  const bits = [["score", snap.score], ["tick", snap.tick],
+                ["you", you.name + " (" + you.role + ")"]];
+  if (you.health != null) bits.splice(1, 0, ["health", you.health]);
+  for (const [label, value] of bits) {
+    const box = el("span"); box.append(label + " ");
+    box.append(el("b", null, String(value)));
+    $("#hud").append(box);
+  }
+  const people = $("#people"); people.textContent = "";
+  for (const person of snap.people || [])
+    people.append(el("span", "pill",
+      person.name + " · " + person.role + (person.playing ? " · playing" : "")));
+  if (snap.status) say(snap.status === "win" ? "WON" : "LOST");
+  else if (snap.message) say(snap.message);
+}
+
+async function pollLive() {
+  const res = await api("api/live");
+  if (!res.ok) { stopLive(); return say("the host ended your access"); }
+  const snap = await res.json();
+  me = snap.you || me;
+  drawWorld(snap);
+  if (pressed.size && me.role !== "watch") {
+    const keys = [...pressed];
+    pressed.clear();
+    api("api/key", {method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({keys})});
+  }
+}
+
+function startLive() {
+  showStage(true);
+  if (livePoll) clearInterval(livePoll);
+  livePoll = setInterval(pollLive, 130);
+  pollLive();
+}
+
+function stopLive() {
+  if (livePoll) clearInterval(livePoll);
+  livePoll = null;
+  showStage(false);
+}
+
+for (const button of document.querySelectorAll("#pad button[data-key]")) {
+  const send = e => { e.preventDefault(); pressed.add(button.dataset.key); };
+  button.addEventListener("pointerdown", send);
+}
+$("#leave").onclick = stopLive;
+
+document.addEventListener("keydown", e => {
+  if (!livePoll) return;
+  const named = {ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left",
+                 ArrowRight: "right", " ": "space"}[e.key];
+  const key = named || (e.key.length === 1 ? e.key.toLowerCase() : null);
+  if (key) { pressed.add(key); e.preventDefault(); }
+});
+
+// ---- joining someone else's world ----------------------------------------
+
+function openJoin() {
+  const form = $("#dlgform");
+  form.textContent = "";
+  form.append(el("h3", null, "join someone's game"));
+  form.append(el("div", "note",
+    "Ask the host for a code. What you may do is decided by the code: " +
+    "edit, play, or watch."));
+  const code = el("input"); code.placeholder = "ABC123";
+  code.style.textTransform = "uppercase";
+  const name = el("input"); name.placeholder = "your name"; name.value = "guest";
+  form.append(field("invite code", code), field("your name", name));
+
+  const btns = el("div", "dlgbtns");
+  const cancel = el("button", null, "cancel");
+  cancel.type = "button"; cancel.onclick = () => $("#dlg").close();
+  const go = el("button", null, "join");
+  go.type = "button";
+  go.onclick = async () => {
+    const res = await fetch("api/join", {method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({code: code.value.trim().toUpperCase(),
+                            name: name.value.trim()})});
+    const out = await res.json();
+    if (!res.ok) return say(out.error || "could not join");
+    localStorage.setItem(LS_TOKEN, out.token);
+    me = {role: out.role, name: out.name};
+    $("#dlg").close();
+    say("joined as " + out.role);
+    renderWhere();
+    startLive();
+  };
+  btns.append(cancel, go);
+  form.append(btns);
+  $("#dlg").showModal();
+}
+
+// ---- the host's panel -----------------------------------------------------
+
+async function openHostPanel() {
+  const res = await api("api/host/invites");
+  if (!res.ok) return openJoin();          // not the host: offer to join instead
+  const info = await res.json();
+  const form = $("#dlgform");
+  form.textContent = "";
+  form.append(el("h3", null, "share this game"));
+  form.append(el("div", "note",
+    "Others on this wifi open " + info.join_url + " and type a code. " +
+    "Each code decides what that person may do."));
+
+  const state = el("div", "note",
+    info.running ? "playing '" + info.game + "' now" : "no game running");
+  form.append(state);
+
+  const startBtn = el("button", null,
+    info.running ? "stop the shared game" : "start '" + (project?.name || "") + "' for everyone");
+  startBtn.type = "button";
+  startBtn.onclick = async () => {
+    await api(info.running ? "api/host/stop" : "api/host/start",
+      {method: "POST", headers: {"Content-Type": "application/json"},
+       body: JSON.stringify({game: project?.name})});
+    $("#dlg").close(); openHostPanel();
+  };
+  form.append(startBtn);
+
+  form.append(el("h3", null, "make a code"));
+  const role = select(["play", "edit", "watch"], "play", () => {});
+  const character = select(["own", ...(project?.characters || []).map(c => c.kind)],
+                           "own", () => {});
+  const note = el("input"); note.placeholder = "who is it for?";
+  form.append(field("they may", role), field("they drive", character),
+              field("label (for you)", note));
+
+  const make = el("button", null, "make the code");
+  make.type = "button";
+  make.onclick = async () => {
+    const res = await api("api/host/invite", {method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({role: role.value, character: character.value,
+                            note: note.value})});
+    if (res.ok) { $("#dlg").close(); openHostPanel(); }
+  };
+  form.append(make);
+
+  if (info.invites.length) {
+    form.append(el("h3", null, "codes in use"));
+    for (const invite of info.invites) {
+      const row = el("div", "note");
+      row.append(el("span", "code", invite.code));
+      row.append("  " + invite.role + " · " + invite.character +
+                 (invite.note ? " · " + invite.note : ""));
+      const kill = el("button", "danger", "revoke");
+      kill.type = "button"; kill.style.marginLeft = "8px";
+      kill.onclick = async () => {
+        await api("api/host/revoke", {method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({code: invite.code})});
+        $("#dlg").close(); openHostPanel();
+      };
+      row.append(kill);
+      form.append(row);
+    }
+  }
+  if (info.people.length) {
+    form.append(el("h3", null, "here now"));
+    const here = el("div");
+    for (const person of info.people)
+      here.append(el("span", "pill", person.name + " · " + person.role));
+    form.append(here);
+  }
+
+  const btns = el("div", "dlgbtns");
+  const watch = el("button", null, "watch the game");
+  watch.type = "button";
+  watch.onclick = () => { $("#dlg").close(); startLive(); };
+  const done = el("button", null, "close");
+  done.type = "button"; done.onclick = () => $("#dlg").close();
+  btns.append(watch, done);
+  form.append(btns);
+  $("#dlg").showModal();
+}
+
+$("#people-btn").onclick = openHostPanel;
+
 // ---------------------------------------------------------------- wiring up
 
 async function loadGames(pick) {
@@ -707,10 +982,28 @@ for (const tab of document.querySelectorAll("#tabs button"))
     return;
   }
   const names = await store.listGames();
+
+  if (names === null) {
+    // The server knows us as a guest, not an editor. There is nothing to edit
+    // here -- go straight to the game.
+    $("#people-btn").hidden = false;
+    $("#save").hidden = $("#new").hidden = $("#games").hidden = true;
+    project = blankProject("guest");
+    renderWhere();
+    if (localStorage.getItem(LS_TOKEN)) {
+      startLive();
+      say("rejoining…");
+    } else {
+      openJoin();
+    }
+    return;
+  }
+
   await loadGames(names[0]);
   if (names.length) await openGame(names[0]);
   else { project = blankProject("mygame"); renderAll(); }
   $("#gear").hidden = (store.mode === "server");
+  $("#people-btn").hidden = (store.mode !== "server");
   say(store.mode === "server" ? "saving to games/ on this phone"
                               : "saving in this browser");
 })();

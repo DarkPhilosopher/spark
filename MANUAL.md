@@ -13,6 +13,7 @@ turning on the browser interface and GitHub.
 - [Controls: the browser editor](#controls-the-browser-editor)
 - [Every command](#every-command)
 - [Connecting the browser interface](#connecting-the-browser-interface)
+- [Connecting another person: live play](#connecting-another-person-live-play)
 - [Connecting GitHub](#connecting-github)
 - [Moving games between phone and GitHub](#moving-games-between-phone-and-github)
 - [Renaming a game](#renaming-a-game)
@@ -37,7 +38,9 @@ no packages, no internet needed to run.
 
 | Thing | For what | If missing |
 |---|---|---|
-| Any browser | the drag-and-drop editor | the terminal menus do everything the browser does |
+| Any browser | the drag-and-drop editor, and joining a shared game | the terminal menus do everything the browser does, except joining someone else's world |
+| A wifi network you and your friend are both on | live multiplayer | see the tunnel row below |
+| `cloudflared` or `ngrok` | live multiplayer with someone far away | wifi play still works; Spark tells you if neither is installed |
 | `termux-api` package + Termux:API app | making `spark.py edit` open the browser for you | it prints the address for you to open yourself |
 | `git` and `gh` | putting Spark on GitHub | everything local still works |
 | `node` | running `tests/store.test.js` | the other test, `check_docs.py`, is Python |
@@ -112,6 +115,17 @@ The screens, in order of depth:
 | **+ character** | new character |
 | **save** | writes the game (see below for where) |
 | **⚙** | GitHub settings — only shown when there is no local server |
+| **👥** | share and multiplayer — only shown when there is one |
+
+In a shared game, the on-screen pad replaces the editor:
+
+| Button | Does |
+|---|---|
+| ▲ ▼ ◀ ▶ | the direction keys, for whoever your character is |
+| ● | the space key, usually shoot |
+| **leave the game** | back to the editor, or to the join screen if you are a guest |
+
+A real keyboard works too — arrows, space, and letter keys all get sent.
 
 Tap **world settings** to open width, height, speed, edge wrapping, and the
 **rename this game** button.
@@ -128,6 +142,12 @@ Run these from inside the spark folder (`cd ~/spark` in Termux).
 | `python3 spark.py games/chase.json` | open the menus with that game loaded |
 | `python3 spark.py edit` | start the browser editor on port 8765 |
 | `python3 spark.py edit 9000` | start it on a port you pick |
+| `python3 spark.py host` | the editor, open to others on this wifi |
+| `python3 spark.py host 9000` | same, on a port you pick |
+| `python3 spark.py host --public` | ...and to anyone, through a tunnel |
+| `python3 spark.py people` | list who can reach your GitHub repo |
+| `python3 spark.py people NAME` | let that GitHub user edit your games |
+| `python3 spark.py people NAME --player` | let them read it only |
 | `python3 spark.py play games/chase.json` | play a game right now |
 | `python3 spark.py play games/chase.json 200` | run 200 ticks with no display, for testing |
 | `python3 spark.py status` | print the Github / Browser / Local line |
@@ -174,6 +194,95 @@ Notes:
 - If port 8765 is busy, use another: `python3 spark.py edit 9000`.
 
 ---
+
+## Connecting another person: live play
+
+Everyone is in the same world at the same time, each driving their own
+character. One phone is the host and runs the game; everyone else's browser
+draws it and sends keypresses.
+
+### Step by step, on the same wifi
+
+**Step 1 — start hosting.** On your phone:
+
+    cd ~/spark
+    python3 spark.py host
+
+It prints two different addresses. They are not interchangeable:
+
+    You are hosting. Open this on THIS phone to be in charge:
+      http://127.0.0.1:8765/#owner=fNdicZw49F2qjKam     <- yours, keep private
+    Others on this wifi go to http://192.168.1.97:8765/  <- read this one out
+
+The first has a key in it that makes you the owner. Open it on your own phone.
+The second is the plain address for everyone else.
+
+**Step 2 — make a code.** Either:
+
+- terminal main menu → **invite someone to play** → pick what they may do, or
+- in the browser, the **👥** button → *make a code*.
+
+You get six characters, like `KQDAD5`.
+
+**Step 3 — start a game for everyone.** 👥 → **start '<your game>' for
+everyone**. Nothing is shared until you do this.
+
+**Step 4 — they join.** They open the second address, type the code and a name,
+and they are in. They get arrow buttons on screen, and a real keyboard works too
+if they have one.
+
+**Step 5 — watch or play along.** 👥 → **watch the game** puts you in the same
+view.
+
+To stop: 👥 → *stop the shared game*, or Ctrl-C in the terminal.
+
+### What each code is worth
+
+| Code says | Change games | Press keys | See the world |
+|---|---|---|---|
+| **edit** | yes | yes | yes |
+| **play** | no | yes | yes |
+| **watch** | no | no | yes |
+| no code | no | no | no |
+
+A code can also say **which character** that person drives — their own copy of
+your player character (the default), or a named one, so a friend could drive the
+bugs while you are the hero. Set that when you make the code.
+
+Codes can be handed to several people at once, or limited to a single use. To
+take access back, revoke the code: anyone who joined with it is dropped
+immediately.
+
+### Step by step, for someone far away
+
+    python3 spark.py host --public
+
+This needs a tunnel program, which Spark does not include and cannot install:
+
+    pkg install cloudflared     no account needed, easiest
+    pkg install ngrok           free account, then run `ngrok config`
+
+Spark runs whichever it finds and prints an address anyone in the world can
+open. It changes every time and stops working when you stop Spark. If neither is
+installed, Spark says so and carries on serving your wifi.
+
+Why this is needed: your phone has no address the internet can dial. A tunnel
+borrows one from a company's server and forwards it to you. That is the only way
+without renting a server.
+
+### Safety, in plain terms
+
+- **When you share, being on the phone is no longer enough to be the owner.**
+  You must open the link containing the key. This is deliberate: a tunnel makes
+  every visitor in the world *look* like they are on your phone, so if being on
+  the phone still counted, a stranger could delete your games.
+- **Your key is in that link.** Anyone you give it to is you. Read out the
+  second address, never the first.
+- **There is no rate limiting and no accounts.** A guest who wanted to could
+  spam the server. Give codes to people you would hand your phone to.
+- **Only the games folder is ever exposed.** No other file on your phone is
+  reachable, and every route refuses anyone whose code does not cover it.
+- Stopping Spark ends everything: all codes, all sessions, the tunnel.
 
 ## Connecting GitHub
 
@@ -255,6 +364,31 @@ delete it on github.com if you stop using it.
 
 ---
 
+### Part 4 — let another person edit your games
+
+This is the slow way of sharing: not the same world at the same time, but the
+same repo over days and weeks. They need a GitHub account.
+
+**Make them an editor** (they can change games and commit them back):
+
+    python3 spark.py people theirusername
+
+**Make them a reader:**
+
+    python3 spark.py people theirusername --player
+
+**See who already has access:**
+
+    python3 spark.py people
+
+GitHub emails them an invitation; access begins when they accept.
+
+One thing that surprises people: on a **public** repo, `--player` changes
+nothing, because anybody can already read a public repo and play from your Pages
+link. Reader access only means something if the repo is private.
+
+To remove someone, do it on github.com: **Settings → Collaborators → Remove**.
+
 ## Moving games between phone and GitHub
 
 Once Part 1 is done you do not need a token for this — it borrows your
@@ -315,3 +449,15 @@ from your repo.
 
 None of the three depends on the others. The terminal alone is a complete Spark;
 the browser makes it pleasant; GitHub makes it portable and backed up.
+
+## The two ways of sharing, compared
+
+| | Live play (`host`) | GitHub (`people`) |
+|---|---|---|
+| Same world at the same time | **yes** | no |
+| Works with no internet | **yes**, over wifi | no |
+| Works with someone far away | only with a tunnel | **yes**, always |
+| They need an account | no | a GitHub account |
+| Access lasts | until you stop Spark | until you remove them |
+| Permissions | edit / play / watch, per code | editor / player, per person |
+| Good for | playing together now | building together over time |

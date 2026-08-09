@@ -32,6 +32,7 @@ rows can hold more than one tile each, so the real number is much larger.
 - [Every command](#every-command)
 - [Where things live](#where-things-live)
 - [What a game file looks like](#what-a-game-file-looks-like)
+- [Playing with someone else](#playing-with-someone-else)
 - [Putting it on GitHub](#putting-it-on-github)
 - [Inventing a new tile](#inventing-a-new-tile)
 - [When something goes wrong](#when-something-goes-wrong)
@@ -189,6 +190,10 @@ Some other rules worth knowing:
 | `python3 spark.py` | the terminal menus |
 | `python3 spark.py edit` | the browser editor on port 8765 |
 | `python3 spark.py edit 9000` | same, on a port you choose |
+| `python3 spark.py host` | the editor, open to others on this wifi |
+| `python3 spark.py host --public` | ...and to anyone, through a tunnel |
+| `python3 spark.py people` | who else can reach your GitHub repo |
+| `python3 spark.py people NAME` | let a GitHub user edit your games |
 | `python3 spark.py play games/chase.json` | play a game straight away |
 | `python3 spark.py play games/chase.json 200` | run 200 ticks with no display, for testing |
 | `python3 spark.py status` | print the Github / Browser / Local line |
@@ -199,6 +204,8 @@ Some other rules worth knowing:
 | `node tests/store.test.js` | check the editor's save and load logic |
 | `python3 tests/check_docs.py` | check this README still matches the code |
 | `python3 tests/check_sync.py` | check the GitHub push/pull logic |
+| `python3 tests/check_permissions.py` | check guests cannot exceed their code |
+| `python3 tests/check_multiplayer.py` | check two players share one world |
 
 ---
 
@@ -220,9 +227,13 @@ Some other rules worth knowing:
     engine/server.py     serves the editor, reads and writes games/
     engine/status.py     works out the Github / Browser / Local flags
     engine/sync.py       push and pull single games to and from GitHub
+    engine/live.py       the shared world: invite codes, roles, connected people
+    engine/tunnel.py     finds and runs cloudflared or ngrok for public play
     tests/store.test.js  17 checks on the editor's save and load logic
     tests/check_docs.py  fails if this README has drifted from the code
     tests/check_sync.py  checks the GitHub push/pull logic, without the network
+    tests/check_permissions.py  checks a guest can only do what their code allows
+    tests/check_multiplayer.py  two players in one world, over real HTTP
 
 Two files are **generated** — do not edit them by hand:
 
@@ -269,6 +280,49 @@ text, and knowing the shape makes the whole thing less mysterious.
   `{"tile": "<id>", "args": {...}}`. That is the entire format.
 
 ---
+
+## Playing with someone else
+
+Instead of `edit`, run:
+
+    python3 spark.py host
+
+It prints two addresses. The first is for **you**, on this phone, and carries a
+key that makes you the owner. The second is the one you read out to whoever is
+on the same wifi.
+
+Then make them a code — terminal main menu → **invite someone to play**, or the
+👥 button in the browser. They open your address, type the code, and they are
+in. Everyone plays the same world at the same time, each driving their own
+character.
+
+The code decides what they may do:
+
+| Code says | They can |
+|---|---|
+| **edit** | change games and save them, and play |
+| **play** | join the world and press keys, nothing else |
+| **watch** | see the world, and nothing else |
+
+Revoke a code at any time. Anyone who joined with it is removed with it.
+
+**For people not on your wifi:**
+
+    python3 spark.py host --public
+
+That needs a tunnel program installed already — `pkg install cloudflared` is the
+easy one. Spark runs it and prints an address that works from anywhere. Without
+one, it says so and wifi still works. Your phone has no address the internet can
+dial by itself; that is how mobile networks are, not something Spark can fix.
+
+**Two things worth knowing.** When you share, being on the phone is no longer
+enough to make you the owner — you must open the link with the key in it, which
+is why the terminal prints it. And there is no rate limiting: hand codes to
+people you would hand your phone to.
+
+There is also a slower way to share, over GitHub instead of live —
+`python3 spark.py people NAME` lets another GitHub user edit your games. See
+[MANUAL.md](MANUAL.md).
 
 ## Putting it on GitHub
 

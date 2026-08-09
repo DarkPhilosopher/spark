@@ -29,6 +29,7 @@ class Thing:
         self.facing = (0, -1)
         self.owner = None
         self.alive = True
+        self.controller = None      # which player drives this one, if any
 
 
 class World:
@@ -50,11 +51,22 @@ class World:
         self.score = 0
         self.message = ""
         self.status = None          # None | "win" | "lose"
-        self.keys = set()
+        self.keys = set()           # keys at this device, for solo play
+        self.player_keys = {}       # player id -> keys, for a shared world
 
         for char in project.get("characters", []):
             for _ in range(char.get("count", 1)):
                 self.spawn_somewhere(char["kind"])
+
+    def keys_for(self, thing):
+        """Whose keypresses this character listens to.
+
+        Unclaimed characters answer to the keyboard in front of the world, so
+        a single-player game behaves exactly as it always did.
+        """
+        if thing.controller is None:
+            return self.keys
+        return self.player_keys.get(thing.controller, ())
 
     # -- grid queries ------------------------------------------------------
 

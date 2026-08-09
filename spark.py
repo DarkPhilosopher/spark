@@ -3,6 +3,10 @@
 
     python3 spark.py                       open the menu
     python3 spark.py edit [port]           open the drag-and-drop editor (8765)
+    python3 spark.py host [port]           same, but open to others on this wifi
+    python3 spark.py host --public         ...and to anyone, through a tunnel
+    python3 spark.py people                who else can get at your GitHub repo
+    python3 spark.py people NAME [--player]  let a GitHub user in as editor/player
     python3 spark.py play games/chase.json [ticks]   skip straight to playing
     python3 spark.py push [game ...]       overwrite games on GitHub with these
     python3 spark.py pull [game ...]       overwrite games here with GitHub's
@@ -23,9 +27,31 @@ from engine import brain, builder, runner  # noqa: E402
 
 def main():
     args = sys.argv[1:]
-    if args and args[0] == "edit":
+    if args and args[0] in ("edit", "host"):
         from engine import server
-        server.serve(port=int(args[1]) if len(args) > 1 else 8765)
+        port = int(args[1]) if len(args) > 1 and args[1].isdigit() else 8765
+        public = "--public" in args
+        if public and args[0] == "edit":
+            sys.exit("--public needs sharing on: use  spark.py host --public")
+        server.serve(port=port,
+                     bind="0.0.0.0" if args[0] == "host" else "127.0.0.1",
+                     public=public)
+        return
+
+    if args and args[0] == "people":
+        from engine import sync
+        try:
+            if len(args) > 1:
+                role = "player" if "--player" in args else "editor"
+                done = sync.add_person(args[1], role)
+                print("  %s is now an %s on %s%s"
+                      % (done["user"], done["role"], done["repo"],
+                         "" if not done["invited"] else " (invitation sent)"))
+            else:
+                for who, role in sync.people():
+                    print("  %-20s %s" % (who, role))
+        except sync.SyncError as err:
+            sys.exit(str(err))
         return
     if args and args[0] in ("push", "pull"):
         from engine import sync

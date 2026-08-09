@@ -280,6 +280,55 @@ def push_screen(project):
     ask("press enter")
 
 
+def invite_screen():
+    """Make and revoke codes for other people, from the terminal."""
+    from . import live, server
+    while True:
+        header("Invite someone")
+        session = live.SESSION
+        print(" They open %s in their browser" % server.lan_address(
+            _read_port() or 8765))
+        print(" and type one of these codes.\n")
+        if session.invites:
+            for code, invite in session.invites.items():
+                print("  %s   may %-5s  drives %-8s %s"
+                      % (code, invite.role, invite.character, invite.note))
+        else:
+            print("  (no codes yet)")
+        print()
+        choice = menu(["make a code that can play",
+                       "make a code that can edit too",
+                       "make a code that can only watch",
+                       "revoke a code"], back_label="done")
+        if choice is None:
+            return
+        if choice == 3:
+            if not session.invites:
+                continue
+            header("Revoke which code?")
+            codes = list(session.invites)
+            index = menu(codes)
+            if index is not None:
+                session.revoke(codes[index])
+            continue
+        role = ["play", "edit", "watch"][choice]
+        note = ask("Who is it for (just a label)", "")
+        invite = session.invite(role, "watch" if role == "watch" else "own", note)
+        header("Their code is")
+        print("\n      %s\n" % invite.code)
+        print(" They may %s. Revoke it here whenever you like." % role)
+        ask("press enter")
+
+
+def _read_port():
+    from . import status
+    try:
+        import json
+        return json.loads(status.STATE.read_text()).get("port")
+    except (OSError, ValueError):
+        return None
+
+
 def open_screen():
     games = brain.list_games()
     if not games:
@@ -299,7 +348,7 @@ def main_menu(project=None):
                   % (project["name"], len(project["characters"])))
             options = ["play it", "characters and their brains",
                        "world settings", "save", "rename this game",
-                       "send this game to GitHub",
+                       "send this game to GitHub", "invite someone to play",
                        "start a new game", "open a game"]
         else:
             print(" nothing open yet\n")
@@ -325,6 +374,8 @@ def main_menu(project=None):
             rename_screen(project)
         elif label == "send this game to GitHub":
             push_screen(project)
+        elif label == "invite someone to play":
+            invite_screen()
         elif label == "start a new game":
             name = ask("Name your game", "mygame").strip() or "mygame"
             project = brain.new_project(name)

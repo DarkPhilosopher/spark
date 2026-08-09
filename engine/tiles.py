@@ -102,7 +102,8 @@ def s_always(obj, world, a):
 @sensor("key", "key {key} is pressed",
         Param("key", "Which key?", "choice", KEYS, "up"))
 def s_key(obj, world, a):
-    return a["key"] in world.keys
+    # In a shared world each character answers only to its own player.
+    return a["key"] in world.keys_for(obj)
 
 
 @sensor("see", "I see {kind} within {range}",

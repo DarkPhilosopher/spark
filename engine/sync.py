@@ -124,6 +124,35 @@ def _resolve(names, available, what):
     return list(names)
 
 
+def add_person(username, role="editor"):
+    """Let another GitHub user in on the repo.
+
+    editor -> push access: they can change games and commit them back.
+    player -> pull access: they can read the repo. On a public repo that
+              changes nothing, because anyone can already read it and play
+              from the Pages link -- it only matters if the repo is private.
+    """
+    tok, (owner, name) = token(), repo()
+    permission = "push" if role == "editor" else "pull"
+    code, body = api("PUT", "/repos/%s/%s/collaborators/%s"
+                     % (owner, name, username), tok, {"permission": permission})
+    if code not in (201, 204):
+        raise SyncError(body.get("message", "GitHub said %d" % code))
+    invited = code == 201            # 204 means they were already in
+    return {"user": username, "role": role, "permission": permission,
+            "invited": invited, "repo": "%s/%s" % (owner, name)}
+
+
+def people():
+    """Who else can already get at the repo."""
+    tok, (owner, name) = token(), repo()
+    code, body = api("GET", "/repos/%s/%s/collaborators" % (owner, name), tok)
+    if code != 200:
+        raise SyncError(body.get("message", "GitHub said %d" % code))
+    return [(c["login"], "editor" if c["permissions"].get("push") else "player")
+            for c in body]
+
+
 def push(names=None, message=None):
     """Overwrite games on GitHub with the copies on this phone."""
     tok, (owner, name), ref = token(), repo(), branch()
