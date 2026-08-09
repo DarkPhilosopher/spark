@@ -2,8 +2,14 @@
 
 Build a game by snapping tiles together. You never type code.
 
-> **What changed and when:** [CHANGELOG.md](CHANGELOG.md), in the same folder as
-> this file. Every change to Spark is written down in both files.
+> Three documents live in this folder, and every change to Spark updates all
+> three that it touches:
+>
+> - **README.md** — this file. The guide: what Spark is and how to use it.
+> - **[MANUAL.md](MANUAL.md)** — the exact reference. System requirements, every
+>   key and button, every command, and step-by-step instructions for connecting
+>   the browser interface and GitHub.
+> - **[CHANGELOG.md](CHANGELOG.md)** — what changed, when, and why.
 
 A game is a cast of **characters**. Each character has a **brain**, and a brain
 is a list of rows. Every row reads the same way:
@@ -187,9 +193,12 @@ Some other rules worth knowing:
 | `python3 spark.py play games/chase.json 200` | run 200 ticks with no display, for testing |
 | `python3 spark.py status` | print the Github / Browser / Local line |
 | `python3 spark.py export` | rewrite `tiles.json` and `games/index.json` |
+| `python3 spark.py push [game ...]` | overwrite games on GitHub with this phone's |
+| `python3 spark.py pull [game ...]` | overwrite games here with GitHub's |
 | `python3 spark.py games/chase.json` | open the menus with that game already loaded |
 | `node tests/store.test.js` | check the editor's save and load logic |
 | `python3 tests/check_docs.py` | check this README still matches the code |
+| `python3 tests/check_sync.py` | check the GitHub push/pull logic |
 
 ---
 
@@ -198,6 +207,7 @@ Some other rules worth knowing:
     spark.py             the launcher — every command above goes through it
     index.html           the drag-and-drop editor (served locally or by Pages)
     README.md            this guide
+    MANUAL.md            controls, requirements, and how to connect things
     CHANGELOG.md         what changed and when
     tiles.json           the tile list, written out for when no server is running
     games/*.json         your games, one file each
@@ -209,8 +219,10 @@ Some other rules worth knowing:
     engine/runner.py     the keyboard and the drawing
     engine/server.py     serves the editor, reads and writes games/
     engine/status.py     works out the Github / Browser / Local flags
+    engine/sync.py       push and pull single games to and from GitHub
     tests/store.test.js  17 checks on the editor's save and load logic
     tests/check_docs.py  fails if this README has drifted from the code
+    tests/check_sync.py  checks the GitHub push/pull logic, without the network
 
 Two files are **generated** — do not edit them by hand:
 

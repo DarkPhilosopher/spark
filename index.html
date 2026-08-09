@@ -255,6 +255,22 @@ function renderProps() {
 function renderWorld() {
   const box = $("#world"); box.textContent = "";
   const w = project.world, grid = el("div", "grid");
+
+  const rename = el("button", null, "rename this game");
+  rename.onclick = async () => {
+    const was = project.name;
+    const now = (prompt("new name for this game", was) || "").trim();
+    if (!now || now === was) return;
+    project.name = now;
+    const out = await store.saveGame(project);
+    if (out.error) { project.name = was; return say(out.error); }
+    if (confirm("delete the old copy, '" + was + "'?")) await store.deleteGame(was);
+    await loadGames(project.name);
+    say("renamed to " + project.name + " — saved to " + out.where);
+  };
+  box.append(field("name", el("div", null, project.name)), rename,
+             el("div", "note", "renaming saves a fresh copy under the new name"));
+
   grid.append(
     field("width", input("number", w.width, v => w.width = Math.min(70, Math.max(5, v)))),
     field("height", input("number", w.height, v => w.height = Math.min(20, Math.max(5, v)))),
@@ -501,6 +517,12 @@ const store = {
                               {cache: "no-store"});
       return res.ok ? await res.json() : null;
     } catch (e) { return null; }
+  },
+
+  async deleteGame(name) {
+    if (this.mode === "server")
+      await fetch("api/game?name=" + encodeURIComponent(name), {method: "DELETE"});
+    localStorage.removeItem(LS_GAME + name);
   },
 
   async saveGame(proj) {

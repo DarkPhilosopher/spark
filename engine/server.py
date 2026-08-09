@@ -87,6 +87,19 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json(brain.load(path))
         self.send_error(404)
 
+    def do_DELETE(self):
+        url = urlparse(self.path)
+        status.note_browser()
+        if url.path != "/api/game":
+            return self.send_error(404)
+        name = (parse_qs(url.query).get("name") or [""])[0]
+        path = brain.GAMES_DIR / (name + ".json")
+        if not name or path.parent != brain.GAMES_DIR or not path.exists():
+            return self.send_json({"error": "no such game"}, 404)
+        path.unlink()
+        export_static()
+        return self.send_json({"deleted": name})
+
     def do_POST(self):
         url = urlparse(self.path)
         status.note_browser()

@@ -249,6 +249,37 @@ def world_screen(project):
 # top level
 # --------------------------------------------------------------------------
 
+def rename_screen(project):
+    """Rename the open game, taking its file with it."""
+    header("Rename '%s'" % project["name"])
+    was = project["name"]
+    now = ask("New name", was).strip()
+    if not now or now == was:
+        return
+    project["name"] = now
+    brain.save(project, brain.GAMES_DIR / (now + ".json"))
+    old = brain.GAMES_DIR / (was + ".json")
+    if old.exists() and ask_yes("Delete the old file '%s.json'" % was, True):
+        old.unlink()
+    print(" now saved as %s.json" % now)
+    ask("press enter")
+
+
+def push_screen(project):
+    from . import sync
+    header("Send '%s' to GitHub" % project["name"])
+    print(" This overwrites the copy on GitHub with the one on this phone.\n")
+    if not ask_yes("Go ahead", True):
+        return
+    try:
+        results, where = sync.push([project["name"]])
+        for game, what in results:
+            print("  %s -> %s  (%s)" % (game, where, what))
+    except sync.SyncError as err:
+        print("  " + str(err))
+    ask("press enter")
+
+
 def open_screen():
     games = brain.list_games()
     if not games:
@@ -267,7 +298,9 @@ def main_menu(project=None):
             print(" open: %s  (%d characters)\n"
                   % (project["name"], len(project["characters"])))
             options = ["play it", "characters and their brains",
-                       "world settings", "save", "start a new game", "open a game"]
+                       "world settings", "save", "rename this game",
+                       "send this game to GitHub",
+                       "start a new game", "open a game"]
         else:
             print(" nothing open yet\n")
             options = ["start a new game", "open a game"]
@@ -288,6 +321,10 @@ def main_menu(project=None):
             header("Saved")
             print(" " + str(path))
             ask("press enter")
+        elif label == "rename this game":
+            rename_screen(project)
+        elif label == "send this game to GitHub":
+            push_screen(project)
         elif label == "start a new game":
             name = ask("Name your game", "mygame").strip() or "mygame"
             project = brain.new_project(name)

@@ -12,6 +12,49 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ---
 
+## 0.5.0 — 2026-08-09
+
+Moving single worlds between the phone and GitHub, and renaming what you have
+already made.
+
+### Added
+
+- **`python3 spark.py push [game ...]`** — overwrite what is on GitHub with what
+  is on this phone. Name one world to send just that one, several to send those,
+  or none to send all of them. It uses the login you already did with
+  `gh auth login`, so there is no second token to keep.
+- **`python3 spark.py pull [game ...]`** — the same in reverse: GitHub's copy
+  replaces the one here.
+- **Send this game to GitHub** in the terminal main menu, which pushes whichever
+  game is open.
+- **Rename this game** — in the terminal main menu, and in the browser under
+  world settings. It saves under the new name and offers to delete the old copy.
+- **[MANUAL.md](MANUAL.md)** — system requirements, every key and button in all
+  three interfaces, every command, and exact step-by-step instructions for
+  connecting the browser interface and GitHub, including how to make the token.
+- **`python3 tests/check_sync.py`** — 19 offline checks on the push and pull
+  logic, with the network and git stood in for.
+
+### Changed
+
+- The README now names all three documents at the top.
+- Deleting a game is possible from the browser, which is what makes renaming
+  tidy rather than leaving a copy behind every time.
+
+### Fixed
+
+- The README check was only spotting commands written one particular way, so
+  `pull` was going unverified. It now reads both forms.
+
+### Notes
+
+- `push` and `pull` do not merge and do not ask. Whichever side you name in the
+  command replaces the other for the games you listed.
+- Spark never deletes anything from your GitHub repo. Renaming and then pushing
+  leaves the old name there until you remove it on github.com yourself.
+
+---
+
 ## 0.4.0 — 2026-08-09
 
 Writing things down, and making it impossible to forget to.

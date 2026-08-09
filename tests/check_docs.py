@@ -48,7 +48,10 @@ for registry, half in ((tiles.SENSORS, "WHEN"), (tiles.ACTIONS, "DO")):
 
 # -- every command the launcher answers to is documented --------------------
 
+# the launcher matches a command either as == "x" or as in ("x", "y")
 commands = set(re.findall(r'args\[0\] == "(\w+)"', LAUNCHER))
+for group in re.findall(r"args\[0\] in \(([^)]*)\)", LAUNCHER):
+    commands.update(re.findall(r'"(\w+)"', group))
 for name in commands:
     check(re.search(r"spark\.py %s\b" % name, README),
           "command 'spark.py %s' is not in the README" % name)
