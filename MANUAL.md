@@ -237,6 +237,12 @@ nothing here needs the internet, GitHub or Cloudflare. If the browser refuses
 WebGL the tab says so plainly and offers you the flat editor instead, rather
 than showing a black screen.
 
+**If anything else goes wrong it is written on the screen too**, with a
+**reload** button. That is deliberate: Chrome on Android has no console you can
+open, so an error with nowhere to go would leave you looking at a black
+rectangle with no way to say what happened. Read the message out, or photograph
+it — it is enough to find the fault.
+
 ### The one thing it will not do
 
 The `open` tile does nothing in the 3D tab. A browser tab cannot hand a URL to

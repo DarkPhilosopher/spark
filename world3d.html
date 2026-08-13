@@ -68,9 +68,12 @@
   #veil{position:fixed;inset:0;z-index:9;display:none;place-items:center;
         background:#0d0f12ee;padding:24px;text-align:center}
   #veil.on{display:grid}
-  #veil div{max-width:34ch}
+  #veil div{max-width:44ch;max-height:80vh;overflow-y:auto}
   #veil h1{font-size:19px;margin:0 0 10px}
-  #veil p{color:var(--dim);font-size:14px;margin:0 0 18px}
+  /* pre-wrap so a stack line keeps its shape, break-word so a long one still
+     fits a phone rather than running off the side where it cannot be read */
+  #veil p{color:var(--dim);font-size:14px;margin:0 0 18px;
+          white-space:pre-wrap;overflow-wrap:break-word;text-align:left}
 </style>
 </head>
 <body>
@@ -1011,6 +1014,26 @@ function fail(heading, detail) {
   $("#veil-p").textContent = detail;
   $("#veil").classList.add("on");
 }
+
+/* Say what went wrong, on the screen.
+ *
+ * A phone browser has no console you can open. Chrome on Android will not show
+ * you a stack trace however hard you tap, so an uncaught error here would be a
+ * black rectangle and no way to find out why -- which is useless to report and
+ * useless to fix. Anything that escapes gets written on the page instead, in
+ * words that can be read out or photographed. */
+function reportCrash(what, err) {
+  const where = err && err.stack ? String(err.stack).split("\n")[0] : "";
+  fail("Spark 3D hit a problem",
+       what + ": " + ((err && err.message) || err || "unknown") +
+       (where ? "\n\n" + where : ""));
+  $("#veil-b").textContent = "reload";
+  $("#veil-b").onclick = () => location.reload();
+}
+
+window.addEventListener("error", e => reportCrash("error", e.error || e.message));
+window.addEventListener("unhandledrejection",
+                        e => reportCrash("unfinished request", e.reason));
 
 (async function boot() {
   try {
