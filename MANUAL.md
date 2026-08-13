@@ -211,16 +211,25 @@ of blocks, with each character's glyph floating over its own block.
 | **centre** | puts the camera back where it started |
 | **run here** / **go live** | switches between the running game and this tab's own engine |
 
-The pad is deliberately big — each key is a quarter of the screen's width, so
-it is roughly twice the size of a fingertip rather than just over it. It is
-translucent, and its four corners are empty, so the world keeps showing through.
-**restart**, **centre** and **run here** live in the top bar instead of beside
-the pad, because they are pressed once in a while and the pad needs the room.
-Anywhere you touch that is not a button turns the camera, including the gaps
-between the keys.
+**The pad never covers the world.** The screen is two regions that do not
+overlap: the world above, the pad below. Turn the phone sideways and they sit
+beside each other instead — world on the left, pad on the right — because a
+landscape screen has width to spare and no height to spare. The camera fits the
+board to whichever region it has been given, so nothing is ever drawn where a
+button is.
 
-Turn the phone sideways and the pad shrinks and moves to the right-hand side,
-where a landscape screen has width to spare and no height to spare.
+The pad is as big as that leaves room for, measured **as a share of your own
+screen** rather than in fixed pixels: half the screen's height upright, half its
+width sideways, capped so a tablet does not hand you a pad the size of a dinner
+plate. Each key is just under a third of that — from about 89px on a small
+phone to 144px on a tablet, against the roughly 48px a fingertip needs. Nothing
+is measured against any particular phone, so a screen I have never seen gets a
+pad in the same proportion.
+
+**restart**, **centre** and **run here** stay in the top bar, over the sky at
+the top of the world where there is nothing to hide, since they are pressed once
+in a while and the pad wants the room. Anywhere in the world you touch that is
+not a button turns the camera.
 
 A real keyboard works: arrows, space, and `w a s d e f`.
 

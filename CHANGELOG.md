@@ -131,17 +131,23 @@ Each entry says **what** changed and, where it is not obvious, **why**.
   smaller than a fingertip, on a device with no pointer. Putting playing first
   and giving it real area matches what the loop actually is: change a rule, look
   at it, change it again.
-- **The 3D pad is roughly twice the size it was.** Each key is a quarter of the
-  screen's width — about 94px on an ordinary phone, up from 56 — capped so a
-  tablet does not get buttons the size of a hand, and shrunk and moved to the
-  right when the phone is turned sideways. The keys are translucent and the
-  pad's corners are empty, so the world still shows through, and every gap
-  around a control passes the touch to the camera rather than swallowing it.
-  **restart**, **centre** and **run here** moved up to the top bar.
-  *Why:* the pad and those three buttons were fighting for one row, which
-  capped a key at 56px — over the 48px a fingertip needs, and under what is
-  comfortable to play with while the other hand holds the phone. Moving the
-  rarely-pressed three out of the row is what made the room.
+- **The 3D pad is two to three times the size it was, and no longer sits on top
+  of the world.** The screen is now two regions that never overlap — world
+  above, pad below, or side by side when the phone is turned sideways, where
+  there is width to spare and no height to spare. The camera fits the board to
+  whichever region it is given, so nothing is drawn underneath a button.
+  The pad fills what is left, measured as a share of the screen it is actually
+  on: half the height upright, half the width sideways, capped so a tablet does
+  not get a pad the size of a dinner plate. That puts a key between 89px on a
+  small phone and 144px on a tablet, up from a flat 56px.
+  **restart**, **centre** and **run here** moved to the top bar.
+  *Why:* the pad had been floating over the canvas, which meant every pixel it
+  gained was a pixel of the game it covered — so it could not grow without
+  taking away the thing it was there to play. Giving it a region of its own
+  turns that into a straight split, and the camera was already fitting the
+  board to the canvas rather than the window, so it followed for free.
+  Sizing in `vh`/`vw` rather than pixels is what makes it land right on a
+  screen nobody has tested it on.
 
 ### Security
 
