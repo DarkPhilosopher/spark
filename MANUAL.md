@@ -209,7 +209,8 @@ anywhere, as plain `spark ...`, once you have run the install command.
 | `python3 spark.py people NAME --player` | let them read it only |
 | `python3 spark.py play games/chase.json` | play a game right now |
 | `python3 spark.py play games/chase.json 200` | run 200 ticks with no display, for testing |
-| `python3 spark.py status` | print the Github / Browser / Local line |
+| `python3 spark.py status` | print the Github / Browser / Local / Cloudflare line |
+| `python3 spark.py players` | list who is connected, first to join at the top |
 | `python3 spark.py export` | rewrite `tiles.json` and `games/index.json` |
 | `python3 spark.py push` | overwrite **every** game on GitHub with this phone's |
 | `python3 spark.py push chase` | overwrite just that one game on GitHub |
@@ -251,6 +252,24 @@ Notes:
   let a `file://` page read the files beside it. There is no way around it; use
   the server.
 - If port 8765 is busy, use another: `python3 spark.py edit 9000`.
+
+### If nothing opens
+
+Spark hands the address to Android and is never told whether anything caught
+it, so it prints "Opening your browser now" either way. If no browser appears,
+first find out whether this phone has one at all:
+
+    pm query-activities --user 0 -a android.intent.action.VIEW -d https://example.com
+
+- **`No activities found`** — nothing here opens web links. Install a browser,
+  or skip the phone entirely: `python3 spark.py host` and type the wifi address
+  it prints on a laptop or another phone.
+- **A browser is listed but the wrong one opens** — name the one you want.
+  `termux-open-url` takes a package as its second argument, so
+  `termux-open-url http://127.0.0.1:8765/ com.android.chrome` goes straight to
+  Chrome. That is exactly what the `open` tile does with its two boxes.
+
+The same check explains an `open` tile that appears to do nothing.
 
 ---
 
@@ -312,6 +331,37 @@ Codes can be handed to several people at once, or limited to a single use. To
 take access back, revoke the code: anyone who joined with it is dropped
 immediately.
 
+### Seeing who is in there
+
+The header counts them — `Players 3` — and one word lists them by name:
+
+    python3 spark.py players
+
+Typing **`players`** at any menu prompt does the same thing without leaving the
+menus, exactly like `browser`. Either way you get:
+
+         name             may    inside         joined
+     ----------------------------------------------------
+     1.  Gabriel          edit   chase          14m ago
+     2.  sam              play   chase          6m ago
+     3.  bex              watch  chase          just now
+
+     3 connected. The one who joined first is at the top.
+
+| Column | What it is |
+|---|---|
+| the number | join order. 1 has been here longest. Someone who leaves and rejoins goes to the bottom, because the world they are in now is the one they just joined. |
+| **name** | what they typed when they entered the code, cut to 16 letters |
+| **may** | `edit`, `play` or `watch` — whatever their code granted |
+| **inside** | the game they are in. `no game yet` means they are connected and waiting, having arrived before you started one. |
+| **joined** | how long ago, rounded — `just now`, `6m ago`, `2h ago` |
+
+The list is only ever as fresh as the last thing that happened: people are
+dropped about 25 seconds after their browser goes quiet, so someone who closed
+their tab a moment ago may still be shown. It works from a second Termux tab
+too — the serving copy of Spark writes the roster to `.spark-state.json` and any
+other copy reads it, so you can host in one tab and check in another.
+
 ### Step by step, for someone far away
 
     python3 spark.py host --public
@@ -340,6 +390,12 @@ can open, like `https://butter-illinois-residents-ended.trycloudflare.com`. It
 is different every time and stops working the moment you stop Spark. If no
 tunnel is installed, Spark says so and carries on serving your wifi.
 
+While that address is live the header reads `Cloudflare T`, on this phone and in
+every browser that joined through it, so you can tell at a glance whether the
+link you handed out still works. It falls back to `F` when Spark stops. The flag
+tracks cloudflared only — if Spark fell back to ngrok you get a working address
+but `Cloudflare F`.
+
 Why this is needed: your phone has no address the internet can dial. A tunnel
 borrows one from a company's server and forwards it to you. That is the only way
 without renting a server.
@@ -356,6 +412,11 @@ without renting a server.
   spam the server. Give codes to people you would hand your phone to.
 - **Only the games folder is ever exposed.** No other file on your phone is
   reachable, and every route refuses anyone whose code does not cover it.
+- **A shared world cannot open other apps.** The `open` tile is the one tile
+  that reaches off the grid, and it does nothing in a hosted game. Somebody
+  with an `edit` code can put an `open` row in a game and save it; it will sit
+  there doing nothing until *you* play that game yourself on this phone. The
+  same goes for a game pulled down from GitHub.
 - Stopping Spark ends everything: all codes, all sessions, the tunnel.
 
 ## Connecting GitHub
@@ -400,10 +461,11 @@ Or on github.com: **Settings → Pages → Source: Deploy from a branch → main
 **Step 2.** Wait a minute or two, then open
 `https://YOURNAME.github.io/spark/`.
 
-**Step 3.** The header will read `Github T  Browser T  Local F`. `Local F` is
-correct and expected — there is no Python behind a Pages site. The editor works
-anyway: it reads `tiles.json` and `games/index.json`, and keeps your edits in
-the browser's own storage.
+**Step 3.** The header will read `Github T  Browser T  Local F  Cloudflare F`.
+`Local F` is correct and expected — there is no Python behind a Pages site, and
+`Cloudflare F` for the same reason: Pages is already public, so no tunnel is
+involved. The editor works anyway: it reads `tiles.json` and `games/index.json`,
+and keeps your edits in the browser's own storage.
 
 **Remember:** anything generated has to be committed or the Pages copy is stale.
 After adding a tile, run `python3 spark.py export`, then commit and push.
@@ -510,19 +572,21 @@ from your repo.
 
 ---
 
-## What each of the three connections gives you
+## What each of the four connections gives you
 
-| | Github | Browser | Local |
-|---|---|---|---|
-| Play games | no | no | **yes** |
-| Drag-and-drop editing | via Pages | **yes** | — |
-| Works with no internet | no | yes, with the local server | **yes** |
-| Edit from a laptop | **yes**, via Pages | no | no |
-| Games stored where | in the repo | in browser storage | in `~/spark/games` |
-| Needed for the others | no | no | no |
+| | Github | Browser | Local | Cloudflare |
+|---|---|---|---|---|
+| Play games | no | no | **yes** | no |
+| Drag-and-drop editing | via Pages | **yes** | — | via the public address |
+| Works with no internet | no | yes, with the local server | **yes** | no |
+| Edit from a laptop | **yes**, via Pages | no | no | **yes**, if you are hosting |
+| Games stored where | in the repo | in browser storage | in `~/spark/games` | in `~/spark/games` |
+| Needed for the others | no | no | no | needs Local |
 
-None of the three depends on the others. The terminal alone is a complete Spark;
-the browser makes it pleasant; GitHub makes it portable and backed up.
+The first three do not depend on each other. The terminal alone is a complete
+Spark; the browser makes it pleasant; GitHub makes it portable and backed up.
+Cloudflare is the exception — it publishes the server this phone is running, so
+it is only ever `T` while Spark is hosting here.
 
 ## The two ways of sharing, compared
 

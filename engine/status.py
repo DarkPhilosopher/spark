@@ -1,13 +1,20 @@
 """Where is Spark running right now?
 
-Three plain flags, shown above every prompt and in the browser header:
+Four plain flags, shown above every prompt and in the browser header:
 
-    Github   your commits are all pushed to a remote
-    Browser  an editor page has talked to the local server in the last 90s
-    Local    the Python engine is here and usable offline right now
+    Github      your commits are all pushed to a remote
+    Browser     an editor page has talked to the local server in the last 90s
+    Local       the Python engine is here and usable offline right now
+    Cloudflare  a cloudflared tunnel is up, so anyone anywhere can join
 
-The browser flag needs the server and the terminal to talk, so the server
-leaves a small note in .spark-state.json (gitignored) and the terminal reads it.
+and then a count, which is not a yes-or-no thing:
+
+    Players     how many people are connected to the world right now
+
+The last three need the server and the terminal to talk, so the server leaves a
+small note in .spark-state.json (gitignored) and the terminal reads it. The
+roster goes in the same note, oldest joiner first, which is what `players` in
+the menus prints.
 """
 
 import json
@@ -54,6 +61,45 @@ def clear_server():
     _write_state(port=0)
 
 
+def note_tunnel(name, url):
+    """Called by the server once a tunnel program hands us an address."""
+    _write_state(tunnel_name=name, tunnel_url=url)
+
+
+def clear_tunnel():
+    _write_state(tunnel_name="", tunnel_url="")
+
+
+def note_players(people):
+    """Called by the live session whenever somebody joins or leaves.
+
+    `people` is a list of {name, role, game, joined}, and it is the only way a
+    second process -- the menus, usually -- can see who is in the world.
+    """
+    _write_state(players=people)
+
+
+def clear_players():
+    _write_state(players=[])
+
+
+def players():
+    """Who is connected, oldest joiner first. Empty if nothing is serving."""
+    state = _read_state()
+    if not server_listening(state.get("port")):
+        return []
+    return _in_join_order(state.get("players"))
+
+
+def _in_join_order(people):
+    """Sort defensively: the note is written by another process, so trust its
+    timestamps rather than the order they happen to arrive in."""
+    if not isinstance(people, list):
+        return []
+    return sorted((p for p in people if isinstance(p, dict)),
+                  key=lambda p: p.get("joined") or 0)
+
+
 def _git(*args):
     try:
         done = subprocess.run(["git", "-C", str(ROOT), *args],
@@ -89,20 +135,29 @@ def server_listening(port):
 
 def probe():
     state = _read_state()
+    # Both live flags below mean nothing if the server that wrote them is gone,
+    # so one check covers them and a stale note heals itself.
+    up = server_listening(state.get("port"))
     return {
         "github": github_ok(),
-        "browser": (time.time() - state.get("browser_seen", 0) < FRESH
-                    and server_listening(state.get("port"))),
+        "browser": (time.time() - state.get("browser_seen", 0) < FRESH and up),
         "local": (ROOT / "spark.py").exists(),
+        "cloudflare": (state.get("tunnel_name") == "cloudflared"
+                       and bool(state.get("tunnel_url")) and up),
+        "players": len(_in_join_order(state.get("players"))) if up else 0,
     }
 
 
 def line(color=True):
     flags = probe()
     parts = []
-    for name in ("github", "browser", "local"):
+    for name in ("github", "browser", "local", "cloudflare"):
         mark = "T" if flags[name] else "F"
         if color:
             mark = (GREEN if flags[name] else GREY) + mark + OFF
         parts.append("%s %s" % (name.capitalize(), mark))
+    count = str(flags["players"])
+    if color:
+        count = (GREEN if flags["players"] else GREY) + count + OFF
+    parts.append("Players " + count)
     return "Spark exe  " + "  ".join(parts)

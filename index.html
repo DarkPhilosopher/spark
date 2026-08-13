@@ -171,19 +171,39 @@ const kinds = () => chars().map(c => c.kind).concat("anything");
 const tileDef = (s, id) => (s === "when" ? catalog.sensors : catalog.actions)
                              .find(t => t.id === id);
 
-// the same three flags the terminal prints above its prompts
+// the same four flags the terminal prints above its prompts
+let serverFlags = null;   // last answer from /api/status, when there is a server
+
+// Only the phone running the tunnel can see it, so ask it and redraw. A page
+// that arrived THROUGH the tunnel already knows from its own address.
+function refreshServerFlags() {
+  if (store.mode !== "server") { serverFlags = null; return; }
+  fetch("/api/status").then(r => r.json())
+    .then(f => { serverFlags = f; renderWhere(); })
+    .catch(() => {});
+}
+
 function renderWhere() {
   const onPages = /github\.io$/i.test(location.hostname) ||
                   /github/i.test(location.hostname);
+  const viaTunnel = /\.trycloudflare\.com$/i.test(location.hostname);
   const flags = {Github: onPages || !!ghConfig(),
                  Browser: true,
-                 Local: store.mode === "server"};
+                 Local: store.mode === "server",
+                 Cloudflare: viaTunnel || !!(serverFlags && serverFlags.cloudflare)};
   const box = $("#where");
   box.textContent = "Spark exe  ";
   for (const [name, on] of Object.entries(flags)) {
     box.append(name + " ");
     box.append(el("b", on ? "t" : "f", on ? "T" : "F"));
     box.append("  ");
+  }
+  // a count, not a flag. Only a page served by Spark has a session behind it;
+  // on GitHub Pages there is nobody to count, so the count stays away.
+  if (serverFlags) {
+    box.append("Players ");
+    box.append(el("b", serverFlags.players ? "t" : "f",
+                 String(serverFlags.players)));
   }
 }
 
@@ -981,6 +1001,8 @@ for (const tab of document.querySelectorAll("#tabs button"))
     $("#status").textContent = e.message;
     return;
   }
+  refreshServerFlags();
+  setInterval(refreshServerFlags, 5000);
   const names = await store.listGames();
 
   if (names === null) {

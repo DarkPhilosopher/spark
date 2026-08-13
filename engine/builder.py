@@ -45,7 +45,8 @@ def ask_yes(prompt, default=False):
 def menu(options, prompt="pick a number", allow_back=True, back_label="back"):
     """Show a numbered list. Returns the index, or None for back/blank.
 
-    Typing `browser` at any menu opens the drag-and-drop editor instead.
+    Two words work at any menu instead of a number: `browser` opens the
+    drag-and-drop editor, `players` lists who is connected.
     """
     for i, label in enumerate(options, 1):
         print(" %2d. %s" % (i, label))
@@ -53,14 +54,18 @@ def menu(options, prompt="pick a number", allow_back=True, back_label="back"):
         print("  0. %s" % back_label)
     while True:
         answer = ask(prompt, "0" if allow_back else None)
-        if answer.strip().lower() in ("browser", "b"):
+        word = answer.strip().lower()
+        if word in ("browser", "b"):
             open_browser_editor()
+            continue
+        if word in ("players", "who"):
+            players_screen()
             continue
         if answer in ("", "0") and allow_back:
             return None
         if answer.isdigit() and 1 <= int(answer) <= len(options):
             return int(answer) - 1
-        print("  pick one of the numbers shown, or type browser")
+        print("  pick one of the numbers shown, or type browser or players")
 
 
 def kinds_in(project):
@@ -399,6 +404,47 @@ def invite_screen():
         ask("press enter")
 
 
+def _ago(when):
+    """How long ago, in words. Rough on purpose -- nobody counts seconds."""
+    import time
+    gap = time.time() - (when or 0)
+    if gap < 45:
+        return "just now"
+    if gap < 3600:
+        return "%dm ago" % round(gap / 60)
+    return "%dh ago" % round(gap / 3600)
+
+
+def print_players():
+    """The roster as plain lines. Shared by the menu screen and `spark players`."""
+    people = status.players()
+    if not people:
+        print(" nobody is connected.\n")
+        print(wrap_note(
+            "People show up here once you are hosting and someone has typed "
+            "an invite code. Start hosting with `python3 spark.py host`, then "
+            "make a code from `invite someone to play`."))
+        return people
+
+    print(" %-3s %-16s %-6s %-14s %s" % ("", "name", "may", "inside", "joined"))
+    print(" " + "-" * 52)
+    for place, person in enumerate(people, 1):
+        print(" %-3s %-16s %-6s %-14s %s"
+              % (str(place) + ".", str(person.get("name", "?"))[:16],
+                 person.get("role", "?"), person.get("game") or "no game yet",
+                 _ago(person.get("joined"))))
+    print()
+    print(" %d connected. The one who joined first is at the top." % len(people))
+    return people
+
+
+def players_screen():
+    """Who is connected right now, whoever arrived first at the top."""
+    header("Players connected")
+    print_players()
+    ask("\npress enter")
+
+
 def _read_port():
     from . import status
     try:
@@ -433,7 +479,8 @@ def main_menu(project=None):
             print(" nothing open yet\n")
             options = ["learn how (guided, about ten minutes)",
                        "start a new game", "open a game"]
-        print(" (type browser at any prompt for the drag-and-drop editor)\n")
+        print(" (type browser at any prompt for the drag-and-drop editor,")
+        print("  or players to see who is connected)\n")
         choice = menu(options, "pick a number", back_label="quit")
         if choice is None:
             print("bye")

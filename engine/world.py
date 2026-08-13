@@ -26,9 +26,13 @@ class Thing:
         self.solid = template.get("solid", False)
         self.role = template.get("role", "prop")
         self.brain = template.get("brain", [])
-        self.facing = (0, -1)
+        self.facing = (0, -1)       # north, until a face/move/shoot tile turns it
         self.owner = None
         self.alive = True
+        self.age = 0                # ticks lived
+        self.travelled = 0          # squares actually moved
+        self.max_life = 0           # longevity, stamped on by the shoot tile
+        self.max_range = 0          # reach, likewise. 0 on both means for ever
         self.controller = None      # which player drives this one, if any
 
 
@@ -53,6 +57,13 @@ class World:
         self.status = None          # None | "win" | "lose"
         self.keys = set()           # keys at this device, for solo play
         self.player_keys = {}       # player id -> keys, for a shared world
+
+        self.memory = {}            # name -> value, written by the remember tile
+        # Handing a URL to another app is the one tile that reaches outside the
+        # game, so it is off unless whoever is playing turned it on. A shared
+        # world never does -- see the `open` tile.
+        self.may_open = False
+        self.opened = {}            # what was opened, and on which tick
 
         for char in project.get("characters", []):
             for _ in range(char.get("count", 1)):
@@ -131,6 +142,7 @@ class World:
         if any(o.solid for o in self.at(x, y)):
             return False
         thing.x, thing.y = x, y
+        thing.travelled += 1
         return True
 
     # -- the rule engine ---------------------------------------------------
@@ -156,6 +168,7 @@ class World:
         for thing in list(self.things):
             if not thing.alive or self.status:
                 continue
+            thing.age += 1
             for row in thing.brain:
                 if not thing.alive:
                     break

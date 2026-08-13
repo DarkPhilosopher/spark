@@ -12,6 +12,125 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ---
 
+## Unreleased
+
+### Added
+
+- **Three tiles that work on names instead of the grid: `remember`, `I
+  remember`, and `open`.** `remember chrome is com.android.chrome` ties a short
+  name to a long value; `open chrome at home` hands a target to another app on
+  the phone. Every box takes either a remembered name or the literal thing, so
+  nothing has to be remembered first:
+
+      WHEN always            DO remember chrome is com.android.chrome
+                                remember home is http://127.0.0.1:8765/
+      WHEN key o is pressed  DO open chrome at home
+
+  *Why:* every tile until now moved something around a grid. These are the two
+  smallest pieces that let a game reach off it — one that names a thing, one
+  that acts on the name — rather than a single `open chrome` tile that would
+  have been useless for anything but Chrome.
+  `I remember <name> is <value>` is the WHEN half, and since nothing is
+  remembered when a game starts, it is also how a game asks *has this happened
+  yet*.
+- **`tests/check_open.py`** — 16 checks on those tiles, most of them on the
+  fences below. It fails if the guest fence is removed; I checked by removing
+  it.
+- **A player count on the status line, and a `players` command to name them.**
+  The line ends with `Players 3`, and typing `players` at any menu prompt — or
+  running `python3 spark.py players` — lists everyone connected, **in the order
+  they joined**, with the game each one is inside and how long ago they
+  arrived. `who` works too, and `players` goes wherever `browser` goes.
+  *Why:* hosting was blind. You handed out invite codes and then had no way to
+  tell whether anybody used them, how many people were in there, or who. The
+  browser had a people button; the terminal, where you actually host from, had
+  nothing. A count answers "is anyone there" at a glance and the list answers
+  "who" without opening a browser.
+  Somebody who leaves and rejoins goes to the **bottom** of the list: the order
+  is when they joined *this* world, not when you first met them.
+
+- **A fourth flag: `Cloudflare`.** The status line now reads
+  `Spark exe  Github T  Browser T  Local T  Cloudflare T`. It is `T` while a
+  cloudflared tunnel is up and serving the public address, in the terminal and
+  in the browser header alike.
+  *Why:* the tunnel was the one connection you could not see. The address is
+  printed once when hosting starts and then scrolls away, and it dies silently
+  whenever Spark stops — so there was no way to answer "is the link I sent my
+  friend still alive?" without sending a message and waiting. Now it is one
+  glance, from the same line as everything else.
+  The flag names cloudflared exactly: if Spark fell back to ngrok you get a
+  working address but `Cloudflare F`.
+
+### Changed
+
+- **The server writes the tunnel's name and address into `.spark-state.json`.**
+  *Why:* the tunnel only ever existed as an object inside the serving process,
+  so the menus — a different process — had no way to know about it. This is the
+  same note the Browser flag already travels on.
+- **Both live flags now share one check that the server is still listening.**
+  *Why:* a note in the state file outlives a hard kill. Tying it to a socket
+  that answers means a stale note reads `F` rather than lying, and it costs one
+  probe instead of two. The player count rides the same check, so a roster left
+  behind by a killed server reads `Players 0` instead of a number of ghosts.
+- **A player now remembers when they joined, separately from when they were
+  last seen.** *Why:* `seen` moves every time their browser polls, so it could
+  never say who arrived first. Ordering needs a timestamp that does not move.
+- **`tests/check_docs.py` can spell past thirteen.** *Why:* it verifies the
+  README's tile count against the real registries by parsing the number word,
+  and the DO tiles just became fourteen. Extending its vocabulary keeps the
+  check as strict as it was; leaving it would have meant deleting the check.
+
+### Security
+
+- **The `open` tile is fenced three ways.** A game file is a thing people
+  share — it comes down from GitHub, and a guest holding an `edit` code can
+  rewrite one — so a tile that launches apps has to say no by default.
+  1. **A shared world never opens anything.** `runner.play` turns opening on
+     for a game you play yourself; `live.Session` leaves it off, so a guest
+     cannot make the host's phone launch anything however they edit the game.
+  2. **A cooldown of 30 ticks per target**, so a row on `always` asks about
+     once every five seconds rather than six times a second.
+  3. **It never waits for the app**, so a slow launch cannot stall the world.
+
+---
+
+## 0.9.0 — 2026-08-09
+
+Aiming, and shots that stop somewhere.
+
+### Added
+
+- **`face <bearing>`, a DO tile.** Turns a character on the spot without moving
+  it. The choices are the eight compass points — north, north-east, east,
+  south-east, south, south-west, west, north-west — plus toward it and away
+  from it. North is up the screen.
+  *Why:* until now the only way to point somewhere was to walk there, so a
+  turret could not aim, and nothing could shoot diagonally at all — the four
+  diagonals existed nowhere in the tile set. `move forward` and `shoot forward`
+  now follow whatever `face` last set.
+- **`shoot` asks two more questions: reach and longevity.** *How many squares
+  does it fly* kills the shot once it is that far from you; *how many ticks does
+  it last* kills it once it has been alive that long. Either can be 0 for no
+  limit, and old games that saved a `shoot` tile with only a direction get the
+  defaults, 8 squares and 12 ticks.
+  *Why:* every shot used to fly until it hit something or reached the edge, so
+  a pistol and a laser were the same weapon.
+- **`my range or time has run out`, a WHEN tile.** How the two limits above
+  actually take effect: it is a plain row in the built-in `shot` brain, so it
+  can be read, copied and rewritten like any other tile rather than hiding in
+  the engine.
+
+### Changed
+
+- Characters now count the ticks they have lived (`age`) and the squares they
+  have actually moved (`travelled`). Only the new WHEN tile reads them, and
+  moving is counted on success, so a shot held against a wall keeps ageing
+  without covering ground.
+- `tiles.json` gained a `bearings` list next to `directions`, and has been
+  re-exported.
+
+---
+
 ## 0.8.0 — 2026-08-09
 
 Getting in and out of Spark with one word each.

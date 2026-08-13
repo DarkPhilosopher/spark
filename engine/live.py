@@ -19,7 +19,7 @@ import string
 import threading
 import time
 
-from . import brain
+from . import brain, status
 from .world import World
 
 CODE_ALPHABET = string.ascii_uppercase.replace("O", "").replace("I", "") + "23456789"
@@ -60,7 +60,8 @@ class Player:
         self.name = name
         self.id = "p" + secrets.token_hex(3)
         self.keys = set()
-        self.seen = time.time()
+        self.joined = time.time()       # fixed; what "who came first" means
+        self.seen = time.time()         # moves; how we notice they left
         self.thing = None               # the character they drive, if any
 
 
@@ -108,6 +109,7 @@ class Session:
             self.players[player.token] = player
             if self.running and player.role == "play":
                 self._give_character(player)
+            self._publish()
             return player, None
 
     def who(self, token):
@@ -124,6 +126,20 @@ class Session:
                 player.thing.controller = None
                 if player.character == "own":
                     self.world and self.world.remove(player.thing)
+            if player:
+                self._publish()
+
+    def _publish(self):
+        """Write the roster where another process can read it.
+
+        The menus are usually not the process that is serving, so `players` in
+        the menus has no Session to look at -- only this note.
+        """
+        with self.lock:
+            status.note_players([
+                {"name": p.name, "role": p.role, "joined": p.joined,
+                 "game": self.game_name if self.running else None}
+                for p in sorted(self.players.values(), key=lambda p: p.joined)])
 
     # -- the world --------------------------------------------------------
 
@@ -160,10 +176,12 @@ class Session:
                     self._give_character(player)
             self.thread = threading.Thread(target=self._loop, daemon=True)
             self.thread.start()
+            self._publish()             # everyone is now inside a named game
 
     def stop(self):
         with self.lock:
             self.running = False
+            self._publish()             # ...and now they are back in no game
         thread = self.thread
         if thread and thread.is_alive() and thread is not threading.current_thread():
             thread.join(timeout=2)

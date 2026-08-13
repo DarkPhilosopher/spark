@@ -74,6 +74,9 @@ def play(project, max_ticks=None):
     speed = max(1, project.get("world", {}).get("speed", 6))
     delay = 1.0 / speed
     headless = max_ticks is not None or not sys.stdin.isatty()
+    # You are playing your own game on your own phone, so the `open` tile is
+    # allowed here. live.Session deliberately leaves it off.
+    world.may_open = not headless
 
     with Keyboard() as keyboard:
         if not headless:

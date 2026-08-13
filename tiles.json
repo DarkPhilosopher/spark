@@ -119,6 +119,31 @@
       "id": "at_edge",
       "label": "I am at the edge of the world",
       "params": []
+    },
+    {
+      "id": "recall",
+      "label": "I remember {name} is {value}",
+      "params": [
+        {
+          "name": "name",
+          "prompt": "Which name?",
+          "kind": "text",
+          "choices": [],
+          "default": "chrome"
+        },
+        {
+          "name": "value",
+          "prompt": "Is what?",
+          "kind": "text",
+          "choices": [],
+          "default": "com.android.chrome"
+        }
+      ]
+    },
+    {
+      "id": "spent",
+      "label": "my range or time has run out",
+      "params": []
     }
   ],
   "actions": [
@@ -145,8 +170,32 @@
       ]
     },
     {
+      "id": "face",
+      "label": "face {dir}",
+      "params": [
+        {
+          "name": "dir",
+          "prompt": "Which way do I face?",
+          "kind": "choice",
+          "choices": [
+            "north",
+            "north-east",
+            "east",
+            "south-east",
+            "south",
+            "south-west",
+            "west",
+            "north-west",
+            "toward it",
+            "away from it"
+          ],
+          "default": "north"
+        }
+      ]
+    },
+    {
       "id": "shoot",
-      "label": "shoot {dir}",
+      "label": "shoot {dir} up to {reach} squares, for {life} ticks",
       "params": [
         {
           "name": "dir",
@@ -163,6 +212,20 @@
             "forward"
           ],
           "default": "forward"
+        },
+        {
+          "name": "reach",
+          "prompt": "How many squares does it fly? (0 = for ever)",
+          "kind": "int",
+          "choices": [],
+          "default": 8
+        },
+        {
+          "name": "life",
+          "prompt": "How many ticks does it last? (0 = for ever)",
+          "kind": "int",
+          "choices": [],
+          "default": 12
         }
       ]
     },
@@ -242,6 +305,46 @@
       ]
     },
     {
+      "id": "remember",
+      "label": "remember {name} is {value}",
+      "params": [
+        {
+          "name": "name",
+          "prompt": "Call it what?",
+          "kind": "text",
+          "choices": [],
+          "default": "chrome"
+        },
+        {
+          "name": "value",
+          "prompt": "Which is?",
+          "kind": "text",
+          "choices": [],
+          "default": "com.android.chrome"
+        }
+      ]
+    },
+    {
+      "id": "open",
+      "label": "open {object} at {target}",
+      "params": [
+        {
+          "name": "object",
+          "prompt": "Which app? (a name you remembered, or a package)",
+          "kind": "text",
+          "choices": [],
+          "default": "chrome"
+        },
+        {
+          "name": "target",
+          "prompt": "Open what? (a name you remembered, or a URL)",
+          "kind": "text",
+          "choices": [],
+          "default": "http://127.0.0.1:8765/"
+        }
+      ]
+    },
+    {
       "id": "vanish",
       "label": "make {target} disappear",
       "params": [
@@ -292,6 +395,18 @@
     "toward it",
     "away from it",
     "forward"
+  ],
+  "bearings": [
+    "north",
+    "north-east",
+    "east",
+    "south-east",
+    "south",
+    "south-west",
+    "west",
+    "north-west",
+    "toward it",
+    "away from it"
   ],
   "keys": [
     "up",

@@ -12,7 +12,8 @@
     python3 spark.py play games/chase.json [ticks]   skip straight to playing
     python3 spark.py push [game ...]       overwrite games on GitHub with these
     python3 spark.py pull [game ...]       overwrite games here with GitHub's
-    python3 spark.py status                print the Github/Browser/Local line
+    python3 spark.py status                print the flags and the player count
+    python3 spark.py players               who is connected, first to join first
     python3 spark.py export                refresh tiles.json and games/index.json
     python3 spark.py games/chase.json      open the menu on that game
 
@@ -86,6 +87,9 @@ def main():
     if args and args[0] == "status":
         from engine import status
         print(status.line())
+        return
+    if args and args[0] == "players":
+        builder.print_players()
         return
     if args and args[0] == "export":
         from engine import server

@@ -65,7 +65,8 @@ def catalog():
         } for tile in registry.values()]
 
     return {"sensors": pack(tiles.SENSORS), "actions": pack(tiles.ACTIONS),
-            "colors": list(COLORS), "directions": tiles.DIRECTIONS, "keys": tiles.KEYS}
+            "colors": list(COLORS), "directions": tiles.DIRECTIONS,
+            "bearings": tiles.BEARINGS, "keys": tiles.KEYS}
 
 
 def lan_address(port):
@@ -298,6 +299,7 @@ def serve(port=8765, open_browser=True, bind="127.0.0.1", public=False,
                 link = tunnel.Tunnel(port)
                 address = link.start()
                 if address:
+                    status.note_tunnel(link.name, address)
                     say("anyone anywhere can join at " + address)
                     say("(that address dies when you stop Spark)")
                 else:
@@ -320,4 +322,6 @@ def serve(port=8765, open_browser=True, bind="127.0.0.1", public=False,
             if link:
                 link.stop()
             live.SESSION.stop()
+            status.clear_tunnel()
+            status.clear_players()
             status.clear_server()
