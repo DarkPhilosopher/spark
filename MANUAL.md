@@ -211,6 +211,17 @@ of blocks, with each character's glyph floating over its own block.
 | **centre** | puts the camera back where it started |
 | **run here** / **go live** | switches between the running game and this tab's own engine |
 
+The pad is deliberately big — each key is a quarter of the screen's width, so
+it is roughly twice the size of a fingertip rather than just over it. It is
+translucent, and its four corners are empty, so the world keeps showing through.
+**restart**, **centre** and **run here** live in the top bar instead of beside
+the pad, because they are pressed once in a while and the pad needs the room.
+Anywhere you touch that is not a button turns the camera, including the gaps
+between the keys.
+
+Turn the phone sideways and the pad shrinks and moves to the right-hand side,
+where a landscape screen has width to spare and no height to spare.
+
 A real keyboard works: arrows, space, and `w a s d e f`.
 
 **The badge in the top corner tells you what you are watching.**

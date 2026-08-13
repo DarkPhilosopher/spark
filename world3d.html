@@ -9,7 +9,14 @@
     --bg:#0d0f12; --panel:#1d2026; --panel2:#252932; --line:#333945;
     --ink:#e8eaed; --dim:#9aa3b2; --accent:#4dd0e1; --bad:#d0554f;
     --good:#5dd97f;
-    --tap:56px;              /* nothing you press is smaller than this */
+    /* The pad is the thing you actually play with, so it takes as much of the
+       screen as it can get: a quarter of the width per key, capped so it does
+       not become silly on a tablet. On a 360px phone that is a 90px key, well
+       over the 48px a fingertip needs, and the whole pad still leaves room to
+       breathe. Anything that scales with vw has to be capped, or a tablet gets
+       buttons the size of a hand. */
+    --tap:min(104px, 26vw);
+    --util:44px;             /* restart / centre / live: pressed rarely */
   }
   *{box-sizing:border-box}
   html,body{height:100%}
@@ -25,10 +32,14 @@
          font:700 15px/1 ui-monospace,monospace;
          text-shadow:0 1px 3px #000,0 0 6px #000;white-space:pre}
 
-  /* top bar */
-  #bar{position:fixed;top:0;left:0;right:0;z-index:4;display:flex;gap:8px;
-       align-items:center;padding:8px;padding-top:calc(8px + env(safe-area-inset-top));
-       background:linear-gradient(#0d0f12ee,#0d0f1200)}
+  /* top bar: the name and badge, then the buttons you press rarely */
+  #bar{position:fixed;top:0;left:0;right:0;z-index:4;display:flex;
+       flex-direction:column;gap:6px;padding:8px;
+       padding-top:calc(8px + env(safe-area-inset-top));
+       background:linear-gradient(#0d0f12f2,#0d0f1200)}
+  .barrow{display:flex;gap:8px;align-items:center}
+  #bar{pointer-events:none}
+  #bar button,#bar .badge{pointer-events:auto}
   #title{font-weight:700;font-size:15px;margin-right:auto;
          text-overflow:ellipsis;overflow:hidden;white-space:nowrap}
   .badge{font:700 11px/1 ui-monospace,monospace;letter-spacing:.1em;
@@ -37,11 +48,11 @@
   .badge.live{color:var(--good);border-color:var(--good)}
   .badge.local{color:var(--accent);border-color:var(--accent)}
 
-  #hud{position:fixed;top:calc(52px + env(safe-area-inset-top));left:8px;z-index:4;
+  #hud{position:fixed;top:calc(104px + env(safe-area-inset-top));left:8px;z-index:4;
        font:12px/1.7 ui-monospace,monospace;color:var(--dim);
        background:#0d0f12bb;border-radius:10px;padding:6px 10px}
   #hud b{color:var(--ink)}
-  #say{position:fixed;top:calc(52px + env(safe-area-inset-top));right:8px;z-index:4;
+  #say{position:fixed;top:calc(104px + env(safe-area-inset-top));right:8px;z-index:4;
        max-width:52vw;text-align:right;color:var(--accent);font-size:13px;
        background:#0d0f12bb;border-radius:10px;padding:6px 10px}
   #say:empty{display:none}
@@ -49,21 +60,34 @@
   /* controls: everything thumb-sized, thumbs at the bottom */
   #controls{position:fixed;left:0;right:0;bottom:0;z-index:5;
             padding:8px;padding-bottom:calc(8px + env(safe-area-inset-bottom));
-            display:flex;align-items:flex-end;justify-content:space-between;
-            gap:10px;background:linear-gradient(#0d0f1200,#0d0f12dd 40%)}
+            display:flex;align-items:flex-end;justify-content:center;
+            gap:10px;background:linear-gradient(#0d0f1200,#0d0f12cc 45%);
+            pointer-events:none}
+  #pad button{pointer-events:auto}
   button{font:inherit;color:var(--ink);background:var(--panel2);
          border:1px solid var(--line);border-radius:14px;
-         min-height:var(--tap);min-width:var(--tap);padding:10px 14px}
+         min-height:48px;min-width:48px;padding:10px 14px}
   button:active{filter:brightness(1.45)}
   button[disabled]{opacity:.4}
 
   #pad{display:grid;grid-template-columns:repeat(3,var(--tap));
-       grid-template-rows:repeat(3,var(--tap));gap:8px}
-  #pad button{font-size:22px;padding:0;border-radius:16px}
-  #pad .fire{background:#2b3a44;border-color:var(--accent);color:var(--accent);
-             font-size:15px}
-  #side{display:flex;flex-direction:column;gap:8px;align-items:stretch}
-  #side button{font-size:13px;padding:10px}
+       grid-template-rows:repeat(3,var(--tap));gap:10px;margin:0 auto}
+  /* translucent, so the world keeps showing through the controls */
+  #pad button{width:100%;height:100%;font-size:calc(var(--tap) * 0.38);
+              padding:0;border-radius:20px;
+              background:rgba(37,41,50,.78);border-color:rgba(120,132,150,.5)}
+  #pad .fire{background:rgba(43,58,68,.82);border-color:var(--accent);
+             color:var(--accent);font-size:calc(var(--tap) * 0.3)}
+  #side{display:flex;gap:6px;justify-content:flex-end}
+  #side button{font-size:12px;padding:8px 12px;border-radius:11px;
+               min-height:var(--util);min-width:0}
+
+  @media (orientation:landscape){
+    :root{--tap:min(84px, 16vh)}
+    #controls{justify-content:flex-end;
+              background:linear-gradient(to left,#0d0f12cc,#0d0f1200 55%)}
+    #bar{background:linear-gradient(#0d0f12f2,#0d0f1200)}
+  }
 
   #veil{position:fixed;inset:0;z-index:9;display:none;place-items:center;
         background:#0d0f12ee;padding:24px;text-align:center}
@@ -82,8 +106,17 @@
 <div id="labels"></div>
 
 <div id="bar">
-  <div id="title">Spark 3D</div>
-  <div class="badge" id="source">…</div>
+  <div class="barrow">
+    <div id="title">Spark 3D</div>
+    <div class="badge" id="source">…</div>
+  </div>
+  <!-- Up here, not down beside the pad: these three are pressed once in a
+       while, and out of the way they leave the whole width for the pad. -->
+  <div id="side">
+    <button id="restart">restart</button>
+    <button id="recentre">centre</button>
+    <button id="mode">…</button>
+  </div>
 </div>
 
 <div id="hud"></div>
@@ -96,11 +129,6 @@
     <button data-key="space" class="fire" aria-label="space">●</button>
     <button data-key="right" aria-label="right">▶</button>
     <span></span><button data-key="down" aria-label="down">▼</button><span></span>
-  </div>
-  <div id="side">
-    <button id="restart">restart</button>
-    <button id="recentre">centre</button>
-    <button id="mode">…</button>
   </div>
 </div>
 
