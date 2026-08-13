@@ -12,6 +12,7 @@ turning on the browser interface and GitHub.
 - [Controls: playing a game](#controls-playing-a-game)
 - [Controls: the terminal menus](#controls-the-terminal-menus)
 - [Controls: the browser editor](#controls-the-browser-editor)
+- [Controls: the 3D view](#controls-the-3d-view)
 - [Every command](#every-command)
 - [Connecting the browser interface](#connecting-the-browser-interface)
 - [Connecting another person: live play](#connecting-another-person-live-play)
@@ -170,8 +171,14 @@ The screens, in order of depth:
 | **+ add a row** | new empty row at the bottom |
 | **+ character** | new character |
 | **save** | writes the game (see below for where) |
+| **▶ 3D** | opens this world in 3D, in a second tab |
 | **⚙** | GitHub settings — only shown when there is no local server |
 | **👥** | share and multiplayer — only shown when there is one |
+
+The top of the editor is two rows: a thin one with the game you are on and the
+two icon buttons, and under it a row of full-width buttons — **▶ 3D**, **save**,
+**new** — sized for a thumb rather than a mouse pointer. Everything you press
+anywhere in the editor is at least 48 pixels tall for the same reason.
 
 In a shared game, the on-screen pad replaces the editor:
 
@@ -185,6 +192,57 @@ A real keyboard works too — arrows, space, and letter keys all get sent.
 
 Tap **world settings** to open width, height, speed, edge wrapping, and the
 **rename this game** button.
+
+---
+
+## Controls: the 3D view
+
+Press **▶ 3D** in the browser editor. The world opens in a second tab as a board
+of blocks, with each character's glyph floating over its own block.
+
+| Gesture | Does |
+|---|---|
+| **drag** one finger | turns the camera around the board |
+| **pinch** two fingers | moves the camera closer or further away |
+| **scroll wheel** | the same, with a mouse |
+| ▲ ▼ ◀ ▶ | the direction keys, for your character |
+| ● | the space key, usually shoot |
+| **restart** | starts the game again from the beginning (local play only) |
+| **centre** | puts the camera back where it started |
+| **run here** / **go live** | switches between the running game and this tab's own engine |
+
+A real keyboard works: arrows, space, and `w a s d e f`.
+
+**The badge in the top corner tells you what you are watching.**
+
+| Badge | Meaning |
+|---|---|
+| `LIVE` | the real game running in Termux, mirrored as it plays |
+| `RUNNING HERE` | this tab is playing the game itself, in the browser |
+
+It picks `LIVE` whenever a Spark server answers, and falls back to
+`RUNNING HERE` when none does — including in aeroplane mode, with Termux shut,
+or from the GitHub Pages copy. The game travels inside the link after the `#`,
+which never leaves the browser, so the 3D tab shows what is on your screen right
+now whether or not you have saved it.
+
+If the server disappears while you are watching `LIVE` — you closed Termux, or
+the tunnel dropped — the tab does not freeze. It switches itself to
+`RUNNING HERE` and carries on from a fresh start of the same game.
+
+### What it needs
+
+WebGL, which every current phone browser has. No library is downloaded, so
+nothing here needs the internet, GitHub or Cloudflare. If the browser refuses
+WebGL the tab says so plainly and offers you the flat editor instead, rather
+than showing a black screen.
+
+### The one thing it will not do
+
+The `open` tile does nothing in the 3D tab. A browser tab cannot hand a URL to
+an Android app the way `termux-open-url` can, so instead of pretending, it puts
+`cannot open things from a browser tab` on screen. Play in the terminal, with
+opening turned on, if a game depends on that tile.
 
 ---
 

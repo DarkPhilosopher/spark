@@ -27,6 +27,7 @@ from .world import COLORS
 
 ROOT = Path(__file__).resolve().parent.parent
 EDITOR = ROOT / "index.html"
+WORLD3D = ROOT / "world3d.html"
 
 MAY_EDIT = ("owner", "edit")
 MAY_PLAY = ("owner", "edit", "play")
@@ -119,7 +120,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def send_file(self, path):
         if not path.exists():
-            self.send_error(404, "index.html is missing")
+            self.send_error(404, "%s is missing" % path.name)
             return
         body = path.read_bytes()
         self.send_response(200)
@@ -145,6 +146,12 @@ class Handler(BaseHTTPRequestHandler):
 
         if path in ("/", "/index.html"):
             return self.send_file(EDITOR)
+        # The 3D view. Handing over the page itself is no more of a door than
+        # handing over the editor: it holds no game data, and everything it
+        # asks for afterwards -- api/live, api/key -- is checked by role like
+        # every other route. A stranger who opens it gets the same nothing.
+        if path in ("/3d", "/world3d.html"):
+            return self.send_file(WORLD3D)
         if path == "/api/tiles":
             return self.send_json(catalog())
         if path == "/api/status":

@@ -4,8 +4,7 @@ Every tick, each character reads its brain top to bottom. A row fires when all
 of its WHEN tiles pass; then all of its DO tiles run. That is the whole engine.
 """
 
-import random
-
+from . import rng as _rng
 from . import tiles
 
 COLORS = {
@@ -37,8 +36,12 @@ class Thing:
 
 
 class World:
-    def __init__(self, project):
+    def __init__(self, project, seed=None):
         self.project = project
+        # Dice first: the opening spawns below already need them. A seed makes
+        # the whole game reproducible, here and in world3d.html alike.
+        self.rng = _rng.Rng(seed)
+        self.seed = seed
         settings = project.get("world", {})
         self.width = settings.get("width", 30)
         self.height = settings.get("height", 14)
@@ -89,8 +92,8 @@ class World:
 
     def empty_cell(self):
         for _ in range(200):
-            x = random.randrange(self.width)
-            y = random.randrange(self.height)
+            x = self.rng.randrange(self.width)
+            y = self.rng.randrange(self.height)
             if not self.at(x, y):
                 return (x, y)
         return None

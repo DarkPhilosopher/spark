@@ -30,6 +30,7 @@ much larger.
 - [Knowing where you are](#knowing-where-you-are)
 - [The tiles](#the-tiles)
 - [How a brain runs](#how-a-brain-runs)
+- [Seeing it in 3D](#seeing-it-in-3d)
 - [Every command](#every-command)
 - [Where things live](#where-things-live)
 - [What a game file looks like](#what-a-game-file-looks-like)
@@ -317,6 +318,72 @@ Some other rules worth knowing:
 
 ---
 
+## Seeing it in 3D
+
+There is a **▶ 3D** button at the top of the browser editor. It opens a second
+tab where the same world stands up off the page: every character becomes a
+block on a board you can turn with one finger and pinch to zoom. The glyph you
+chose sits on top of its block, so a `@` is still a `@`, and the colours are the
+ones you picked.
+
+Nothing is downloaded to make that happen. The 3D is drawn with WebGL, which is
+already in the phone's browser, and no library is fetched from anywhere -- a
+page that reaches out to a CDN is a page that goes blank the moment you lose
+signal, which is the opposite of what this is for.
+
+**It works whether or not anything is running.** The tab looks for a Spark
+server first, and shows one of two badges in the corner:
+
+| Badge | What you are looking at |
+|---|---|
+| `LIVE` | the real game running in Termux, mirrored tick for tick — what everyone else in a shared world sees |
+| `RUNNING HERE` | the tab playing the game by itself, in the browser |
+
+So the same link behaves sensibly in all of these:
+
+    spark.py host, phone on wifi        LIVE  -- the shared world, in 3D
+    spark.py host --public, tunnel      LIVE  -- guests see it too
+    the GitHub Pages copy               RUNNING HERE
+    aeroplane mode, Termux closed       RUNNING HERE
+    the .html file saved and reopened   RUNNING HERE
+
+The last two work because the **▶ 3D** button packs the whole game into the
+link itself, after the `#`. A fragment never travels to any server, so the tab
+already has everything it needs before it asks anyone for anything. That also
+means it shows the game as it is *on screen* — you do not have to save first.
+
+The `run here` button forces the local engine even when a server is there, which
+is the quickest way to try a change without disturbing a game other people are
+playing. `centre` puts the camera back where it started.
+
+### Two engines, kept honest
+
+Running a game with no server means Spark now has its rules written down twice:
+in `engine/world.py`, and again in JavaScript inside `world3d.html`. Two copies
+of anything drift apart, and rules that drift would mean the 3D view quietly
+telling you a lie about your own game.
+
+`tests/check_engines.py` is what stops that. It plays every game in `games/`
+twice, once with each engine, from the same seed and with the same keys pressed
+on the same ticks, and demands that every character be in the same square with
+the same health on every tick. It fails if you change a rule in one engine and
+forget the other; I checked by flipping a single sign in the JavaScript, and it
+caught it.
+
+The two can only agree about luck because a seeded world stops using Python's
+own `random` — which no JavaScript could reproduce — and uses `engine/rng.py`
+instead, a small generator both languages run in exact integer arithmetic.
+**Ordinary play is unchanged and still genuinely random**; the seed exists for
+the test.
+
+One tile behaves differently in the 3D tab, and it is the one you would want to
+be careful about: `open` does nothing there. A browser tab has no way to hand a
+URL to an Android app the way `termux-open-url` does, so it says so in the game
+rather than pretending. The Python engine still opens things when you play in
+the terminal and opening is on.
+
+---
+
 ## Every command
 
 Once `python3 spark.py install` has been run, every one of these works as plain
@@ -347,6 +414,7 @@ Once `python3 spark.py install` has been run, every one of these works as plain
 | `python3 tests/check_permissions.py` | check guests cannot exceed their code |
 | `python3 tests/check_open.py` | check the remember/open tiles and their fences |
 | `python3 tests/check_multiplayer.py` | check two players share one world |
+| `python3 tests/check_engines.py` | check the Python and JavaScript engines still agree |
 
 ---
 
@@ -354,6 +422,7 @@ Once `python3 spark.py install` has been run, every one of these works as plain
 
     spark.py             the launcher — every command above goes through it
     index.html           the drag-and-drop editor (served locally or by Pages)
+    world3d.html         the 3D view, and a second copy of the rules in JavaScript
     README.md            this guide
     MANUAL.md            controls, requirements, and how to connect things
     CHANGELOG.md         what changed and when
@@ -372,12 +441,15 @@ Once `python3 spark.py install` has been run, every one of these works as plain
     engine/sync.py       push and pull single games to and from GitHub
     engine/live.py       the shared world: invite codes, roles, connected people
     engine/tunnel.py     finds and runs cloudflared or ngrok for public play
+    engine/rng.py        seeded dice, so both engines can roll the same numbers
     tests/store.test.js  17 checks on the editor's save and load logic
     tests/check_docs.py  fails if this README has drifted from the code
     tests/check_sync.py  checks the GitHub push/pull logic, without the network
     tests/check_permissions.py  checks a guest can only do what their code allows
     tests/check_multiplayer.py  two players in one world, over real HTTP
     tests/check_open.py  checks remember/open, and that a guest cannot launch apps
+    tests/check_engines.py      plays every game twice, once per engine, and compares
+    tests/engine_trace.js       runs the JavaScript engine from a terminal, for that test
 
 Two files are **generated** — do not edit them by hand:
 

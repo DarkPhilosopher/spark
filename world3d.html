@@ -1,0 +1,1044 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Spark 3D</title>
+<style>
+  :root{
+    --bg:#0d0f12; --panel:#1d2026; --panel2:#252932; --line:#333945;
+    --ink:#e8eaed; --dim:#9aa3b2; --accent:#4dd0e1; --bad:#d0554f;
+    --good:#5dd97f;
+    --tap:56px;              /* nothing you press is smaller than this */
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);overflow:hidden;
+       font:15px/1.4 system-ui,-apple-system,"Roboto",sans-serif;
+       -webkit-text-size-adjust:100%;-webkit-user-select:none;user-select:none;
+       touch-action:none}
+  canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+
+  /* the glyphs, floated over their cubes */
+  #labels{position:fixed;inset:0;pointer-events:none;overflow:hidden}
+  .glyph{position:absolute;transform:translate(-50%,-50%);
+         font:700 15px/1 ui-monospace,monospace;
+         text-shadow:0 1px 3px #000,0 0 6px #000;white-space:pre}
+
+  /* top bar */
+  #bar{position:fixed;top:0;left:0;right:0;z-index:4;display:flex;gap:8px;
+       align-items:center;padding:8px;padding-top:calc(8px + env(safe-area-inset-top));
+       background:linear-gradient(#0d0f12ee,#0d0f1200)}
+  #title{font-weight:700;font-size:15px;margin-right:auto;
+         text-overflow:ellipsis;overflow:hidden;white-space:nowrap}
+  .badge{font:700 11px/1 ui-monospace,monospace;letter-spacing:.1em;
+         border-radius:20px;padding:8px 12px;border:1px solid var(--line);
+         background:var(--panel);white-space:nowrap}
+  .badge.live{color:var(--good);border-color:var(--good)}
+  .badge.local{color:var(--accent);border-color:var(--accent)}
+
+  #hud{position:fixed;top:calc(52px + env(safe-area-inset-top));left:8px;z-index:4;
+       font:12px/1.7 ui-monospace,monospace;color:var(--dim);
+       background:#0d0f12bb;border-radius:10px;padding:6px 10px}
+  #hud b{color:var(--ink)}
+  #say{position:fixed;top:calc(52px + env(safe-area-inset-top));right:8px;z-index:4;
+       max-width:52vw;text-align:right;color:var(--accent);font-size:13px;
+       background:#0d0f12bb;border-radius:10px;padding:6px 10px}
+  #say:empty{display:none}
+
+  /* controls: everything thumb-sized, thumbs at the bottom */
+  #controls{position:fixed;left:0;right:0;bottom:0;z-index:5;
+            padding:8px;padding-bottom:calc(8px + env(safe-area-inset-bottom));
+            display:flex;align-items:flex-end;justify-content:space-between;
+            gap:10px;background:linear-gradient(#0d0f1200,#0d0f12dd 40%)}
+  button{font:inherit;color:var(--ink);background:var(--panel2);
+         border:1px solid var(--line);border-radius:14px;
+         min-height:var(--tap);min-width:var(--tap);padding:10px 14px}
+  button:active{filter:brightness(1.45)}
+  button[disabled]{opacity:.4}
+
+  #pad{display:grid;grid-template-columns:repeat(3,var(--tap));
+       grid-template-rows:repeat(3,var(--tap));gap:8px}
+  #pad button{font-size:22px;padding:0;border-radius:16px}
+  #pad .fire{background:#2b3a44;border-color:var(--accent);color:var(--accent);
+             font-size:15px}
+  #side{display:flex;flex-direction:column;gap:8px;align-items:stretch}
+  #side button{font-size:13px;padding:10px}
+
+  #veil{position:fixed;inset:0;z-index:9;display:none;place-items:center;
+        background:#0d0f12ee;padding:24px;text-align:center}
+  #veil.on{display:grid}
+  #veil div{max-width:34ch}
+  #veil h1{font-size:19px;margin:0 0 10px}
+  #veil p{color:var(--dim);font-size:14px;margin:0 0 18px}
+</style>
+</head>
+<body>
+
+<canvas id="gl"></canvas>
+<div id="labels"></div>
+
+<div id="bar">
+  <div id="title">Spark 3D</div>
+  <div class="badge" id="source">…</div>
+</div>
+
+<div id="hud"></div>
+<div id="say"></div>
+
+<div id="controls">
+  <div id="pad">
+    <span></span><button data-key="up" aria-label="up">▲</button><span></span>
+    <button data-key="left" aria-label="left">◀</button>
+    <button data-key="space" class="fire" aria-label="space">●</button>
+    <button data-key="right" aria-label="right">▶</button>
+    <span></span><button data-key="down" aria-label="down">▼</button><span></span>
+  </div>
+  <div id="side">
+    <button id="restart">restart</button>
+    <button id="recentre">centre</button>
+    <button id="mode">…</button>
+  </div>
+</div>
+
+<div id="veil"><div>
+  <h1 id="veil-h">…</h1>
+  <p id="veil-p"></p>
+  <button id="veil-b">try again</button>
+</div></div>
+
+<script>
+// ==== SPARK-ENGINE-START ====
+// A second copy of engine/world.py and engine/tiles.py, in JavaScript, so that
+// this page can run a game with nothing behind it -- no Termux, no Cloudflare,
+// no GitHub. Two engines can drift apart, so tests/check_engines.py plays every
+// game twice, once with each engine, from the same seed and with the same keys
+// pressed on the same ticks, and demands the same board on every tick. If you
+// change a rule in one, change it in the other -- that test will tell you if
+// you forgot. It reaches this code through tests/engine_trace.js, which is why
+// the markers around this section matter and why nothing here touches the DOM.
+
+const RNG_MOD = 4294967296, RNG_MULT = 1664525, RNG_ADD = 1013904223;
+
+class Rng {
+  // The twin of engine/rng.py. Same constants, same order, same numbers.
+  constructor(seed) {
+    this.seeded = seed !== null && seed !== undefined;
+    this.state = this.seeded ? ((Number(seed) % RNG_MOD) + RNG_MOD) % RNG_MOD : 0;
+  }
+  _next() {
+    this.state = (this.state * RNG_MULT + RNG_ADD) % RNG_MOD;
+    return this.state;
+  }
+  randrange(n) {
+    if (!(n > 0)) throw new Error("randrange needs a positive number");
+    if (!this.seeded) return Math.floor(Math.random() * n);
+    return this._next() % n;
+  }
+  choice(seq) {
+    if (!seq.length) throw new Error("cannot choose from nothing");
+    if (!this.seeded) return seq[Math.floor(Math.random() * seq.length)];
+    return seq[this._next() % seq.length];
+  }
+}
+
+const STEPS = {
+  up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0],
+  north: [0, -1], "north-east": [1, -1], east: [1, 0], "south-east": [1, 1],
+  south: [0, 1], "south-west": [-1, 1], west: [-1, 0], "north-west": [-1, -1],
+};
+// Same twelve, same order as tiles.STEP_LIST -- seeded `move random` depends on it.
+const STEP_LIST = Object.keys(STEPS).map(k => STEPS[k]);
+const OPEN_COOLDOWN = 30;
+
+const has = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
+const num = (v, fallback) => (v === undefined || v === null || v === "" ? fallback : Number(v));
+const floorMod = (a, b) => ((a % b) + b) % b;
+
+function matches(obj, kind) { return kind === "anything" || obj.kind === kind; }
+
+function resolveStep(name, obj, it, rng) {
+  if (has(STEPS, name)) return STEPS[name];
+  if (name === "random") return rng.choice(STEP_LIST);
+  if (name === "forward") return obj.facing;
+  if (it === null || it === undefined) return [0, 0];
+  let dx = it.x - obj.x, dy = it.y - obj.y;
+  if (name === "away from it") { dx = -dx; dy = -dy; }
+  if (Math.abs(dx) >= Math.abs(dy)) return [dx ? (dx > 0 ? 1 : -1) : 0, 0];
+  return [0, dy ? (dy > 0 ? 1 : -1) : 0];
+}
+
+function remembered(world, text) {
+  const t = String(text || "").trim();
+  return String(has(world.memory, t) ? world.memory[t] : t);
+}
+
+const SHOT_BRAIN = [
+  {when: [{tile: "always", args: {}}],
+   do: [{tile: "move", args: {dir: "forward"}}]},
+  {when: [{tile: "touch", args: {kind: "anything"}}],
+   do: [{tile: "damage", args: {target: "it", amount: 1}},
+        {tile: "vanish", args: {target: "self"}}]},
+  {when: [{tile: "spent", args: {}}],
+   do: [{tile: "vanish", args: {target: "self"}}]},
+  {when: [{tile: "at_edge", args: {}}],
+   do: [{tile: "vanish", args: {target: "self"}}]},
+];
+
+class Thing {
+  constructor(kind, x, y, template) {
+    this.kind = kind;
+    this.x = x; this.y = y;
+    this.glyph = String(template.glyph || "?").slice(0, 1) || "?";
+    this.color = template.color || "white";
+    this.health = template.health === undefined ? 1 : template.health;
+    this.solid = !!template.solid;
+    this.role = template.role || "prop";
+    this.brain = template.brain || [];
+    this.facing = [0, -1];
+    this.owner = null;
+    this.alive = true;
+    this.age = 0;
+    this.travelled = 0;
+    this.maxLife = 0;
+    this.maxRange = 0;
+    this.controller = null;
+  }
+}
+
+// -- SENSORS, the WHEN half ------------------------------------------------
+const SENSORS = {
+  always: () => true,
+  key: (obj, world, a) => world.keysFor(obj).has(a.key),
+  see: (obj, world, a) => world.nearest(obj, a.kind, num(a.range, 6)),
+  touch: (obj, world, a) => world.nearest(obj, a.kind, 1),
+  timer: (obj, world, a) => world.tick % Math.max(1, num(a.every, 4)) === 0,
+  health_below: (obj, world, a) => obj.health < num(a.value, 2),
+  score_at_least: (obj, world, a) => world.score >= num(a.value, 10),
+  chance: (obj, world, a) => world.rng.randrange(100) < num(a.percent, 25),
+  at_edge: (obj, world) =>
+    obj.x === 0 || obj.x === world.width - 1 ||
+    obj.y === 0 || obj.y === world.height - 1,
+  recall: (obj, world, a) => {
+    const name = String(a.name === undefined ? "" : a.name).trim();
+    return has(world.memory, name) &&
+      world.memory[name] === String(a.value === undefined ? "" : a.value);
+  },
+  spent: (obj) => {
+    if (obj.maxRange && obj.travelled >= obj.maxRange) return true;
+    return !!(obj.maxLife && obj.age >= obj.maxLife);
+  },
+};
+
+// -- ACTIONS, the DO half --------------------------------------------------
+const ACTIONS = {
+  move: (obj, world, a, it) => {
+    const [dx, dy] = resolveStep(a.dir, obj, it, world.rng);
+    if (dx || dy) { obj.facing = [dx, dy]; world.tryMove(obj, dx, dy); }
+  },
+  face: (obj, world, a, it) => {
+    const [dx, dy] = resolveStep(a.dir, obj, it, world.rng);
+    if (dx || dy) obj.facing = [dx, dy];
+  },
+  shoot: (obj, world, a, it) => {
+    const [dx, dy] = resolveStep(a.dir, obj, it, world.rng);
+    if (!(dx || dy)) return;
+    const shot = world.spawn("shot", obj.x + dx, obj.y + dy);
+    if (shot) {
+      shot.facing = [dx, dy];
+      shot.owner = obj;
+      shot.maxRange = Math.max(0, num(a.reach, 8));
+      shot.maxLife = Math.max(0, num(a.life, 12));
+    }
+  },
+  say: (obj, world, a) => { world.message = a.text; },
+  score: (obj, world, a) => { world.score += num(a.amount, 1); },
+  damage: (obj, world, a, it) => {
+    const victim = a.target === "self" ? obj : it;
+    if (victim) {
+      victim.health -= num(a.amount, 1);
+      if (victim.health <= 0) world.remove(victim);
+    }
+  },
+  heal: (obj, world, a) => { obj.health += num(a.amount, 1); },
+  spawn: (obj, world, a) => { world.spawnSomewhere(a.kind); },
+  remember: (obj, world, a) => {
+    const name = String(a.name === undefined ? "" : a.name).trim();
+    if (name) world.memory[name] = String(a.value === undefined ? "" : a.value);
+  },
+  open: (obj, world, a) => {
+    // The one tile that reaches outside the game. A browser tab cannot hand a
+    // URL to an Android app the way termux-open-url can, and this page is often
+    // the guest's view, so opening stays off here and the game is told so --
+    // exactly what the Python tile does in a shared world.
+    if (!world.mayOpen) { world.message = "opening is off in this world"; return; }
+    const target = remembered(world, a.target);
+    if (!target) return;
+    const key = remembered(world, a.object) + " " + target;
+    const when = world.opened[key];
+    if (when !== undefined && world.tick - when < OPEN_COOLDOWN) return;
+    world.opened[key] = world.tick;
+    world.message = "cannot open things from a browser tab";
+  },
+  vanish: (obj, world, a, it) => {
+    const victim = a.target === "self" ? obj : it;
+    if (victim) world.remove(victim);
+  },
+  teleport: (obj, world) => {
+    const spot = world.emptyCell();
+    if (spot) { obj.x = spot[0]; obj.y = spot[1]; }
+  },
+  win: (obj, world) => { world.status = "win"; },
+  lose: (obj, world) => { world.status = "lose"; },
+};
+
+class World {
+  constructor(project, seed) {
+    this.project = project;
+    this.rng = new Rng(seed);
+    this.seed = seed;
+    const settings = project.world || {};
+    this.width = settings.width === undefined ? 30 : settings.width;
+    this.height = settings.height === undefined ? 14 : settings.height;
+    this.wrap = !!settings.wrap;
+
+    this.templates = {};
+    for (const c of project.characters || []) this.templates[c.kind] = c;
+    if (!has(this.templates, "shot")) {
+      this.templates.shot = {kind: "shot", glyph: "*", color: "yellow",
+                             health: 1, brain: SHOT_BRAIN};
+    }
+
+    this.things = [];
+    this.tick = 0;
+    this.score = 0;
+    this.message = "";
+    this.status = null;
+    this.keys = new Set();
+    this.playerKeys = {};
+    this.memory = {};
+    this.mayOpen = false;
+    this.opened = {};
+
+    for (const char of project.characters || []) {
+      const count = char.count === undefined ? 1 : char.count;
+      for (let i = 0; i < count; i++) this.spawnSomewhere(char.kind);
+    }
+  }
+
+  keysFor(thing) {
+    if (thing.controller === null) return this.keys;
+    return this.playerKeys[thing.controller] || new Set();
+  }
+
+  inBounds(x, y) {
+    return x >= 0 && x < this.width && y >= 0 && y < this.height;
+  }
+
+  at(x, y) {
+    return this.things.filter(t => t.alive && t.x === x && t.y === y);
+  }
+
+  emptyCell() {
+    for (let i = 0; i < 200; i++) {
+      const x = this.rng.randrange(this.width);
+      const y = this.rng.randrange(this.height);
+      if (!this.at(x, y).length) return [x, y];
+    }
+    return null;
+  }
+
+  nearest(obj, kind, reach) {
+    let best = null, bestD = null;
+    for (const other of this.things) {
+      if (other === obj || !other.alive || other === obj.owner) continue;
+      if (obj.owner !== null && other.owner === obj.owner) continue;
+      if (!matches(other, kind)) continue;
+      const dist = Math.max(Math.abs(other.x - obj.x), Math.abs(other.y - obj.y));
+      if (dist <= reach && (bestD === null || dist < bestD)) { best = other; bestD = dist; }
+    }
+    return best;
+  }
+
+  spawn(kind, x, y) {
+    const template = this.templates[kind];
+    if (template === undefined) return null;
+    if (!this.inBounds(x, y)) return null;
+    const thing = new Thing(kind, x, y, template);
+    this.things.push(thing);
+    return thing;
+  }
+
+  spawnSomewhere(kind) {
+    const spot = this.emptyCell();
+    return spot ? this.spawn(kind, spot[0], spot[1]) : null;
+  }
+
+  remove(thing) { thing.alive = false; }
+
+  tryMove(thing, dx, dy) {
+    let x = thing.x + dx, y = thing.y + dy;
+    if (this.wrap) { x = floorMod(x, this.width); y = floorMod(y, this.height); }
+    else if (!this.inBounds(x, y)) return false;
+    if (this.at(x, y).some(o => o.solid)) return false;
+    thing.x = x; thing.y = y;
+    thing.travelled += 1;
+    return true;
+  }
+
+  runRow(thing, row) {
+    let it = null;
+    for (const use of row.when || []) {
+      const fn = SENSORS[use.tile];
+      if (fn === undefined) return;
+      const result = fn(thing, this, use.args || {});
+      if (!result) return;
+      if (it === null && result instanceof Thing) it = result;
+    }
+    for (const use of row.do || []) {
+      const fn = ACTIONS[use.tile];
+      if (fn !== undefined) fn(thing, this, use.args || {}, it);
+    }
+  }
+
+  step() {
+    this.tick += 1;
+    for (const thing of this.things.slice()) {
+      if (!thing.alive || this.status) continue;
+      thing.age += 1;
+      for (const row of thing.brain) {
+        if (!thing.alive) break;
+        this.runRow(thing, row);
+      }
+    }
+    this.things = this.things.filter(t => t.alive);
+
+    const players = this.things.filter(t => t.role === "player");
+    const wanted = (this.project.characters || []).some(c => c.role === "player");
+    if (!players.length && wanted) this.status = "lose";
+  }
+}
+// ==== SPARK-ENGINE-END ====
+
+
+// ==========================================================================
+// The 3D view. Raw WebGL: no library is loaded, because a page that fetches
+// three.js from a CDN is a page that goes blank on a phone in aeroplane mode.
+// ==========================================================================
+
+// How close and how far the camera may ever get. The far clipping plane has to
+// clear the furthest of these plus the board's own radius, or a big world gets
+// its back edge sliced off.
+const MIN_DIST = 4, MAX_DIST = 900;
+
+const COLOR_RGB = {
+  white: [0.91, 0.92, 0.93], red: [0.82, 0.33, 0.31], green: [0.36, 0.85, 0.50],
+  yellow: [0.88, 0.75, 0.29], blue: [0.29, 0.53, 0.78], magenta: [0.73, 0.41, 0.78],
+  cyan: [0.30, 0.82, 0.88], grey: [0.55, 0.58, 0.63],
+};
+const COLOR_CSS = {
+  white: "#e8eaed", red: "#d0554f", green: "#5dd97f", yellow: "#e0c04a",
+  blue: "#4a86c7", magenta: "#b968c7", cyan: "#4dd0e1", grey: "#8b93a1",
+};
+
+// -- the smallest amount of matrix maths that will do ----------------------
+function mat4Multiply(a, b) {
+  const out = new Float32Array(16);
+  for (let c = 0; c < 4; c++)
+    for (let r = 0; r < 4; r++) {
+      let sum = 0;
+      for (let k = 0; k < 4; k++) sum += a[k * 4 + r] * b[c * 4 + k];
+      out[c * 4 + r] = sum;
+    }
+  return out;
+}
+
+function mat4Perspective(fovy, aspect, near, far) {
+  const f = 1 / Math.tan(fovy / 2), nf = 1 / (near - far);
+  const out = new Float32Array(16);
+  out[0] = f / aspect; out[5] = f;
+  out[10] = (far + near) * nf; out[11] = -1;
+  out[14] = 2 * far * near * nf;
+  return out;
+}
+
+function mat4LookAt(eye, centre, up) {
+  const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+  const norm = v => {
+    const len = Math.hypot(v[0], v[1], v[2]) || 1;
+    return [v[0] / len, v[1] / len, v[2] / len];
+  };
+  const cross = (a, b) => [a[1] * b[2] - a[2] * b[1],
+                           a[2] * b[0] - a[0] * b[2],
+                           a[0] * b[1] - a[1] * b[0]];
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const z = norm(sub(eye, centre));
+  const x = norm(cross(up, z));
+  const y = cross(z, x);
+  return new Float32Array([
+    x[0], y[0], z[0], 0,
+    x[1], y[1], z[1], 0,
+    x[2], y[2], z[2], 0,
+    -dot(x, eye), -dot(y, eye), -dot(z, eye), 1,
+  ]);
+}
+
+const VERTEX_SRC = `
+attribute vec3 aPos;
+attribute vec3 aNormal;
+attribute vec3 aColor;
+uniform mat4 uMVP;
+varying vec3 vNormal;
+varying vec3 vColor;
+void main() {
+  vNormal = aNormal;
+  vColor = aColor;
+  gl_Position = uMVP * vec4(aPos, 1.0);
+}`;
+
+const FRAGMENT_SRC = `
+precision mediump float;
+varying vec3 vNormal;
+varying vec3 vColor;
+const vec3 LIGHT = vec3(0.35, 0.86, 0.37);
+void main() {
+  float lambert = max(dot(normalize(vNormal), LIGHT), 0.0);
+  gl_FragColor = vec4(vColor * (0.34 + 0.72 * lambert), 1.0);
+}`;
+
+// Six faces, each two triangles: offsets and the normal that goes with them.
+const FACES = [
+  {n: [0, 1, 0], v: [[0,1,0],[0,1,1],[1,1,1],[0,1,0],[1,1,1],[1,1,0]]},  // top
+  {n: [0,-1, 0], v: [[0,0,0],[1,0,0],[1,0,1],[0,0,0],[1,0,1],[0,0,1]]},  // bottom
+  {n: [0, 0, 1], v: [[0,0,1],[1,0,1],[1,1,1],[0,0,1],[1,1,1],[0,1,1]]},  // south
+  {n: [0, 0,-1], v: [[1,0,0],[0,0,0],[0,1,0],[1,0,0],[0,1,0],[1,1,0]]},  // north
+  {n: [1, 0, 0], v: [[1,0,1],[1,0,0],[1,1,0],[1,0,1],[1,1,0],[1,1,1]]},  // east
+  {n: [-1,0, 0], v: [[0,0,0],[0,0,1],[0,1,1],[0,0,0],[0,1,1],[0,1,0]]},  // west
+];
+
+function pushBox(out, x, y, z, sx, sy, sz, rgb, faces) {
+  for (const face of faces || FACES)
+    for (const corner of face.v)
+      out.push(x + corner[0] * sx, y + corner[1] * sy, z + corner[2] * sz,
+               face.n[0], face.n[1], face.n[2], rgb[0], rgb[1], rgb[2]);
+}
+
+class Renderer {
+  constructor(canvas) {
+    this.canvas = canvas;
+    const opts = {antialias: true, alpha: false, preserveDrawingBuffer: false};
+    this.gl = canvas.getContext("webgl", opts) ||
+              canvas.getContext("experimental-webgl", opts);
+    if (!this.gl) throw new Error("no WebGL");
+    const gl = this.gl;
+
+    this.program = this.link(VERTEX_SRC, FRAGMENT_SRC);
+    gl.useProgram(this.program);
+    this.aPos = gl.getAttribLocation(this.program, "aPos");
+    this.aNormal = gl.getAttribLocation(this.program, "aNormal");
+    this.aColor = gl.getAttribLocation(this.program, "aColor");
+    this.uMVP = gl.getUniformLocation(this.program, "uMVP");
+
+    this.floorBuf = gl.createBuffer();
+    this.floorCount = 0;
+    this.thingBuf = gl.createBuffer();
+    this.thingCount = 0;
+
+    gl.enable(gl.DEPTH_TEST);
+    gl.clearColor(0.051, 0.059, 0.071, 1);
+
+    // camera, in spherical coordinates around the middle of the board
+    this.yaw = 0.0; this.pitch = 0.86; this.dist = 26;
+    this.centre = [0, 0, 0];
+    this.board = [30, 14];
+    this.radius = 16;          // how big a sphere the board fits inside
+    this.fovy = Math.PI / 4;
+    this.mvp = new Float32Array(16);
+  }
+
+  /* Stand far enough back to see the whole board, from any angle.
+   *
+   * Fitting the width and the depth separately is the obvious thing and it is
+   * wrong, because the camera turns: swing a quarter turn and a board's width
+   * is now its depth. So what gets fitted is the sphere the whole board sits
+   * inside, whose radius does not care which way round anything is.
+   *
+   * The shape of the screen matters as much as the size of the board. A phone
+   * held upright has a narrow horizontal field of view -- the vertical one
+   * squeezed by the aspect ratio -- and a wide world runs off the sides long
+   * before it runs off the top. The tighter of the two angles decides. */
+  frameBoard() {
+    const wide = this.canvas.clientWidth || window.innerWidth || 1;
+    const high = this.canvas.clientHeight || window.innerHeight || 1;
+    const halfV = this.fovy / 2;
+    const halfH = Math.atan(Math.tan(halfV) * (wide / high));
+    // + 0.5 for the rim around the board, 1.3 for how tall a character stands
+    this.radius = Math.hypot(this.board[0] / 2 + 0.5, this.board[1] / 2 + 0.5, 1.3);
+    const room = this.radius / Math.sin(Math.min(halfV, halfH)) * 1.06;
+    this.dist = Math.max(MIN_DIST, Math.min(MAX_DIST, room));
+  }
+
+  link(vertexSrc, fragmentSrc) {
+    const gl = this.gl;
+    const compile = (type, src) => {
+      const shader = gl.createShader(type);
+      gl.shaderSource(shader, src);
+      gl.compileShader(shader);
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS))
+        throw new Error("shader: " + gl.getShaderInfoLog(shader));
+      return shader;
+    };
+    const program = gl.createProgram();
+    gl.attachShader(program, compile(gl.VERTEX_SHADER, vertexSrc));
+    gl.attachShader(program, compile(gl.FRAGMENT_SHADER, fragmentSrc));
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS))
+      throw new Error("link: " + gl.getProgramInfoLog(program));
+    return program;
+  }
+
+  resize() {
+    const scale = Math.min(window.devicePixelRatio || 1, 2);
+    const width = Math.floor(this.canvas.clientWidth * scale);
+    const height = Math.floor(this.canvas.clientHeight * scale);
+    if (this.canvas.width !== width || this.canvas.height !== height) {
+      this.canvas.width = width; this.canvas.height = height;
+    }
+    this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+  }
+
+  /* The board only changes when the game does, so it is built once and kept. */
+  buildFloor(width, height) {
+    const data = [];
+    for (let y = 0; y < height; y++)
+      for (let x = 0; x < width; x++) {
+        const dark = (x + y) % 2 === 0;
+        const shade = dark ? [0.109, 0.125, 0.149] : [0.133, 0.153, 0.180];
+        pushBox(data, x, -0.35, y, 1, 0.35, 1, shade, [FACES[0]]);
+      }
+    // a low wall around the edge, so you can see where the world stops
+    const rim = [0.180, 0.200, 0.235];
+    pushBox(data, -0.4, -0.35, -0.4, width + 0.8, 0.35, 0.4, rim);
+    pushBox(data, -0.4, -0.35, height, width + 0.8, 0.35, 0.4, rim);
+    pushBox(data, -0.4, -0.35, 0, 0.4, 0.35, height, rim);
+    pushBox(data, width, -0.35, 0, 0.4, 0.35, height, rim);
+
+    const gl = this.gl;
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.floorBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+    this.floorCount = data.length / 9;
+    this.centre = [width / 2, 0, height / 2];
+    this.board = [width, height];
+    this.frameBoard();
+  }
+
+  /* Characters change every tick, so their mesh is thrown away and remade. */
+  buildThings(things) {
+    const data = [];
+    for (const thing of things) {
+      const rgb = COLOR_RGB[thing.color] || COLOR_RGB.white;
+      const shot = thing.kind === "shot";
+      const tall = thing.role === "player" ? 1.15 : (thing.solid ? 1.0 : 0.75);
+      const size = shot ? 0.34 : 0.86;
+      const height = shot ? 0.34 : tall;
+      const inset = (1 - size) / 2;
+      pushBox(data, thing.x + inset, 0, thing.y + inset, size, height, size, rgb);
+    }
+    const gl = this.gl;
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.thingBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.DYNAMIC_DRAW);
+    this.thingCount = data.length / 9;
+  }
+
+  camera() {
+    const cp = Math.cos(this.pitch), sp = Math.sin(this.pitch);
+    const eye = [
+      this.centre[0] + this.dist * cp * Math.sin(this.yaw),
+      this.centre[1] + this.dist * sp,
+      this.centre[2] + this.dist * cp * Math.cos(this.yaw),
+    ];
+    const aspect = this.canvas.width / Math.max(1, this.canvas.height);
+    const near = Math.max(0.1, this.dist - this.radius * 1.6);
+    const far = this.dist + this.radius * 2.2 + 10;
+    const projection = mat4Perspective(this.fovy, aspect, near, far);
+    const view = mat4LookAt(eye, this.centre, [0, 1, 0]);
+    this.mvp = mat4Multiply(projection, view);
+  }
+
+  draw() {
+    const gl = this.gl;
+    this.resize();
+    this.camera();
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.useProgram(this.program);
+    gl.uniformMatrix4fv(this.uMVP, false, this.mvp);
+    for (const [buffer, count] of [[this.floorBuf, this.floorCount],
+                                   [this.thingBuf, this.thingCount]]) {
+      if (!count) continue;
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+      const stride = 36;
+      for (const [loc, offset] of [[this.aPos, 0], [this.aNormal, 12], [this.aColor, 24]]) {
+        gl.enableVertexAttribArray(loc);
+        gl.vertexAttribPointer(loc, 3, gl.FLOAT, false, stride, offset);
+      }
+      gl.drawArrays(gl.TRIANGLES, 0, count);
+    }
+  }
+
+  /* Where a point in the world lands on the screen, for the glyph overlay. */
+  project(x, y, z) {
+    const m = this.mvp;
+    const cw = m[3] * x + m[7] * y + m[11] * z + m[15];
+    if (cw <= 0) return null;
+    const cx = m[0] * x + m[4] * y + m[8] * z + m[12];
+    const cy = m[1] * x + m[5] * y + m[9] * z + m[13];
+    return [(cx / cw * 0.5 + 0.5) * this.canvas.clientWidth,
+            (1 - (cy / cw * 0.5 + 0.5)) * this.canvas.clientHeight];
+  }
+}
+
+
+// ==========================================================================
+// Where the world comes from: the running game if one can be reached, and
+// this page's own engine if not.
+// ==========================================================================
+
+const $ = s => document.querySelector(s);
+const LS_TOKEN = "spark:token", LS_OWNER = "spark:ownerkey";
+
+const DEMO = {
+  name: "demo",
+  world: {width: 16, height: 12, wrap: false, speed: 6},
+  characters: [
+    {kind: "hero", glyph: "@", color: "cyan", health: 3, count: 1,
+     solid: false, role: "player",
+     brain: [
+       {when: [{tile: "key", args: {key: "up"}}], do: [{tile: "move", args: {dir: "up"}}]},
+       {when: [{tile: "key", args: {key: "down"}}], do: [{tile: "move", args: {dir: "down"}}]},
+       {when: [{tile: "key", args: {key: "left"}}], do: [{tile: "move", args: {dir: "left"}}]},
+       {when: [{tile: "key", args: {key: "right"}}], do: [{tile: "move", args: {dir: "right"}}]},
+       {when: [{tile: "key", args: {key: "space"}}],
+        do: [{tile: "shoot", args: {dir: "forward", reach: 8, life: 12}}]},
+       {when: [{tile: "touch", args: {kind: "apple"}}],
+        do: [{tile: "score", args: {amount: 1}}, {tile: "vanish", args: {target: "it"}},
+             {tile: "spawn", args: {kind: "apple"}}]},
+     ]},
+    {kind: "apple", glyph: "o", color: "green", health: 1, count: 5,
+     solid: false, role: "prop", brain: []},
+    {kind: "rock", glyph: "#", color: "grey", health: 9, count: 10,
+     solid: true, role: "prop", brain: []},
+    {kind: "bug", glyph: "x", color: "red", health: 2, count: 3,
+     solid: false, role: "prop",
+     brain: [
+       {when: [{tile: "timer", args: {every: 2}}, {tile: "see", args: {kind: "hero", range: 7}}],
+        do: [{tile: "move", args: {dir: "toward it"}}]},
+       {when: [{tile: "timer", args: {every: 3}}],
+        do: [{tile: "move", args: {dir: "random"}}]},
+     ]},
+  ],
+};
+
+let renderer = null;
+let world = null;             // the local engine's world, when running locally
+let project = null;           // the game data
+let live = false;             // are we mirroring a real server?
+let liveSnapshot = null;
+let forcedLocal = false;      // the user pressed "run here"
+let stepTimer = null, pollTimer = null;
+const pressed = new Set();
+
+function authHeaders() {
+  const headers = {};
+  const token = localStorage.getItem(LS_TOKEN);
+  const key = localStorage.getItem(LS_OWNER);
+  if (token) headers["X-Spark-Token"] = token;
+  if (key) headers["X-Spark-Owner"] = key;
+  return headers;
+}
+
+/* The game to show, in order of how directly it was handed to us. */
+async function findProject() {
+  // 1. handed over in the link, which is what the editor's 3D button does.
+  //    This is the only source that works with no network at all.
+  const inLink = /[#&]g=([A-Za-z0-9_-]+=*)/.exec(location.hash || "");
+  if (inLink) {
+    try {
+      const json = decodeURIComponent(escape(atob(
+        inLink[1].replace(/-/g, "+").replace(/_/g, "/"))));
+      return [JSON.parse(json), "the editor"];
+    } catch (err) { /* fall through to the next source */ }
+  }
+  // 2. asked for by name
+  const named = /[?&]game=([^&#]+)/.exec(location.search || "");
+  if (named) {
+    const name = decodeURIComponent(named[1]);
+    const got = await fetchJson("games/" + name + ".json");
+    if (got) return [got, name];
+  }
+  // 3. whatever is in the games folder -- works on GitHub Pages too
+  const index = await fetchJson("games/index.json");
+  if (index && index.length) {
+    const got = await fetchJson("games/" + index[0] + ".json");
+    if (got) return [got, index[0]];
+  }
+  // 4. nothing reachable: the game baked into this file
+  return [DEMO, "the built-in demo"];
+}
+
+async function fetchJson(path) {
+  try {
+    const res = await fetch(path, {headers: authHeaders()});
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    return null;                 // no server, or a file:// page
+  }
+}
+
+/* Is a Spark server there, with a game actually running? */
+async function probeLive() {
+  if (forcedLocal) return null;
+  try {
+    const res = await fetch("api/live", {headers: authHeaders()});
+    if (!res.ok) return null;
+    const snap = await res.json();
+    return snap && snap.running && snap.w ? snap : null;
+  } catch (err) {
+    return null;
+  }
+}
+
+function setSource(kind, text) {
+  const badge = $("#source");
+  badge.className = "badge " + kind;
+  badge.textContent = text;
+}
+
+function startLocal() {
+  live = false;
+  liveSnapshot = null;
+  world = new World(project, null);
+  renderer.buildFloor(world.width, world.height);
+  setSource("local", "RUNNING HERE");
+  $("#mode").textContent = forcedLocal ? "go live" : "reload";
+  if (stepTimer) clearInterval(stepTimer);
+  const speed = Math.max(1, (project.world || {}).speed || 6);
+  stepTimer = setInterval(localStep, 1000 / speed);
+}
+
+function localStep() {
+  if (!world || world.status) return;
+  world.keys = new Set(pressed);
+  pressed.clear();                       // each press acts once, as in live.py
+  world.step();
+}
+
+function startLive(snap) {
+  live = true;
+  liveSnapshot = snap;
+  if (stepTimer) { clearInterval(stepTimer); stepTimer = null; }
+  renderer.buildFloor(snap.w, snap.h);
+  setSource("live", "LIVE");
+  $("#mode").textContent = "run here";
+}
+
+async function poll() {
+  const snap = await probeLive();
+  if (snap) {
+    if (!live || (liveSnapshot &&
+        (liveSnapshot.w !== snap.w || liveSnapshot.h !== snap.h))) startLive(snap);
+    else liveSnapshot = snap;
+    if (pressed.size) {
+      const keys = [...pressed];
+      pressed.clear();
+      fetch("api/key", {
+        method: "POST",
+        headers: {"Content-Type": "application/json", ...authHeaders()},
+        body: JSON.stringify({keys}),
+      }).catch(() => {});
+    }
+  } else if (live) {
+    startLocal();                        // the server went away mid-game
+  }
+}
+
+/* What the renderer draws, whichever source is feeding us. */
+function currentThings() {
+  if (live && liveSnapshot) {
+    return (liveSnapshot.things || []).map(([x, y, glyph, color]) =>
+      ({x, y, glyph, color, kind: "", role: "prop", solid: false}));
+  }
+  return world ? world.things : [];
+}
+
+function currentHud() {
+  if (live && liveSnapshot) {
+    const you = liveSnapshot.you || {};
+    return {score: liveSnapshot.score, tick: liveSnapshot.tick,
+            health: you.health, message: liveSnapshot.message,
+            status: liveSnapshot.status, name: liveSnapshot.game};
+  }
+  if (!world) return null;
+  const player = world.things.find(t => t.role === "player");
+  return {score: world.score, tick: world.tick,
+          health: player ? player.health : null, message: world.message,
+          status: world.status, name: project.name};
+}
+
+// -- the frame -------------------------------------------------------------
+const labelPool = [];
+
+function frame() {
+  const things = currentThings();
+  renderer.buildThings(things);
+  renderer.draw();
+  drawGlyphs(things);
+  drawHud();
+  requestAnimationFrame(frame);
+}
+
+function drawGlyphs(things) {
+  const box = $("#labels");
+  while (labelPool.length < things.length) {
+    const node = document.createElement("div");
+    node.className = "glyph";
+    box.appendChild(node);
+    labelPool.push(node);
+  }
+  things.forEach((thing, i) => {
+    const node = labelPool[i];
+    const shot = thing.kind === "shot";
+    const top = shot ? 0.4 : (thing.role === "player" ? 1.2 : 0.85);
+    const at = renderer.project(thing.x + 0.5, top, thing.y + 0.5);
+    if (!at) { node.style.display = "none"; return; }
+    node.style.display = "";
+    node.style.left = at[0] + "px";
+    node.style.top = at[1] + "px";
+    node.style.color = COLOR_CSS[thing.color] || COLOR_CSS.white;
+    if (node.textContent !== thing.glyph) node.textContent = thing.glyph;
+  });
+  for (let i = things.length; i < labelPool.length; i++)
+    labelPool[i].style.display = "none";
+}
+
+function drawHud() {
+  const hud = currentHud();
+  if (!hud) return;
+  const bits = ["score <b>" + hud.score + "</b>", "tick <b>" + hud.tick + "</b>"];
+  if (hud.health !== null && hud.health !== undefined)
+    bits.splice(1, 0, "health <b>" + hud.health + "</b>");
+  $("#hud").innerHTML = bits.join("<br>");
+  $("#title").textContent = hud.name || "Spark 3D";
+  $("#say").textContent = hud.status
+    ? (hud.status === "win" ? "YOU WON" : "YOU LOST")
+    : (hud.message || "");
+}
+
+// -- touch: one finger turns the camera, two pinch it ----------------------
+function bindCamera(canvas) {
+  const touches = new Map();
+  let lastPinch = null;
+
+  canvas.addEventListener("pointerdown", e => {
+    canvas.setPointerCapture(e.pointerId);
+    touches.set(e.pointerId, [e.clientX, e.clientY]);
+  });
+
+  canvas.addEventListener("pointermove", e => {
+    if (!touches.has(e.pointerId)) return;
+    const last = touches.get(e.pointerId);
+    touches.set(e.pointerId, [e.clientX, e.clientY]);
+
+    if (touches.size === 1) {
+      renderer.yaw -= (e.clientX - last[0]) * 0.008;
+      renderer.pitch += (e.clientY - last[1]) * 0.006;
+      renderer.pitch = Math.max(0.18, Math.min(1.5, renderer.pitch));
+    } else if (touches.size === 2) {
+      const [a, b] = [...touches.values()];
+      const gap = Math.hypot(a[0] - b[0], a[1] - b[1]);
+      if (lastPinch) renderer.dist *= lastPinch / Math.max(1, gap);
+      renderer.dist = Math.max(MIN_DIST, Math.min(MAX_DIST, renderer.dist));
+      lastPinch = gap;
+    }
+  });
+
+  const drop = e => {
+    touches.delete(e.pointerId);
+    if (touches.size < 2) lastPinch = null;
+  };
+  canvas.addEventListener("pointerup", drop);
+  canvas.addEventListener("pointercancel", drop);
+
+  canvas.addEventListener("wheel", e => {
+    e.preventDefault();
+    renderer.dist = Math.max(MIN_DIST,
+      Math.min(MAX_DIST, renderer.dist * (1 + e.deltaY * 0.001)));
+  }, {passive: false});
+}
+
+function bindControls() {
+  for (const button of document.querySelectorAll("#pad button[data-key]")) {
+    const press = e => { e.preventDefault(); pressed.add(button.dataset.key); };
+    button.addEventListener("pointerdown", press);
+  }
+  const named = {ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left",
+                 ArrowRight: "right", " ": "space"};
+  document.addEventListener("keydown", e => {
+    const key = named[e.key] || (/^[wasdef]$/i.test(e.key) ? e.key.toLowerCase() : null);
+    if (key) { pressed.add(key); e.preventDefault(); }
+  });
+
+  $("#restart").onclick = () => {
+    if (live) return;
+    startLocal();
+  };
+  $("#recentre").onclick = () => {
+    renderer.yaw = 0; renderer.pitch = 0.86;
+    renderer.frameBoard();          // re-fitted to the screen as it is now
+  };
+  $("#mode").onclick = async () => {
+    forcedLocal = !forcedLocal;
+    if (forcedLocal) startLocal();
+    else {
+      const snap = await probeLive();
+      if (snap) startLive(snap); else startLocal();
+    }
+  };
+}
+
+function fail(heading, detail) {
+  $("#veil-h").textContent = heading;
+  $("#veil-p").textContent = detail;
+  $("#veil").classList.add("on");
+}
+
+(async function boot() {
+  try {
+    renderer = new Renderer($("#gl"));
+  } catch (err) {
+    fail("This browser has no WebGL",
+         "Spark 3D needs WebGL, which this browser did not give us. The flat " +
+         "editor still works: go back and press play there. (" + err.message + ")");
+    $("#veil-b").onclick = () => location.href = "./";
+    return;
+  }
+
+  const [found, where] = await findProject();
+  project = found;
+  $("#title").textContent = project.name || "Spark 3D";
+
+  const snap = await probeLive();
+  if (snap) startLive(snap); else startLocal();
+
+  bindCamera($("#gl"));
+  bindControls();
+  window.addEventListener("resize", () => renderer.resize());
+  pollTimer = setInterval(poll, 130);
+  requestAnimationFrame(frame);
+
+  if (where === "the built-in demo")
+    $("#say").textContent = "no game found - showing the built-in demo";
+})();
+</script>
+</body>
+</html>

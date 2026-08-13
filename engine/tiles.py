@@ -34,6 +34,12 @@ COMPASS = {
 STEPS.update(COMPASS)
 BEARINGS = list(COMPASS) + ["toward it", "away from it"]
 
+# What `move random` picks from, fixed in one place because the JavaScript
+# engine in world3d.html has to walk the same twelve steps in the same order
+# for a seeded world to come out the same in both. Insertion order: the four
+# arrows first, then the compass.
+STEP_LIST = list(STEPS.values())
+
 
 @dataclass
 class Param:
@@ -85,12 +91,18 @@ def matches(obj, kind):
     return kind == "anything" or obj.kind == kind
 
 
-def resolve_step(name, obj, it):
-    """Turn a direction name into a (dx, dy) step."""
+def resolve_step(name, obj, it, rng=None):
+    """Turn a direction name into a (dx, dy) step.
+
+    `rng` is the world's dice, so that a seeded world moves the same way twice.
+    It stays optional because the direction names that need luck are the rare
+    ones -- everything else here is pure arithmetic.
+    """
     if name in STEPS:
         return STEPS[name]
     if name == "random":
-        return random.choice(list(STEPS.values()))
+        return (rng.choice(STEP_LIST) if rng is not None
+                else random.choice(STEP_LIST))
     if name == "forward":
         return obj.facing
     if it is None:
@@ -167,7 +179,7 @@ def s_score(obj, world, a):
 @sensor("chance", "{percent}% of the time",
         Param("percent", "Percent chance (0-100)?", "int", [], 25))
 def s_chance(obj, world, a):
-    return random.randrange(100) < a["percent"]
+    return world.rng.randrange(100) < a["percent"]
 
 
 @sensor("at_edge", "I am at the edge of the world")
@@ -208,7 +220,7 @@ def s_spent(obj, world, a):
 @action("move", "move {dir}",
         Param("dir", "Move which way?", "choice", DIRECTIONS, "toward it"))
 def a_move(obj, world, a, it):
-    dx, dy = resolve_step(a["dir"], obj, it)
+    dx, dy = resolve_step(a["dir"], obj, it, world.rng)
     if dx or dy:
         obj.facing = (dx, dy)
         world.try_move(obj, dx, dy)
@@ -218,7 +230,7 @@ def a_move(obj, world, a, it):
         Param("dir", "Which way do I face?", "choice", BEARINGS, "north"))
 def a_face(obj, world, a, it):
     """Turn on the spot. Nothing moves; `forward` just means somewhere new."""
-    dx, dy = resolve_step(a["dir"], obj, it)
+    dx, dy = resolve_step(a["dir"], obj, it, world.rng)
     if dx or dy:
         obj.facing = (dx, dy)
 
@@ -228,7 +240,7 @@ def a_face(obj, world, a, it):
         Param("reach", "How many squares does it fly? (0 = for ever)", "int", [], 8),
         Param("life", "How many ticks does it last? (0 = for ever)", "int", [], 12))
 def a_shoot(obj, world, a, it):
-    dx, dy = resolve_step(a["dir"], obj, it)
+    dx, dy = resolve_step(a["dir"], obj, it, world.rng)
     if not (dx or dy):
         return
     shot = world.spawn("shot", obj.x + dx, obj.y + dy)

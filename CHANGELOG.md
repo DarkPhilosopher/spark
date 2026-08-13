@@ -61,6 +61,48 @@ Each entry says **what** changed and, where it is not obvious, **why**.
   The flag names cloudflared exactly: if Spark fell back to ngrok you get a
   working address but `Cloudflare F`.
 
+- **A 3D view of your world, on a button, that works with nothing behind it.**
+  The browser editor has a **▶ 3D** button; it opens a second tab where the
+  board stands up off the page as blocks you can turn with one finger and pinch
+  to zoom, each still wearing the glyph and colour you gave it.
+
+  The tab shows the real running game when a Spark server answers — badge
+  `LIVE`, mirrored tick for tick, guests included — and plays the game itself
+  when none does — badge `RUNNING HERE`. That covers the local server, a
+  Cloudflare tunnel, the GitHub Pages copy, aeroplane mode with Termux shut, and
+  the file saved and reopened on its own. If the server vanishes mid-watch it
+  switches over rather than freezing.
+
+  *Why:* the flat grid of letters is honest about the rules but says nothing
+  about the shape of a world, and the moment you want to show somebody what you
+  built, a wall of monospace is the wrong thing to hand them. The awkward part
+  was that "show it to somebody" and "have it work" pull in opposite directions:
+  anything drawn with a library fetched from a CDN goes blank the moment the
+  signal does, which is exactly when a phone game matters. So the 3D is raw
+  WebGL, already in the browser, and **nothing is downloaded at any point**. The
+  game itself rides inside the link after the `#`, which never travels to any
+  server — so the tab has the world before it asks anyone for anything, and it
+  shows what is on your screen rather than what you last saved.
+- **`world3d.html`** — the 3D view, and with it a second copy of Spark's rules
+  written in JavaScript, so a browser on its own can play a game.
+- **Seeded worlds, and `engine/rng.py`.** `World(project, seed=7)` now replays
+  exactly, in both languages. Unseeded play is untouched and still genuinely
+  random.
+  *Why:* two engines can only be *proved* to agree if they can be made to roll
+  the same dice, and Python's `random` is a Mersenne Twister that no reasonable
+  amount of JavaScript will reproduce. A small generator both languages run in
+  exact integer arithmetic costs almost nothing and makes the check below
+  possible.
+- **`tests/check_engines.py`** — plays every game in `games/` twice, once with
+  each engine, from the same seed and with the same keys pressed on the same
+  ticks, and fails unless every character is in the same square with the same
+  health on every tick.
+  *Why:* two copies of a rule drift apart, and drift here would mean the 3D view
+  quietly lying to you about your own game. This is what makes a second engine
+  safe to keep. It fails if you change a rule in one engine and forget the
+  other; I checked by flipping a single sign in the JavaScript, and it caught it
+  in nine of the twelve game-and-seed runs.
+
 ### Changed
 
 - **The server writes the tunnel's name and address into `.spark-state.json`.**
@@ -79,6 +121,16 @@ Each entry says **what** changed and, where it is not obvious, **why**.
   README's tile count against the real registries by parsing the number word,
   and the DO tiles just became fourteen. Extending its vocabulary keeps the
   check as strict as it was; leaving it would have meant deleting the check.
+
+- **The editor is built for thumbs.** Nothing you press is under 48 pixels tall
+  now — tiles, row buttons, character pills, the pad. The top is two rows
+  instead of one: the game you are on with its two icon buttons, and beneath it
+  a full-width row of the three things you actually reach for — **▶ 3D**,
+  **save**, **new**, in that order.
+  *Why:* the header had grown to five controls on one line, several of them
+  smaller than a fingertip, on a device with no pointer. Putting playing first
+  and giving it real area matches what the loop actually is: change a rule, look
+  at it, change it again.
 
 ### Security
 
