@@ -189,6 +189,19 @@
       ]
     },
     {
+      "id": "combo",
+      "label": "the tile called \"{name}\"",
+      "params": [
+        {
+          "name": "name",
+          "prompt": "Which of your own tiles?",
+          "kind": "text",
+          "choices": [],
+          "default": ""
+        }
+      ]
+    },
+    {
       "id": "place_named",
       "label": "placeholder {who} is named \"{text}\"",
       "params": [
@@ -427,6 +440,19 @@
       "id": "teleport",
       "label": "jump to a random empty square",
       "params": []
+    },
+    {
+      "id": "combo",
+      "label": "the tile called \"{name}\"",
+      "params": [
+        {
+          "name": "name",
+          "prompt": "Which of your own tiles?",
+          "kind": "text",
+          "choices": [],
+          "default": ""
+        }
+      ]
     },
     {
       "id": "place_name",

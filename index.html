@@ -75,6 +75,8 @@
   /* A tile from the other half, offered here because you asked to see
      everything. Dashed and dimmed so it is obvious which half it belongs to. */
   .chip.foreign{opacity:.6;border-style:dashed}
+  /* One of your own named tiles: a whole row folded up under a name. */
+  .chip.mine{background:#2c2440;border-color:#8c6fd0}
   #tiles .split{flex:0 0 100%;font-size:11px;color:var(--dim);
                 padding:6px 2px 0;letter-spacing:.04em;text-transform:uppercase}
   #tiles .toggle{flex:0 0 100%;margin:2px 0 4px}
@@ -302,8 +304,24 @@ function renderWhere() {
 function say(msg) { $("#status").textContent = msg;
   clearTimeout(say.t); say.t = setTimeout(() => $("#status").textContent = "", 4000); }
 
+// Your own named tiles, kept in the game file so they travel with it.
+const myTiles = () => (project.tiles ||= []);
+const myTile = name => myTiles().find(t => t.name === name);
+
+/* What one of your named tiles does in the half it is sitting in, in English.
+   Its two halves are stored together, so the same tile reads differently
+   depending on where it was dropped -- which is the whole point of it. */
+function describeMine(s, name) {
+  const mine = myTile(name);
+  if (!mine) return "⊞ " + name + " (no such tile)";
+  const inside = (mine[s] || []).length;
+  return "⊞ " + name + (inside ? "" : " (nothing in its " +
+                                          s.toUpperCase() + " half)");
+}
+
 // tile label with its arguments filled in -- mirrors Tile.describe in tiles.py
 function describe(s, use) {
+  if (use.tile === "combo") return describeMine(s, use.args.name);
   const def = tileDef(s, use.tile);
   if (!def) return use.tile;
   let text = def.label;
@@ -315,7 +333,7 @@ function describe(s, use) {
 
 function blankProject(name) {
   return { name, world:{width:30,height:14,wrap:false,speed:6},
-           characters:[ newChar("hero","@") ] };
+           tiles:[], characters:[ newChar("hero","@") ] };
 }
 function newChar(kind, glyph) {
   return { kind, glyph, color:"white", health:1, count:1,
@@ -463,6 +481,9 @@ function renderRows() {
     }
 
     const btns = el("div", "rowbtns");
+    const fold = el("button", null, "⊞");
+    fold.title = "fold this whole row into one tile of your own, and name it";
+    fold.onclick = ev => { ev.stopPropagation(); foldRow(r); };
     const up = el("button", null, "↑");
     up.onclick = ev => { ev.stopPropagation();
       if (r > 0) { remember(); const b = c.brain; [b[r-1], b[r]] = [b[r], b[r-1]];
@@ -470,7 +491,7 @@ function renderRows() {
     const del = el("button", null, "✕");
     del.onclick = ev => { ev.stopPropagation(); remember(); c.brain.splice(r, 1);
                           rowIdx = Math.max(0, rowIdx - 1); renderRows(); };
-    btns.append(up, del);
+    btns.append(fold, up, del);
     node.append(body, btns);
     box.append(node);
   });
@@ -483,6 +504,52 @@ function renderRows() {
  * hidden from you: the rule about which tile belongs where is the engine's, and
  * you may want to place one anyway to see what happens. The marking is there so
  * that "why does this row never fire" has a visible answer. */
+/* Fold a whole row into one tile of your own, and put that tile in its place.
+ *
+ * Both halves of the row go in together, which is what makes the result usable
+ * on either side: dropped in the WHEN half its sensors are tested, dropped in
+ * the DO half its actions run. The row it came from is replaced by the new tile
+ * in both halves, so the character carries on doing exactly what it did -- the
+ * fold is a tidying, not a change of behaviour. */
+function foldRow(r) {
+  const c = cur();
+  const row = c.brain[r];
+  if (!row.when.length && !row.do.length) return say("that row is empty");
+
+  const name = (prompt("name this tile", "my tile") || "").trim();
+  if (!name) return;
+  if (name.length > 40) return say("that name is too long");
+  const already = myTile(name);
+  if (already && !confirm("you already have a tile called " + name +
+                          ". replace what is inside it?")) return;
+
+  remember();
+  const copy = JSON.parse(JSON.stringify(row));
+  const made = {name, when: copy.when, do: copy.do};
+  const list = myTiles();
+  const at = list.findIndex(t => t.name === name);
+  if (at >= 0) list[at] = made; else list.push(made);
+
+  c.brain[r] = {when: [{tile: "combo", args: {name}}],
+                do:   [{tile: "combo", args: {name}}]};
+  renderRows(); renderPalette();
+  say("made ⊞ " + name + " — it is in the palette now, in both halves");
+}
+
+/* Take one of your tiles away. Rows still pointing at it are left alone: the
+   engine treats a name nobody has defined as simply not firing, and the chip
+   says so, which is kinder than hunting them down and deleting those too. */
+function unfold(name) {
+  if (!confirm("delete your tile " + name + "?\n\nrows using it will stop " +
+               "doing anything, but are not themselves deleted.")) return;
+  remember();
+  const list = myTiles();
+  const at = list.findIndex(t => t.name === name);
+  if (at >= 0) list.splice(at, 1);
+  renderRows(); renderPalette();
+  say("deleted ⊞ " + name);
+}
+
 function renderPalette() {
   const box = $("#tiles"); box.textContent = "";
 
@@ -494,7 +561,34 @@ function renderPalette() {
   toggle.onclick = () => { showEverything = !showEverything; renderPalette(); };
   box.append(toggle);
 
-  const mine = side === "when" ? catalog.sensors : catalog.actions;
+  // Your own named tiles first: they are the ones you made, and the reason to
+  // make one is to reach for it often.
+  if (myTiles().length) {
+    box.append(el("div", "split", "your own tiles"));
+    for (const own of myTiles()) {
+      const empty = !(own[side] || []).length;
+      const chip = el("div", "chip mine" + (empty ? " foreign" : ""),
+                      "⊞ " + own.name);
+      chip.title = empty
+        ? "this tile has nothing in its " + side.toUpperCase() + " half"
+        : (own[side] || []).length + " tile(s) in its " + side.toUpperCase()
+          + " half";
+      chip.onclick = () => addTile({id: "combo", params: [],
+                                    args: {name: own.name}});
+      const bin = el("span", null, "  ✕");
+      bin.style.opacity = ".7";
+      bin.onclick = ev => { ev.stopPropagation(); unfold(own.name); };
+      chip.append(bin);
+      box.append(chip);
+    }
+    box.append(el("div", "split", side.toUpperCase() + " tiles"));
+  }
+
+  // `combo` is the machinery behind your own tiles; it is offered as those
+  // chips above rather than as a raw tile asking you to type a name.
+  const plain = defs => defs.filter(d => d.id !== "combo");
+
+  const mine = plain(side === "when" ? catalog.sensors : catalog.actions);
   for (const def of mine) {
     const chip = el("div", "chip " + side, def.label);
     chip.onclick = () => addTile(def);
@@ -503,7 +597,7 @@ function renderPalette() {
   if (!showEverything) return;
 
   const other = side === "when" ? "do" : "when";
-  const theirs = side === "when" ? catalog.actions : catalog.sensors;
+  const theirs = plain(side === "when" ? catalog.actions : catalog.sensors);
   box.append(el("div", "split",
                 other.toUpperCase() + " tiles — placed here they do not fire"));
   for (const def of theirs) {
@@ -528,12 +622,15 @@ function addTile(def) {
   remember();
   if (!c.brain.length) c.brain.push({when:[], do:[]});
   rowIdx = Math.min(rowIdx, c.brain.length - 1);
-  const args = {};
-  for (const p of def.params) args[p.name] = p.default;
+  // A named tile arrives with its name already filled in, so it is placed
+  // without asking anything -- which is the point of having made it.
+  const args = Object.assign({}, def.args || {});
+  for (const p of def.params) if (!(p.name in args)) args[p.name] = p.default;
   const use = {tile: def.id, args};
   c.brain[rowIdx][side].push(use);
   renderRows();
-  if (def.params.length) openParams(side, use, rowIdx, c.brain[rowIdx][side].length - 1);
+  if (def.params.length && !def.args)
+    openParams(side, use, rowIdx, c.brain[rowIdx][side].length - 1);
 }
 
 function openParams(s, use, r, i) {
@@ -1089,7 +1186,7 @@ async function openGame(name) {
   const loaded = await store.loadGame(name);
   if (!loaded) return say("could not open " + name);
   project = loaded;
-  project.characters ||= []; project.world ||= {};
+  project.characters ||= []; project.world ||= {}; project.tiles ||= [];
   for (const c of project.characters) {
     c.brain ||= [];
     for (const row of c.brain) { row.when ||= []; row.do ||= []; }

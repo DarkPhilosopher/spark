@@ -6,6 +6,37 @@
     "wrap": false,
     "speed": 6
   },
+  "tiles": [
+    {
+      "name": "count a step",
+      "when": [{"tile": "timer", "args": {"every": 1}}],
+      "do": [{"tile": "place_value",
+              "args": {"who": "steps", "a": "steps", "op": "plus", "b": "1"}}]
+    },
+    {
+      "name": "go home",
+      "when": [{"tile": "place_has",
+                "args": {"who": "steps", "face": "value",
+                         "test": "at least", "amount": "40"}}],
+      "do": [{"tile": "place_value",
+              "args": {"who": "steps", "a": "0", "op": "plus", "b": "0"}},
+             {"tile": "place_jump", "args": {"who": "home"}},
+             {"tile": "say", "args": {"text": "back to where I was"}}]
+    },
+    {
+      "name": "eat what I touch",
+      "when": [{"tile": "place_named", "args": {"who": "target", "text": "apple"}},
+               {"tile": "touch", "args": {"kind": "apple"}}],
+      "do": [{"tile": "place_vector",
+              "args": {"who": "reach", "axis": "x",
+                       "a": "it x", "op": "minus", "b": "my x"}},
+             {"tile": "place_value",
+              "args": {"who": "eaten", "a": "eaten", "op": "plus", "b": "1"}},
+             {"tile": "score", "args": {"amount": 1}},
+             {"tile": "vanish", "args": {"target": "it"}},
+             {"tile": "spawn", "args": {"kind": "apple"}}]
+    }
+  ],
   "characters": [
     {
       "kind": "hero",
@@ -21,9 +52,8 @@
           "do": [{"tile": "place_name", "args": {"who": "target", "text": "apple"}}]
         },
         {
-          "when": [{"tile": "timer", "args": {"every": 1}}],
-          "do": [{"tile": "place_value",
-                  "args": {"who": "steps", "a": "steps", "op": "plus", "b": "1"}}]
+          "when": [{"tile": "combo", "args": {"name": "count a step"}}],
+          "do": [{"tile": "combo", "args": {"name": "count a step"}}]
         },
         {
           "when": [{"tile": "timer", "args": {"every": 20}}],
@@ -62,25 +92,14 @@
                  {"tile": "place_move", "args": {"who": "step"}}]
         },
         {
-          "when": [{"tile": "place_named", "args": {"who": "target", "text": "apple"}},
-                   {"tile": "touch", "args": {"kind": "apple"}}],
+          "when": [{"tile": "combo", "args": {"name": "eat what I touch"}}],
           "do": [{"tile": "place_vector",
-                  "args": {"who": "reach", "axis": "x", "a": "it x", "op": "minus", "b": "my x"}},
-                 {"tile": "place_vector",
                   "args": {"who": "reach", "axis": "y", "a": "it y", "op": "minus", "b": "my y"}},
-                 {"tile": "place_value",
-                  "args": {"who": "eaten", "a": "eaten", "op": "plus", "b": "1"}},
-                 {"tile": "score", "args": {"amount": 1}},
-                 {"tile": "vanish", "args": {"target": "it"}},
-                 {"tile": "spawn", "args": {"kind": "apple"}}]
+                 {"tile": "combo", "args": {"name": "eat what I touch"}}]
         },
         {
-          "when": [{"tile": "place_has",
-                    "args": {"who": "steps", "face": "value", "test": "at least", "amount": 40}}],
-          "do": [{"tile": "place_value",
-                  "args": {"who": "steps", "a": "0", "op": "plus", "b": "0"}},
-                 {"tile": "place_jump", "args": {"who": "home"}},
-                 {"tile": "say", "args": {"text": "back to where I was"}}]
+          "when": [{"tile": "combo", "args": {"name": "go home"}}],
+          "do": [{"tile": "combo", "args": {"name": "go home"}}]
         },
         {
           "when": [{"tile": "place_has",

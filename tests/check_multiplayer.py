@@ -35,6 +35,23 @@ def check(name, condition, extra=""):
         print("  FAIL " + name + ("  -> " + str(extra) if extra else ""))
 
 
+def wait_until(ready, seconds=6.0):
+    """Poll until `ready()` is true, or give up after `seconds`.
+
+    The world runs on its own thread at a few ticks a second, so a keypress
+    lands whenever that thread next gets to run. Sleeping a fixed moment and
+    then asserting assumes the phone was not busy, which on a phone running the
+    rest of this suite is not a safe assumption -- it made this test fail about
+    one run in six. Polling waits exactly as long as it needs to and no longer.
+    """
+    deadline = time.time() + seconds
+    while time.time() < deadline:
+        if ready():
+            return True
+        time.sleep(0.05)
+    return ready()
+
+
 def call(method, path, token=None, body=None):
     request = urllib.request.Request(
         BASE + path, method=method,
@@ -78,7 +95,7 @@ with session.lock:
 
 print("\none player presses a key")
 call("POST", "/api/key", one["token"], {"keys": ["right"]})
-time.sleep(0.6)
+wait_until(lambda: (p1.thing.x, p1.thing.y) != start1)
 with session.lock:
     moved1 = (p1.thing.x, p1.thing.y)
     moved2 = (p2.thing.x, p2.thing.y)
@@ -89,7 +106,7 @@ print("\nthe other one presses a different key")
 with session.lock:
     before = (p2.thing.x, p2.thing.y)
 call("POST", "/api/key", two["token"], {"keys": ["down"]})
-time.sleep(0.6)
+wait_until(lambda: (p2.thing.x, p2.thing.y) != before)
 with session.lock:
     after = (p2.thing.x, p2.thing.y)
 check("they moved downward", after[1] > before[1] or after != before, (before, after))
@@ -105,7 +122,7 @@ check("health is reported for the hud", snap["you"]["health"] is not None)
 
 print("\nleaving")
 session.drop(two["token"])
-time.sleep(0.4)
+wait_until(lambda: call("GET", "/api/live", two["token"])[0] == 403)
 status, _ = call("GET", "/api/live", two["token"])
 check("a departed player is a stranger again", status == 403, status)
 status, snap = call("GET", "/api/live", one["token"])

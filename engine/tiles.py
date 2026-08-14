@@ -21,6 +21,12 @@ from typing import Any, Callable
 
 OPEN_COOLDOWN = 30      # ticks before the same thing may be opened again
 
+# How deep one of your own named tiles may sit inside another. A named tile can
+# hold another named tile, which is the whole point of them; a named tile that
+# holds *itself* would otherwise spin for ever. Eight is far past anything worth
+# building by hand and shallow enough that hitting it costs nothing.
+MAX_COMBO_DEPTH = 8
+
 DIRECTIONS = ["up", "down", "left", "right", "random", "toward it", "away from it", "forward"]
 STEPS = {"up": (0, -1), "down": (0, 1), "left": (-1, 0), "right": (1, 0)}
 KEYS = ["up", "down", "left", "right", "space", "w", "a", "s", "d", "e", "f"]
@@ -539,6 +545,31 @@ def s_place_has(obj, world, a):
                    number(a.get("amount", 1), obj, world, None))
 
 
+@sensor("combo", "the tile called \"{name}\"",
+        Param("name", "Which of your own tiles?", "text", [], ""))
+def s_combo(obj, world, a):
+    """True when every sensor inside one of your own named tiles passes.
+
+    A named tile keeps a whole row -- a WHEN half and a DO half -- so the same
+    one placed in the WHEN half is checked and placed in the DO half is run. It
+    is checked by the very code that checks an ordinary row, so it composes the
+    same way: if a sensor inside it finds a character, that character becomes
+    "it" for the row the named tile is sitting in.
+
+    A name nobody has defined is False rather than an error -- a game may
+    arrive from GitHub with a row referring to a tile somebody has since
+    renamed, and the row should sit quiet rather than break the character.
+    """
+    spec = world.combos.get(str(a.get("name", "")))
+    if spec is None or world.combo_depth >= MAX_COMBO_DEPTH:
+        return False
+    world.combo_depth += 1
+    try:
+        return world.check_all(obj, spec.get("when", []))
+    finally:
+        world.combo_depth -= 1
+
+
 @sensor("place_named", "placeholder {who} is named \"{text}\"",
         Param("who", "Which placeholder?", "text", [], "thing"),
         Param("text", "Named what?", "text", [], "hero"))
@@ -689,6 +720,24 @@ def a_teleport(obj, world, a, it):
     spot = world.empty_cell()
     if spot:
         obj.x, obj.y = spot
+
+
+@action("combo", "the tile called \"{name}\"",
+        Param("name", "Which of your own tiles?", "text", [], ""))
+def a_combo(obj, world, a, it):
+    """Run every action inside one of your own named tiles.
+
+    Whoever the row found is handed straight through, so a named tile built out
+    of `move toward it` still moves toward whatever the row's WHEN half saw.
+    """
+    spec = world.combos.get(str(a.get("name", "")))
+    if spec is None or world.combo_depth >= MAX_COMBO_DEPTH:
+        return
+    world.combo_depth += 1
+    try:
+        world.do_all(obj, spec.get("do", []), it)
+    finally:
+        world.combo_depth -= 1
 
 
 @action("place_name", "name {who} is \"{text}\"",

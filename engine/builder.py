@@ -220,6 +220,105 @@ def fill_params(tile, project):
     return args
 
 
+def my_tiles(project):
+    """Your own named tiles, kept in the game file so they travel with it."""
+    return project.setdefault("tiles", [])
+
+
+def find_my_tile(project, name):
+    for own in my_tiles(project):
+        if own.get("name") == name:
+            return own
+    return None
+
+
+def describe_mine(side, own):
+    """One of your tiles, as it reads in the half it has been put in."""
+    inside = len(own.get(side, []))
+    return "%s%s" % (own.get("name", "?"),
+                     "" if inside else
+                     "   (nothing in its %s half)" % side.upper())
+
+
+def fold_row(project, rows, index):
+    """Fold a whole row into one tile of your own, and take its place.
+
+    Both halves go in together, which is what makes the result usable on either
+    side. The row is then replaced by the new tile in both halves, so the
+    character carries on doing exactly what it did -- a fold is a tidying, not
+    a change of behaviour.
+    """
+    row = rows[index]
+    if not (row.get("when") or row.get("do")):
+        print("  that row is empty")
+        ask("press enter")
+        return
+    header("Fold a row into one tile")
+    print(" " + brain.describe_row(row) + "\n")
+    name = ask("Name this tile", "my tile").strip()
+    if not name:
+        return
+    if len(name) > 40:
+        print("  that name is too long")
+        ask("press enter")
+        return
+    already = find_my_tile(project, name)
+    if already and not ask_yes("You already have a tile called '%s'. "
+                               "Replace what is inside it" % name):
+        return
+
+    remember(project)
+    made = {"name": name,
+            "when": json.loads(json.dumps(row.get("when", []))),
+            "do": json.loads(json.dumps(row.get("do", [])))}
+    if already:
+        already.clear()
+        already.update(made)
+    else:
+        my_tiles(project).append(made)
+    rows[index] = {"when": [{"tile": "combo", "args": {"name": name}}],
+                   "do": [{"tile": "combo", "args": {"name": name}}]}
+    print("\n  made the tile '%s'. It is on the tile menus now, in both "
+          "halves." % name)
+    ask("press enter")
+
+
+def my_tiles_screen(project):
+    """See what your own tiles hold, and throw one away."""
+    while True:
+        header("Your own tiles")
+        mine = my_tiles(project)
+        if not mine:
+            print(" (none yet)\n")
+            print(wrap_note(
+                "Build a row you like, then pick 'fold a row into one tile' on "
+                "a character's brain menu. Both halves of the row go in "
+                "together, so the tile works wherever you drop it."))
+            ask("press enter")
+            return
+        for i, own in enumerate(mine, 1):
+            print(" %2d. %s" % (i, own.get("name", "?")))
+            print("     WHEN %s" % (" and ".join(
+                brain.describe_tile(tiles.SENSORS, t)
+                for t in own.get("when", [])) or "(nothing)"))
+            print("     DO   %s" % (" and ".join(
+                brain.describe_tile(tiles.ACTIONS, t)
+                for t in own.get("do", [])) or "(nothing)"))
+        print()
+        choice = menu(["delete one of them"], back_label="done")
+        if choice is None:
+            return
+        header("Delete which of your tiles?")
+        index = menu([own.get("name", "?") for own in mine])
+        if index is None:
+            continue
+        name = mine[index].get("name", "?")
+        if ask_yes("Delete '%s'? Rows using it will stop doing anything, "
+                   "but are not themselves deleted" % name):
+            remember(project)
+            mine.pop(index)
+
+
 def pick_tile(registry, project, what):
     """Every tile, this half's first and the other half's after.
 
@@ -234,15 +333,25 @@ def pick_tile(registry, project, what):
     warning = ("stops the row firing" if registry is tiles.SENSORS
                else "is skipped here")
 
+    side = "when" if registry is tiles.SENSORS else "do"
+    mine = my_tiles(project)
+
     header("Pick a %s tile" % what)
-    ids = list(registry) + list(other)
-    labels = ([registry[i].label for i in registry] +
+    # `combo` is the machinery behind your own tiles; it is offered as those
+    # by name rather than as a raw tile asking you to type one.
+    ids = [i for i in registry if i != "combo"] + \
+          [i for i in other if i != "combo"]
+    labels = (["your tile: " + describe_mine(side, own) for own in mine] +
+              [registry[i].label for i in ids if i in registry] +
               ["%s  <- %s tile, %s" % (other[i].label, other_name, warning)
-               for i in other])
+               for i in ids if i in other])
     index = menu(labels)
     if index is None:
         return None
-    tile = (registry if index < len(registry) else other)[ids[index]]
+    if index < len(mine):
+        return {"tile": "combo", "args": {"name": mine[index].get("name", "")}}
+    tile_id = ids[index - len(mine)]
+    tile = registry[tile_id] if tile_id in registry else other[tile_id]
     return {"tile": tile.id, "args": fill_params(tile, project)}
 
 
@@ -309,10 +418,16 @@ def brain_screen(project, char):
             print(" (empty -- this character just sits there)")
         print()
         choice = menu(["add a new row", "change a row", "delete a row",
-                       "move a row up", undo_label()], back_label="done")
+                       "move a row up", "fold a row into one tile of your own",
+                       undo_label()], back_label="done")
         if choice is None:
             return None
-        if choice == 4:
+        if choice == 4 and rows:
+            header("Fold which row?")
+            index = menu([brain.describe_row(r) for r in rows])
+            if index is not None:
+                fold_row(project, rows, index)
+        elif choice == 5:
             if undo(project):
                 return UNDONE
             print("  nothing to undo")
@@ -584,6 +699,7 @@ def main_menu(project=None):
             print(" open: %s  (%d characters)\n"
                   % (project["name"], len(project["characters"])))
             options = ["play it", "characters and their brains",
+                       "your own tiles (%d)" % len(my_tiles(project)),
                        "world settings", "save", "rename this game",
                        "send this game to GitHub", "invite someone to play",
                        "start a new game", "open a game"]
@@ -607,6 +723,8 @@ def main_menu(project=None):
             runner.play(project)
         elif label == "characters and their brains":
             characters_screen(project)
+        elif label.startswith("your own tiles"):
+            my_tiles_screen(project)
         elif label == "world settings":
             world_screen(project)
         elif label == "save":

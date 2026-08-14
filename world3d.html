@@ -222,6 +222,9 @@ function remembered(world, text) {
 
 const AXES = ["x", "y", "z"];
 const FUNCTIONS = ["root", "round", "down", "up", "random"];
+// How deep one named tile may sit inside another -- see MAX_COMBO_DEPTH in
+// tiles.py. A named tile holding itself would otherwise spin for ever.
+const MAX_COMBO_DEPTH = 8;
 const LIMIT = 1000000000;
 const NUMBER = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
 
@@ -418,6 +421,14 @@ const SENSORS = {
     return !!spot &&
       spot.name === String(a.text === undefined ? "" : a.text);
   },
+  combo: (obj, world, a) => {
+    const name = String(a.name === undefined ? "" : a.name);
+    if (!has(world.combos, name) || world.comboDepth >= MAX_COMBO_DEPTH)
+      return false;
+    world.comboDepth += 1;
+    try { return world.checkAll(obj, world.combos[name].when || []); }
+    finally { world.comboDepth -= 1; }
+  },
 };
 
 // -- ACTIONS, the DO half --------------------------------------------------
@@ -511,6 +522,13 @@ const ACTIONS = {
       world.tryMove(obj, dx, dy);
     }
   },
+  combo: (obj, world, a, it) => {
+    const name = String(a.name === undefined ? "" : a.name);
+    if (!has(world.combos, name) || world.comboDepth >= MAX_COMBO_DEPTH) return;
+    world.comboDepth += 1;
+    try { world.doAll(obj, world.combos[name].do || [], it); }
+    finally { world.comboDepth -= 1; }
+  },
   win: (obj, world) => { world.status = "win"; },
   lose: (obj, world) => { world.status = "lose"; },
 };
@@ -539,6 +557,15 @@ class World {
     this.status = null;
     this.keys = new Set();
     this.playerKeys = {};
+    // The named tiles this game carries: a name -> a stored row. They live in
+    // the game file, so they travel with it to GitHub and to other players.
+    this.combos = {};
+    for (const c of project.tiles || []) {
+      const name = String(c.name === undefined ? "" : c.name);
+      if (name.trim()) this.combos[name] = c;
+    }
+    this.comboDepth = 0;
+
     this.memory = {};
     this.places = {};
     this.mayOpen = false;
@@ -610,19 +637,33 @@ class World {
     return true;
   }
 
-  runRow(thing, row) {
+  /* Every sensor must pass. False if any fails, otherwise the first character
+     one of them found -- which becomes "it" -- or true if none found anybody.
+     An empty list passes, which is why a row with no WHEN tiles acts every
+     tick. Split out of runRow so a named tile is checked by the same code. */
+  checkAll(thing, uses) {
     let it = null;
-    for (const use of row.when || []) {
+    for (const use of uses) {
       const fn = SENSORS[use.tile];
-      if (fn === undefined) return;
+      if (fn === undefined) return false;
       const result = fn(thing, this, use.args || {});
-      if (!result) return;
+      if (!result) return false;
       if (it === null && result instanceof Thing) it = result;
     }
-    for (const use of row.do || []) {
+    return it === null ? true : it;
+  }
+
+  doAll(thing, uses, it) {
+    for (const use of uses) {
       const fn = ACTIONS[use.tile];
       if (fn !== undefined) fn(thing, this, use.args || {}, it);
     }
+  }
+
+  runRow(thing, row) {
+    const found = this.checkAll(thing, row.when || []);
+    if (!found) return;
+    this.doAll(thing, row.do || [], found instanceof Thing ? found : null);
   }
 
   step() {

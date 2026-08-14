@@ -16,6 +16,50 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ### Added
 
+- **Tiles of your own: fold a whole row up under a name.** The **⊞** button on a
+  row in the browser, or *fold a row into one tile of your own* on the terminal
+  brain menu. The new tile joins the palette and can be used anywhere, as often
+  as you like.
+
+      the row:  WHEN I see apple within 6   DO move toward it, hurt it by 1
+
+      folded as "hunt":
+
+      WHEN ⊞ hunt      the seeing part is tested
+      DO   ⊞ hunt      the moving and hurting part runs
+
+  **Both halves go in together**, which is the whole point: one tile that works
+  on either side and does the matching half of what you folded. The row you
+  folded is replaced by the new tile in both halves, so the character carries on
+  doing exactly what it did — folding tidies, it never changes behaviour.
+
+  *Why:* rows repeat. The same three or four tiles get rebuilt on every enemy,
+  and changing the idea meant changing it everywhere. This is the smallest thing
+  that fixes that without inventing a second language: a named tile is only
+  other tiles, so it needs no new syntax, runs no code, and cannot do anything
+  the tiles it is made of could not.
+
+  **"it" reaches inside.** A sensor within your tile that finds a character
+  hands it out to the row; an action within it is handed whatever the row found.
+  So a tile made only of `hurt it` still hurts whatever the row's WHEN half saw.
+
+  **They live in the game file**, under `tiles`, so they travel with the game to
+  GitHub and to anyone who joins your world — nothing to install, no code run.
+  They may hold each other up to eight deep, and one that contains itself stops
+  at that depth rather than spinning for ever.
+
+  A name nobody has defined does not fire, and is skipped in the DO half, so a
+  game whose tile has been renamed or deleted goes quiet rather than breaking.
+  Deleting a tile therefore leaves rows that used it alone, and the chip says
+  `(no such tile)`.
+
+  Internally `run_row` was split into `check_all` and `do_all` so that a named
+  tile is checked and run by exactly the code an ordinary row is — there is no
+  second implementation to drift. `tests/check_tiles_of_mine.py` — 18 checks —
+  covers both halves, empty halves, "it" passing through, unknown names,
+  nesting, and self-reference; `games/placeholders.json` now uses three named
+  tiles so `check_engines.py` compares them across both engines and four seeds.
+
 - **Undo, in both brain editors.** A button beside *+ add a row* in the browser,
   and *undo the last change* on the brain and row menus in the terminal. Both
   show how many steps are left, and both remember the last **60** changes.

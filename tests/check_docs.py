@@ -81,10 +81,14 @@ check("README.md" in CHANGELOG,
 # -- the tile count claimed in the README is the real one -------------------
 
 flowed = " ".join(README.split())          # the sentence may wrap across lines
-claim = re.search(r"(\w+) WHEN tiles crossed with (\w+) DO tiles", flowed)
+claim = re.search(r"([\w-]+) WHEN tiles crossed with ([\w-]+) DO tiles", flowed)
 numbers = {"nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13,
            "fourteen": 14, "fifteen": 15, "sixteen": 16, "seventeen": 17,
-           "eighteen": 18, "nineteen": 19, "twenty": 20}
+           "eighteen": 18, "nineteen": 19, "twenty": 20,
+           "twenty-one": 21, "twenty-two": 22, "twenty-three": 23,
+           "twenty-four": 24, "twenty-five": 25, "twenty-six": 26,
+           "twenty-seven": 27, "twenty-eight": 28, "twenty-nine": 29,
+           "thirty": 30}
 if claim:
     said = (numbers.get(claim.group(1).lower()), numbers.get(claim.group(2).lower()))
     check(said == (len(tiles.SENSORS), len(tiles.ACTIONS)),

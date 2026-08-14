@@ -61,6 +61,14 @@ class World:
         self.keys = set()           # keys at this device, for solo play
         self.player_keys = {}       # player id -> keys, for a shared world
 
+        # The named tiles this game carries: a name -> a stored row, with a
+        # `when` half and a `do` half. They live in the game file, so they
+        # travel to GitHub and to other players along with everything else.
+        self.combos = {str(c.get("name", "")): c
+                       for c in project.get("tiles", [])
+                       if str(c.get("name", "")).strip()}
+        self.combo_depth = 0        # how deep one named tile is inside another
+
         self.memory = {}            # name -> value, written by the remember tile
         # name -> {"name", "value", "x", "y", "z"}: the placeholders, each an
         # arbitrary slot with three faces. Made on demand by the tiles that
@@ -154,21 +162,42 @@ class World:
 
     # -- the rule engine ---------------------------------------------------
 
-    def run_row(self, thing, row):
+    def check_all(self, thing, uses):
+        """Every sensor in the list must pass.
+
+        Returns False if any fails, otherwise the first character one of them
+        found -- which becomes "it" -- or plain True if none found anybody. An
+        empty list passes, which is why a row with no WHEN tiles runs its
+        actions every tick.
+
+        Split out of run_row so that a named tile made of several sensors is
+        checked by the very same code as a row of them.
+        """
         it = None
-        for tile_use in row.get("when", []):
+        for tile_use in uses:
             tile = tiles.SENSORS.get(tile_use["tile"])
             if tile is None:
-                return
+                return False
             result = tile.fn(thing, self, tile_use.get("args", {}))
             if not result:
-                return
+                return False
             if it is None and isinstance(result, Thing):
                 it = result
-        for tile_use in row.get("do", []):
+        return it if it is not None else True
+
+    def do_all(self, thing, uses, it):
+        """Run every action in the list, handing each the same "it"."""
+        for tile_use in uses:
             tile = tiles.ACTIONS.get(tile_use["tile"])
             if tile is not None:
                 tile.fn(thing, self, tile_use.get("args", {}), it)
+
+    def run_row(self, thing, row):
+        found = self.check_all(thing, row.get("when", []))
+        if not found:
+            return
+        self.do_all(thing, row.get("do", []),
+                    found if isinstance(found, Thing) else None)
 
     def step(self):
         self.tick += 1

@@ -16,10 +16,11 @@ is a list of rows. Every row reads the same way:
 
     WHEN something is true   DO something
 
-That is the whole idea, and it is the idea Kodu and Project Spark used. Thirteen
-WHEN tiles crossed with twenty DO tiles is two hundred and sixty different
-sentences, and rows can hold more than one tile each, so the real number is
-much larger.
+That is the whole idea, and it is the idea Kodu and Project Spark used. Fourteen
+WHEN tiles crossed with twenty-one DO tiles is two hundred and ninety-four
+different sentences, and rows can hold more than one tile each, so the real
+number is much larger. One of those tiles is **your own**: fold any row up under
+a name and it joins the palette like the rest.
 
 ---
 
@@ -191,6 +192,7 @@ who arrived before you started a game — they are connected and waiting.
 | I remember `<name>` is `<value>` | remember `<name>` is `<value>` |
 | placeholder `<who>` has `<face>` `<test>` `<n>` | open `<object>` at `<target>` |
 | placeholder `<who>` is named "`<text>`" | name `<who>` is "`<text>`" |
+| the tile called "`<name>`" — one of your own | the tile called "`<name>`" — one of your own |
 | | value `<who>` = `<box>` `<op>` `<box>` |
 | | vector `<who>` `<axis>` = `<box>` `<op>` `<box>` |
 | | copy my place into vector `<who>` |
@@ -218,6 +220,46 @@ What happens is worth knowing before you do:
 
 Placed strays stay marked, so a row that never fires shows why on its face. Tap
 the button at the top of the palette to go back to only the tiles that fit.
+
+### Making a tile of your own
+
+Build a row you like, then fold the whole thing up under a name. It joins the
+palette and you can use it anywhere, as often as you like.
+
+- **In the browser** — the **⊞** button on the row.
+- **In the terminal** — *fold a row into one tile of your own*, on the brain
+  menu.
+
+**Both halves go in together.** That is what makes it worth doing: the one tile
+works on either side, and does the matching half of what you folded.
+
+    the row:  WHEN I see apple within 6   DO move toward it, hurt it by 1
+
+    folded as "hunt", it becomes:
+
+    WHEN ⊞ hunt   the seeing part is tested
+    DO   ⊞ hunt   the moving and hurting part runs
+
+The row you folded is replaced by the new tile in both halves, so the character
+carries on doing exactly what it did — folding tidies, it never changes
+behaviour.
+
+**"it" reaches inside.** A sensor inside your tile that finds a character hands
+it out to the row, and an action inside your tile is handed whatever the row
+found. So `⊞ hunt` above still moves toward the apple its own sensor saw, and a
+tile made only of `hurt it` still hurts whatever the row's WHEN half saw.
+
+**Your tiles can hold your tiles**, up to eight deep. One that contains itself
+stops at that depth rather than spinning for ever.
+
+**They live in the game file**, under `tiles`, so they travel with the game
+everywhere it goes — to GitHub, and to anyone who joins your world. Nothing has
+to be installed and no code is run: a named tile is only other tiles.
+
+Delete one with the **✕** on its palette chip, or from *your own tiles* on the
+main menu in the terminal. Rows still pointing at a deleted tile are left alone
+— the engine treats a name nobody has defined as simply not firing, and the chip
+says `(no such tile)` — which is kinder than deleting those rows too.
 
 ### Undoing
 
@@ -618,6 +660,7 @@ Once `python3 spark.py install` has been run, every one of these works as plain
 | `python3 tests/check_open.py` | check the remember/open tiles and their fences |
 | `python3 tests/check_places.py` | check placeholders: the three faces and the sums |
 | `python3 tests/check_undo.py` | check the undo stack behind both brain editors |
+| `python3 tests/check_tiles_of_mine.py` | check your own named tiles, and the ways they can be malformed |
 | `python3 tests/check_multiplayer.py` | check two players share one world |
 | `python3 tests/check_engines.py` | check the Python and JavaScript engines still agree |
 
@@ -655,6 +698,7 @@ Once `python3 spark.py install` has been run, every one of these works as plain
     tests/check_open.py  checks remember/open, and that a guest cannot launch apps
     tests/check_places.py       checks the placeholder tiles, their sums and their edges
     tests/check_undo.py         checks the undo stack both brain editors keep
+    tests/check_tiles_of_mine.py  checks named tiles, nesting, and self-reference
     tests/check_engines.py      plays every game twice, once per engine, and compares
     tests/engine_trace.js       runs the JavaScript engine from a terminal, for that test
 
@@ -678,6 +722,13 @@ text, and knowing the shape makes the whole thing less mysterious.
 {
   "name": "chase",
   "world": { "width": 30, "height": 14, "wrap": false, "speed": 6 },
+  "tiles": [
+    {
+      "name": "hunt",
+      "when": [ { "tile": "see", "args": { "kind": "apple", "range": 6 } } ],
+      "do":   [ { "tile": "move", "args": { "dir": "toward it" } } ]
+    }
+  ],
   "characters": [
     {
       "kind": "hero",
