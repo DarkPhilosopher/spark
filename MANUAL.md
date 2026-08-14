@@ -9,6 +9,7 @@ turning on the browser interface and GitHub.
 
 - [The tutorial](#the-tutorial)
 - [System requirements](#system-requirements)
+- [Controls: the deck (what the browser opens on)](#controls-the-deck-what-the-browser-opens-on)
 - [Controls: playing a game](#controls-playing-a-game)
 - [Controls: the terminal menus](#controls-the-terminal-menus)
 - [Controls: the browser editor](#controls-the-browser-editor)
@@ -155,6 +156,77 @@ The screens, in order of depth:
    a row up.
 5. **One row** — add or remove WHEN tiles and DO tiles.
 6. **One tile** — answer its questions, one per screen.
+
+---
+
+## Controls: the deck (what the browser opens on)
+
+Six buttons and a box, filling the screen.
+
+| Button | Opens |
+|---|---|
+| play | the game — live through Termux, or the 3D view with no server |
+| edit | the top bar: open, save, new, rename, GitHub, sharing, and world settings |
+| characters | the cast strip and the character panel |
+| brain | the rows, the tile palette, undo, the ⊞ fold button and the bin |
+| tiles | your own tiles — the folded ones and the Python editor |
+| save | writes the game down. No page: it just saves and says where |
+
+**‹ back**, top left of any page, returns to the deck.
+
+### The formation
+
+Eight cells, six of them buttons.
+
+| Held | Grid | Buttons | Box |
+|---|---|---|---|
+| upright | 2 across, 4 down | the first 3 rows | the last row, across both columns |
+| sideways | 4 across, 2 down | the first 3 columns | the 4th column |
+
+Buttons stretch to fill the screen; the deck itself never scrolls. Should there
+ever be more than six, the **button area** scrolls up and down only, keeping the
+same columns.
+
+`/swap side chat` moves the box to the other side when the phone is sideways,
+and remembers which side you left it on. `/swap side chat left` and
+`... right` name a side outright.
+
+### The box
+
+| Typed | What happens |
+|---|---|
+| `/help` | lists all of this on screen |
+| `/play` `/edit` `/characters` `/brain` `/tiles` `/save` | the same as the buttons |
+| `/pin "note"` | keeps a note. Quotes are optional: `/pin feed the bug` works |
+| `/pins` | lists them, numbered |
+| `/unpin 2` | removes number 2 |
+| `/swap side chat` | the box changes sides when sideways |
+| `/who` | who is connected |
+| `/clear` | empties the log |
+| anything else | said to everyone else in your world |
+
+An unrecognised `/word` says so and is **not** sent as chat, so a mistyped
+command never gets broadcast.
+
+Notes live in this browser (`localStorage`), not in the game, so they follow the
+device rather than the game file.
+
+### Chat
+
+| | |
+|---|---|
+| Who may talk | anyone who can see the world — **owner, edit, play and watch** |
+| Who may not | somebody with no valid code: 403 |
+| One line | trimmed of extra spaces, cut at **300** characters |
+| How many kept | the last **40**, in memory only |
+| Where it is stored | nowhere. It never reaches the disk and does not survive a restart |
+| How it arrives | with the world snapshot, so there is no extra polling |
+
+A watcher can talk because somebody who may only look is still a person in the
+room, and saying something changes nothing about the world.
+
+Chat needs the server running. Opened from GitHub Pages with no server, the box
+still does every `/command`, and says so if you try to talk.
 
 ---
 
@@ -639,6 +711,7 @@ anywhere, as plain `spark ...`, once you have run the install command.
 | `python3 tests/check_mytiles.py` | check the gate in front of Python tiles |
 | `python3 tests/check_engines.py` | check both engines still play games identically |
 | `node tests/store.test.js` | check the editor's save and load logic |
+| `node tests/deck.test.js` | check the six buttons and the box you type in |
 
 ---
 

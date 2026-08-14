@@ -227,6 +227,15 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json({"token": player.token, "role": player.role,
                                    "name": player.name})
 
+        if path == "/api/chat":
+            # Anyone who may look may talk. A watcher is still a person in the
+            # room, and saying something changes nothing about the world.
+            player, ok = self.allow(MAY_LOOK)
+            if not ok:
+                return None
+            said = live.SESSION.say(player, sent.get("text", ""))
+            return self.send_json({"said": said})
+
         if path == "/api/key":
             player, ok = self.allow(MAY_PLAY)
             if not ok:

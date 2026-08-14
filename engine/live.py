@@ -68,6 +68,13 @@ class Player:
 class Session:
     """The host's live game: one world, several people watching or playing."""
 
+    # What people say to each other, newest last. Kept only in memory and only
+    # this many: a shared world is a conversation while it is happening, not a
+    # record afterwards, and nothing said here should outlive the session or
+    # reach the disk.
+    CHAT_KEPT = 40
+    CHAT_LIMIT = 300                    # characters in one message
+
     def __init__(self):
         self.lock = threading.RLock()
         self.invites = {}               # code -> Invite
@@ -76,6 +83,8 @@ class Session:
         self.game_name = None
         self.thread = None
         self.running = False
+        self.chat = []                  # [{"who", "text", "at"}]
+        self.chat_seq = 0               # so a page can tell what it has seen
 
     # -- invites ----------------------------------------------------------
 
@@ -212,13 +221,35 @@ class Session:
             if player.role == "play":
                 player.keys.update(k for k in keys if isinstance(k, str))
 
+    # -- talking ----------------------------------------------------------
+
+    def say(self, player, text):
+        """One line of chat. Returns it, or None if there was nothing to say.
+
+        Anyone who can see the world can talk, watchers included -- somebody
+        who may only look is still a person in the room. What they cannot do is
+        shout: one line is capped, and only the last few are kept.
+        """
+        text = " ".join(str(text or "").split())[:self.CHAT_LIMIT]
+        if not text:
+            return None
+        with self.lock:
+            self.chat_seq += 1
+            line = {"who": player.name if player else "host",
+                    "role": player.role if player else "owner",
+                    "text": text, "at": time.time(), "n": self.chat_seq}
+            self.chat.append(line)
+            del self.chat[:-self.CHAT_KEPT]
+            return line
+
     # -- what a guest's browser draws -------------------------------------
 
     def snapshot(self, player=None):
         with self.lock:
             if self.world is None:
                 return {"running": False, "game": None,
-                        "people": self._people(), "you": self._you(player)}
+                        "people": self._people(), "you": self._you(player),
+                        "chat": list(self.chat)}
             world = self.world
             return {
                 "running": self.running,
@@ -229,6 +260,7 @@ class Session:
                 "things": [[t.x, t.y, t.glyph, t.color] for t in world.things],
                 "people": self._people(),
                 "you": self._you(player),
+                "chat": list(self.chat),
             }
 
     def _people(self):

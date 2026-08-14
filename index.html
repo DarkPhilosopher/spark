@@ -80,6 +80,73 @@
   #tiles .split{flex:0 0 100%;font-size:11px;color:var(--dim);
                 padding:6px 2px 0;letter-spacing:.04em;text-transform:uppercase}
   #tiles .toggle{flex:0 0 100%;margin:2px 0 4px}
+  /* ------------------------------------------------------------- the deck
+     Eight cells. Six are buttons; the two that are left are the box you type
+     in. The whole thing fills the screen exactly -- no page scroll, ever --
+     which is why every measurement here is a fraction of the viewport and the
+     only thing allowed to scroll is the button area itself.
+
+     Held upright:  2 across, 4 down. Buttons take the first 3 rows, the box
+                    takes the last, across both columns.
+     Held sideways: 4 across, 2 down. Buttons take 3 columns, the box takes the
+                    fourth -- on the right, or the left after /swap side chat.
+
+     More than six buttons and the button area scrolls, up and down only, in
+     the same formation: the grid keeps its column count and simply runs on. */
+  #deck{position:fixed;inset:0;display:grid;gap:8px;padding:8px;
+        background:var(--bg);z-index:40;
+        grid-template-columns:1fr 1fr;grid-template-rows:repeat(4,1fr)}
+  #deck.off{display:none}
+  #keys{grid-column:1 / -1;grid-row:1 / 4;
+        display:grid;gap:8px;grid-template-columns:1fr 1fr;
+        grid-auto-rows:calc((100% - 16px) / 3);
+        overflow-y:auto;overflow-x:hidden;
+        scrollbar-width:thin;-webkit-overflow-scrolling:touch}
+  #talk{grid-column:1 / -1;grid-row:4 / 5;
+        display:flex;flex-direction:column;gap:6px;min-height:0}
+
+  /* sideways: four across, two down */
+  @media (orientation:landscape){
+    #deck{grid-template-columns:repeat(4,1fr);grid-template-rows:1fr 1fr}
+    #keys{grid-column:1 / 4;grid-row:1 / -1;
+          grid-template-columns:1fr 1fr 1fr;
+          grid-auto-rows:calc((100% - 8px) / 2)}
+    #talk{grid-column:4 / 5;grid-row:1 / -1}
+    /* the box on the left instead, after /swap side chat */
+    #deck.swapped #keys{grid-column:2 / 5}
+    #deck.swapped #talk{grid-column:1 / 2}
+  }
+
+  #keys button{width:100%;height:100%;margin:0;font-size:clamp(13px,4.2vmin,22px);
+               font-weight:600;letter-spacing:.01em;border-radius:14px;
+               display:flex;align-items:center;justify-content:center;
+               text-align:center;padding:4px;line-height:1.15;
+               background:var(--panel2);border:1px solid var(--line)}
+  #keys button:active{border-color:var(--accent);color:var(--accent)}
+  #keys button .sub{display:block;font-size:.62em;font-weight:400;
+                    color:var(--dim);margin-top:3px}
+
+  #log{flex:1;min-height:0;overflow-y:auto;background:var(--panel);
+       border:1px solid var(--line);border-radius:12px;padding:8px;
+       font-size:12px;line-height:1.4;display:flex;flex-direction:column;
+       gap:3px;scrollbar-width:thin}
+  #log .line span{color:var(--dim)}
+  #log .me span{color:var(--accent)}
+  #log .sys{color:var(--dim);font-style:italic}
+  #log .pin{color:var(--good)}
+  #log .bad{color:var(--bad)}
+  #saybar{display:flex;gap:6px}
+  #saybox{flex:1;min-width:0;background:var(--panel);color:var(--ink);
+          border:1px solid var(--line);border-radius:10px;padding:10px;
+          font-size:15px}
+  #saygo{flex:0 0 auto}
+
+  /* a page opened from the deck */
+  #pagebar{position:sticky;top:0;z-index:5;background:var(--bg);
+           display:flex;gap:8px;align-items:center;padding:8px;
+           border-bottom:1px solid var(--line)}
+  #pagename{color:var(--dim);font-size:13px}
+
   /* the Python editor */
   #code textarea{width:100%;min-height:220px;font-family:ui-monospace,monospace;
      font-size:12px;line-height:1.45;background:#12151a;color:var(--ink);
@@ -176,21 +243,48 @@
   </div>
 </div>
 
-<h2>characters</h2>
+<!-- The deck: what you land on. Six buttons and a box to type in, filling the
+     screen. Everything below is a page the deck opens. -->
+<div id="deck">
+  <div id="keys"></div>
+  <div id="talk">
+    <div id="log"></div>
+    <form id="saybar" autocomplete="off">
+      <input id="saybox" placeholder="/help, or say something"
+             autocomplete="off" autocapitalize="off" spellcheck="false">
+      <button id="saygo">go</button>
+    </form>
+  </div>
+</div>
+
+<div id="page" hidden>
+  <div id="pagebar">
+    <button id="back">‹ back</button>
+    <span id="pagename"></span>
+  </div>
+
+<h2 id="cast-h">characters</h2>
 <div class="strip" id="cast"></div>
 <div class="panel" id="props"></div>
 
-<details>
+<details id="world-details">
   <summary>world settings</summary>
   <div class="panel" id="world"></div>
 </details>
+
+<div id="tilesnote" class="note" style="padding:0 8px">
+  Tiles of your own come in two kinds. <b>Fold a row</b> into one named tile
+  with the ⊞ button on any row under <i>brain</i> — that works everywhere,
+  including offline and on other people's phones. <b>Write one in Python</b>
+  below — that runs in Termux only, and only after you switch it on.
+</div>
 
 <details id="codepanel" hidden>
   <summary>your own tiles, written in Python</summary>
   <div class="panel" id="code"></div>
 </details>
 
-<h2>brain <span id="whose"></span></h2>
+<h2 id="brain-h">brain <span id="whose"></span></h2>
 <div id="rows"></div>
 <div id="rowbar" style="padding:0 8px 20px;display:flex;gap:6px">
   <button id="addrow" style="flex:3">+ add a row</button>
@@ -207,6 +301,8 @@
   <div id="hint">tap a tile to add it to the highlighted row - drag a placed tile to move it</div>
   <div id="tiles"></div>
 </div>
+
+</div><!-- #page -->
 
 <dialog id="dlg"><form method="dialog" id="dlgform"></form></dialog>
 
@@ -946,6 +1042,230 @@ function openGitHubSettings() {
   $("#dlg").showModal();
 }
 
+// ------------------------------------------------------------------ the deck
+//
+// Six buttons and a box to type in, filling the screen. Everything that was
+// here before is still here -- the deck opens it as a page with a back button,
+// rather than replacing it. That is deliberate: the six buttons are a way in,
+// not a smaller Spark.
+//
+// The formation is the CSS above. This half is what the buttons do, and what
+// the box understands.
+
+const LS_SWAP = "spark:chatside", LS_PINS = "spark:pins";
+
+const DECK = [
+  {key: "play",       sub: "run the game",        go: () => deckPlay()},
+  {key: "edit",       sub: "open / save / new",   go: () => openPage("edit")},
+  {key: "characters", sub: "the cast",            go: () => openPage("characters")},
+  {key: "brain",      sub: "rows and tiles",      go: () => openPage("brain")},
+  {key: "tiles",      sub: "yours, and Python",   go: () => openPage("tiles")},
+  {key: "save",       sub: "write it down",       go: () => deckSave()},
+];
+
+// Which parts of the old page each button shows. Everything not listed for a
+// page is hidden while that page is open.
+const PAGES = {
+  edit:       {name: "edit", show: ["#top", "#world-details"]},
+  characters: {name: "characters", show: ["#cast-h", "#cast", "#props"]},
+  brain:      {name: "brain", show: ["#brain-h", "#rows", "#rowbar", "#palette",
+                                     "#trash"]},
+  tiles:      {name: "tiles", show: ["#codepanel", "#palette", "#tilesnote"]},
+};
+
+let pinned = [];
+
+function renderKeys() {
+  const box = $("#keys"); box.textContent = "";
+  for (const item of DECK) {
+    const b = el("button", null, item.key);
+    b.append(el("span", "sub", item.sub));
+    b.onclick = item.go;
+    box.append(b);
+  }
+}
+
+// The four that change the game. A guest who joined to play or watch gets the
+// deck and the chat, but not these -- the server would refuse the saves anyway,
+// so saying it here is a kindness rather than a lock.
+const EDIT_PAGES = ["edit", "characters", "brain", "tiles"];
+
+function openPage(which) {
+  if (EDIT_PAGES.includes(which) && !amEditor())
+    return note("you joined as a guest — you can play and talk here, "
+                + "not change the game", "bad");
+  const page = PAGES[which];
+  if (!page) return;
+  $("#deck").classList.add("off");
+  $("#page").hidden = false;
+  $("#pagename").textContent = page.name;
+  for (const sel of PAGE_PARTS)
+    document.querySelectorAll(sel).forEach(n => {
+      n.style.display = page.show.includes(sel) ? "" : "none";
+    });
+  window.scrollTo(0, 0);
+}
+
+const PAGE_PARTS = ["#top", "#world-details", "#cast-h", "#cast", "#props",
+                    "#brain-h", "#rows", "#rowbar", "#palette", "#trash",
+                    "#codepanel", "#tilesnote"];
+
+function closePage() {
+  $("#page").hidden = true;
+  $("#deck").classList.remove("off");
+}
+
+async function deckSave() {
+  if (!project) return note("nothing open to save", "bad");
+  const out = await store.saveGame(project);
+  if (out.error) return note(out.error, "bad");
+  await loadGames(project.name);
+  note("saved to " + out.where + (out.warn ? " — " + out.warn : ""));
+}
+
+function deckPlay() {
+  if (store.mode === "server") { startLive(); note("starting the world…"); }
+  else {
+    // No server: the 3D page carries its own engine and can play it here.
+    const packed = btoa(unescape(encodeURIComponent(JSON.stringify(project))))
+      .replace(/\+/g, "-").replace(/\//g, "_");
+    location.href = "world3d.html#g=" + packed;
+  }
+}
+
+// -- the box you type in ----------------------------------------------------
+
+function note(text, kind) {
+  const line = el("div", kind || "sys", text);
+  $("#log").append(line);
+  $("#log").scrollTop = $("#log").scrollHeight;
+  while ($("#log").children.length > 200) $("#log").firstChild.remove();
+}
+
+function chatLine(who, text, mine) {
+  const line = el("div", "line" + (mine ? " me" : ""));
+  line.append(el("span", null, who + ": "));
+  line.append(document.createTextNode(text));
+  $("#log").append(line);
+  $("#log").scrollTop = $("#log").scrollHeight;
+}
+
+function loadPins() {
+  try { pinned = JSON.parse(localStorage.getItem(LS_PINS) || "[]"); }
+  catch (e) { pinned = []; }
+}
+function savePins() {
+  localStorage.setItem(LS_PINS, JSON.stringify(pinned.slice(-100)));
+}
+
+/* Pull the text of  /pin "some note"  or  /pin some note  */
+function quoted(rest) {
+  const m = /^"([^"]*)"|^'([^']*)'/.exec(rest.trim());
+  return m ? (m[1] ?? m[2]) : rest.trim();
+}
+
+function swapSide(to) {
+  const deck = $("#deck");
+  const on = to === undefined ? !deck.classList.contains("swapped")
+                              : to === "left";
+  deck.classList.toggle("swapped", on);
+  localStorage.setItem(LS_SWAP, on ? "left" : "right");
+  note("the box is on the " + (on ? "left" : "right") +
+       " when the phone is sideways");
+}
+
+const COMMANDS = {
+  help() {
+    note("buttons: " + DECK.map(d => d.key).join(", "), "pin");
+    note("/play /edit /characters /brain /tiles /save — same as the buttons");
+    note('/pin "note" — keep a note.  /pins — list them.  /unpin 2 — remove one');
+    note("/swap side chat — put the box on the other side when sideways");
+    note("/who — who is connected.  /clear — empty this log");
+    note("anything not starting with / is said to the others, if any");
+  },
+  pins() {
+    if (!pinned.length) return note("no notes pinned");
+    pinned.forEach((p, i) => note((i + 1) + ". " + p, "pin"));
+  },
+  pin(rest) {
+    const text = quoted(rest);
+    if (!text) return note('say what to pin:  /pin "feed the bug first"', "bad");
+    pinned.push(text); savePins();
+    note("pinned " + pinned.length + ". " + text, "pin");
+  },
+  unpin(rest) {
+    const at = parseInt(rest.trim(), 10);
+    if (!at || at < 1 || at > pinned.length)
+      return note("which one? /pins lists them", "bad");
+    note("removed: " + pinned.splice(at - 1, 1)[0]);
+    savePins();
+  },
+  swap(rest) {
+    const said = rest.trim().toLowerCase();
+    if (!/^side chat|^chat side|^side|^chat/.test(said))
+      return note("did you mean /swap side chat ?", "bad");
+    const to = /left/.test(said) ? "left" : /right/.test(said) ? "right"
+                                                              : undefined;
+    swapSide(to);
+  },
+  clear() { $("#log").textContent = ""; },
+  who() {
+    const people = (liveSnap && liveSnap.people) || [];
+    if (!people.length) return note("nobody else is connected");
+    for (const p of people) note(p.name + " — " + p.role, "pin");
+  },
+};
+for (const item of DECK) COMMANDS[item.key] = () => item.go();
+
+function startDeck() {
+  renderKeys();
+  loadPins();
+  if (localStorage.getItem(LS_SWAP) === "left")
+    $("#deck").classList.add("swapped");
+  closePage();
+  note("six buttons above. type /help for what this box can do.");
+  if (pinned.length)
+    note(pinned.length + " note" + (pinned.length === 1 ? "" : "s") +
+         " pinned — /pins", "pin");
+}
+
+async function runSaid(said) {
+  said = said.trim();
+  if (!said) return;
+  if (!said.startsWith("/")) return sendChat(said);
+  const cut = said.indexOf(" ");
+  const word = (cut < 0 ? said.slice(1) : said.slice(1, cut)).toLowerCase();
+  const rest = cut < 0 ? "" : said.slice(cut + 1);
+  const fn = COMMANDS[word];
+  if (!fn) return note("no such command: /" + word + " — try /help", "bad");
+  await fn(rest);
+}
+
+async function sendChat(text) {
+  if (store.mode !== "server") {
+    return note("nobody to talk to — chat needs the server running", "bad");
+  }
+  const res = await fetch("api/chat", {
+    method: "POST",
+    headers: {"Content-Type": "application/json", ...authHeaders()},
+    body: JSON.stringify({text}),
+  }).catch(() => null);
+  if (!res || !res.ok) return note("could not say that", "bad");
+  chatLine(me.name || "you", text, true);
+  seenChat = Math.max(seenChat, 0);      // our own line is already on screen
+}
+
+// Chat arrives with the world snapshot, so it needs no polling of its own.
+let seenChat = 0;
+function showNewChat(snap) {
+  for (const line of (snap && snap.chat) || []) {
+    if (line.n <= seenChat) continue;
+    seenChat = line.n;
+    if (line.who === (me.name || "")) continue;     // already shown when sent
+    chatLine(line.who, line.text, false);
+  }
+}
+
 // ------------------------------------------- your own tiles, in Python
 //
 // The one place in Spark where you write code rather than arrange tiles, and
@@ -1161,6 +1481,7 @@ const LS_TOKEN = "spark:token", LS_OWNER = "spark:ownerkey";
 
 let me = {role: "owner", name: "host"};   // until told otherwise
 let livePoll = null, pressed = new Set();
+let liveSnap = null;                      // the last thing the host sent us
 
 function ownerKey() {
   const fromUrl = /[#&]owner=([\w-]+)/.exec(location.hash || "");
@@ -1190,6 +1511,10 @@ function amEditor() { return me.role === "owner" || me.role === "edit"; }
 
 function showStage(on) {
   $("#stage").classList.toggle("on", on);
+  // Playing takes the whole screen, so the deck steps out of the way and comes
+  // back when you leave the game.
+  $("#deck").classList.toggle("off", on);
+  if (on) $("#page").hidden = true;
   for (const id of ["#rows", "#props", "#palette", "#rowbar", "#cast"])
     document.querySelectorAll(id).forEach(n => n.style.display = on ? "none" : "");
   document.querySelectorAll("details").forEach(n => n.style.display = on ? "none" : "");
@@ -1229,7 +1554,10 @@ async function pollLive() {
   if (!res.ok) { stopLive(); return say("the host ended your access"); }
   const snap = await res.json();
   me = snap.you || me;
+  liveSnap = snap;
   drawWorld(snap);
+  showNewChat(snap);        // chat rides along with the world, so it needs no
+                            // polling of its own
   if (pressed.size && me.role !== "watch") {
     const keys = [...pressed];
     pressed.clear();
@@ -1479,6 +1807,17 @@ $("#addrow").onclick = () => {
 
 $("#undo").onclick = undo;
 
+// -- the deck's own wiring --------------------------------------------------
+
+$("#back").onclick = closePage;
+$("#saybar").onsubmit = e => {
+  e.preventDefault();
+  const box = $("#saybox");
+  const said = box.value;
+  box.value = "";
+  runSaid(said);
+};
+
 for (const tab of document.querySelectorAll("#tabs button"))
   tab.onclick = () => {
     side = tab.dataset.side;
@@ -1505,6 +1844,9 @@ for (const tab of document.querySelectorAll("#tabs button"))
     $("#save").hidden = $("#new").hidden = $("#games").hidden = true;
     project = blankProject("guest");
     renderWhere();
+    // A guest gets the deck too: play, and the box to talk in. That is most of
+    // what the box is for.
+    startDeck();
     if (localStorage.getItem(LS_TOKEN)) {
       startLive();
       say("rejoining…");
@@ -1522,6 +1864,7 @@ for (const tab of document.querySelectorAll("#tabs button"))
   // Owner-only, and the server decides: a guest's request comes back 403 and
   // loadCodePanel leaves the panel hidden.
   await loadCodePanel();
+  startDeck();
   say(store.mode === "server" ? "saving to games/ on this phone"
                               : "saving in this browser");
 })();

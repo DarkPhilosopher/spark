@@ -82,6 +82,65 @@ menu, as *learn how*.
 Otherwise, there are three ways in. All of them edit the same `games/*.json`
 files, so you can start a game in one and finish it in another.
 
+### The deck: six buttons and a box
+
+The browser opens on **six buttons and a box to type in**, filling the screen.
+
+| | |
+|---|---|
+| **play** | run the game — live through Termux, or in the 3D view if there is no server |
+| **edit** | open, save, rename, new, GitHub, sharing |
+| **characters** | the cast, and what each one looks like |
+| **brain** | the rows, the tiles, undo, and ⊞ fold |
+| **tiles** | your own — folded ones and Python ones |
+| **save** | write the game down |
+
+Each opens a page with a **‹ back** button. Nothing was taken away; the buttons
+are a way in, not a smaller Spark.
+
+**How it sits on the screen.** Eight cells. Six are buttons, and the two left
+over are the box.
+
+    held upright                 held sideways
+    ┌──────────┬──────────┐      ┌───────┬───────┬───────┬────────┐
+    │  play    │  edit    │      │ play  │ chars │ tiles │        │
+    ├──────────┼──────────┤      ├───────┼───────┼───────┤  box   │
+    │ characters│ brain   │      │ edit  │ brain │ save  │        │
+    ├──────────┼──────────┤      └───────┴───────┴───────┴────────┘
+    │  tiles   │  save    │
+    ├──────────┴──────────┤      /swap side chat puts the box on the left
+    │        box          │
+    └─────────────────────┘
+
+The buttons resize to fill whatever screen they are on, and the whole thing
+fits without the page ever scrolling. If there are ever more than six buttons,
+the button area **scrolls up and down** in the same formation — the columns stay
+put and the rows run on.
+
+**The box** takes commands, or plain words to talk to whoever else is in your
+world:
+
+| Typed | What happens |
+|---|---|
+| `/help` | everything below, on screen |
+| `/play` `/edit` `/characters` `/brain` `/tiles` `/save` | the same as the buttons |
+| `/pin "feed the bug first"` | keep a note. Quotes optional |
+| `/pins` | list them |
+| `/unpin 2` | remove one |
+| `/swap side chat` | put the box on the other side when the phone is sideways |
+| `/who` | who is connected |
+| `/clear` | empty the log |
+| anything not starting with `/` | said to the others, if there are any |
+
+Notes are kept in this browser. Chat needs the server running — everyone who can
+see the world can talk, **watchers included**, since somebody who may only look
+is still a person in the room. One line is capped at 300 characters and only the
+last 40 are kept: a shared world is a conversation while it is happening, not a
+record afterwards, so nothing said reaches the disk.
+
+Guests get the deck too — **play** and the box — but not the four buttons that
+change the game.
+
 ### 1. Drag and drop, in your browser
 
     spark edit
@@ -709,6 +768,7 @@ Once `python3 spark.py install` has been run, every one of these works as plain
 | `python3 spark.py pull [game ...]` | overwrite games here with GitHub's |
 | `python3 spark.py games/chase.json` | open the menus with that game already loaded |
 | `node tests/store.test.js` | check the editor's save and load logic |
+| `node tests/deck.test.js` | check the six buttons and what the box understands |
 | `python3 tests/check_docs.py` | check this README still matches the code |
 | `python3 tests/check_sync.py` | check the GitHub push/pull logic |
 | `python3 tests/check_permissions.py` | check guests cannot exceed their code |
@@ -751,6 +811,7 @@ Once `python3 spark.py install` has been run, every one of these works as plain
     engine/tunnel.py     finds and runs cloudflared or ngrok for public play
     engine/rng.py        seeded dice, so both engines can roll the same numbers
     tests/store.test.js  17 checks on the editor's save and load logic
+    tests/deck.test.js   37 checks on the six buttons and the box you type in
     tests/check_docs.py  fails if this README has drifted from the code
     tests/check_sync.py  checks the GitHub push/pull logic, without the network
     tests/check_permissions.py  checks a guest can only do what their code allows

@@ -14,7 +14,59 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ## Unreleased
 
+### Changed
+
+- **The browser now opens on a deck: six buttons and a box to type in, filling
+  the screen.** The buttons are **play, edit, characters, brain, tiles, save**,
+  and each opens what used to be a section of one long page, with a **‹ back**
+  button. Nothing was removed — the deck is a way in, not a smaller Spark.
+
+  Eight cells, six of them buttons, and the two left over are the box:
+
+  | Held | Grid | Buttons | Box |
+  |---|---|---|---|
+  | upright | 2 across, 4 down | the first 3 rows | the last row, both columns |
+  | sideways | 4 across, 2 down | the first 3 columns | the 4th column |
+
+  The buttons stretch to fill whatever screen they are on and the deck itself
+  never scrolls. If there are ever more than six, the **button area** scrolls up
+  and down only, keeping the same columns — the rows simply run on.
+
 ### Added
+
+- **A box to type in, under the buttons.** It takes commands or plain words:
+
+  | Typed | What happens |
+  |---|---|
+  | `/help` | all of it, on screen |
+  | `/play` `/edit` `/characters` `/brain` `/tiles` `/save` | the same as the buttons |
+  | `/pin "feed the bug first"` | keeps a note — quotes optional |
+  | `/pins`, `/unpin 2` | list them, remove one |
+  | `/swap side chat` | the box changes sides when the phone is sideways |
+  | `/who`, `/clear` | who is connected; empty the log |
+  | anything else | said to everyone else in your world |
+
+  An unrecognised `/word` says so and is **not** sent as chat, so a mistyped
+  command is never broadcast. Notes are kept in the browser rather than the game
+  file, so they follow the device.
+
+- **Chat in a shared world.** Everyone who can see the world may talk,
+  **watchers included** — somebody who may only look is still a person in the
+  room, and saying something changes nothing about the world. A stranger with no
+  valid code gets 403.
+
+  One line is tidied of extra spaces and cut at 300 characters; only the last 40
+  are kept, in memory. Nothing said reaches the disk or survives a restart: a
+  shared world is a conversation while it is happening, not a record afterwards.
+  It rides along with the world snapshot the page already fetches, so it costs
+  no extra polling.
+
+  Guests get the deck too — **play** and the box — but not the four buttons that
+  change the game.
+
+  `tests/deck.test.js` — 37 checks — covers the six buttons, every command,
+  what `/pin` makes of quoted and unquoted notes, that `/swap side chat`
+  remembers its side, and that an unknown command is not broadcast.
 
 - **Write a tile in Python, from the browser.** A plain-text editor —
   *your own tiles, written in Python* — that writes files into `mytiles/`. What
