@@ -47,6 +47,7 @@ function snapshot(world) {
     status: world.status,
     message: world.message,
     memory: world.memory,
+    places: world.places,
     things: world.things.map(t => [
       t.kind, t.x, t.y, t.health, t.glyph, t.color,
       t.facing[0], t.facing[1], t.age, t.travelled, t.solid ? 1 : 0,

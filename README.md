@@ -16,8 +16,8 @@ is a list of rows. Every row reads the same way:
 
     WHEN something is true   DO something
 
-That is the whole idea, and it is the idea Kodu and Project Spark used. Eleven
-WHEN tiles crossed with fourteen DO tiles is a hundred and fifty-four different
+That is the whole idea, and it is the idea Kodu and Project Spark used. Thirteen
+WHEN tiles crossed with twenty DO tiles is two hundred and sixty different
 sentences, and rows can hold more than one tile each, so the real number is
 much larger.
 
@@ -189,7 +189,13 @@ who arrived before you started a game — they are connected and waiting.
 | I am at the edge of the world | make it / self disappear |
 | my range or time has run out | jump to a random empty square |
 | I remember `<name>` is `<value>` | remember `<name>` is `<value>` |
-| | open `<object>` at `<target>` |
+| placeholder `<who>` has `<face>` `<test>` `<n>` | open `<object>` at `<target>` |
+| placeholder `<who>` is named "`<text>`" | name `<who>` is "`<text>`" |
+| | value `<who>` = `<box>` `<op>` `<box>` |
+| | vector `<who>` `<axis>` = `<box>` `<op>` `<box>` |
+| | copy my place into vector `<who>` |
+| | jump to vector `<who>` |
+| | move by vector `<who>` |
 | | win the game |
 | | lose the game |
 
@@ -232,6 +238,91 @@ of the game:
 
 If nothing happens, the phone has nothing that opens that kind of link — see
 [When something goes wrong](#when-something-goes-wrong).
+
+### Placeholders: one slot, regarded three ways
+
+A **placeholder** is a name you invent — `speed`, `home`, `target`, anything at
+all — and the world keeps a slot under it. The slot has **three faces at once**,
+and each tile says which face it is regarding:
+
+| Face | What it holds | The tile that writes it |
+|---|---|---|
+| its **name** | a piece of text | name `<who>` is "`<text>`" |
+| its **value** | one whole number | value `<who>` = `<box>` `<op>` `<box>` |
+| its **vector** | three whole numbers — x, y and z | vector `<who>` `<axis>` = `<box>` `<op>` `<box>` |
+
+They are three faces of the same slot, not three slots. `home` can be named,
+valued and pointed at a square all at the same time, and each face is read back
+on its own.
+
+**Nothing has to be set up first.** You do not declare a placeholder; you just
+use the name and the slot appears underneath it. One nobody has written to has
+an empty name, a value of **0** and a vector of **(0, 0, 0)**, so a row may read
+one before any row has written it and still get a sensible answer. That is what
+makes it a *placeholder* — it stands in for something before there is anything
+there. Capitals and spare spaces are ignored, so `Home` and `home` are the one
+slot.
+
+**The `=` half is a sum.** Two boxes with a word between them:
+
+| Word | What it does |
+|---|---|
+| **plus** | add the two boxes |
+| **minus** | take the second from the first |
+| **times** | multiply them |
+| **divided by** | divide, dropping any fraction. Dividing by 0 gives 0 |
+
+**What you can put in a box.** Read in this order, first match wins:
+
+| In the box | What it means |
+|---|---|
+| *(empty)* | 0 |
+| `12`, `-3`, `2.7` | that number, with any fraction dropped |
+| `my x`, `my y`, `my health`, `my age`, `my travelled` | about me |
+| `it x`, `it y`, `it health`, `it age`, `it travelled` | about whoever the WHEN half found |
+| `score`, `tick` | about the world |
+| `speed` | the **value** face of the placeholder called speed |
+| `home x` | one axis of the **vector** face of the placeholder home |
+| anything else | 0 |
+
+So a counter is one row, reading its own placeholder and writing it back:
+
+    WHEN every 1 ticks   DO value steps = steps plus 1
+
+and a placeholder can measure the gap between two characters:
+
+    WHEN I see apple within 6   DO value gap = it x minus my x
+
+**Vectors that do something.** Three tiles make a vector more than bookkeeping:
+
+    WHEN key h is pressed   DO copy my place into vector home
+    WHEN key g is pressed   DO jump to vector home
+
+*copy my place into vector* writes where you are standing into x and y, leaving
+z alone. *jump to vector* stands you on that square — it obeys the edges of the
+world, and does nothing at all if the vector points off the board. *move by
+vector* takes one step of that size and direction, going through the same walls
+and wrapping edges as the ordinary *move* tile. z is kept for you but never
+travelled: the world is flat, and z is there for holding a third number.
+
+**Asking about one.** Two WHEN tiles read placeholders back:
+
+    WHEN placeholder eaten has value at least 5    DO win the game
+    WHEN placeholder target is named "apple"       DO ...
+
+The first picks its face — **value**, **x**, **y** or **z** — and its
+comparison — **at least**, **at most** or **exactly**. The second is the one
+that reads the name face, which is how a row asks *which thing is this
+placeholder standing in for at the moment*.
+
+**Whole numbers only, inside a fence.** Every number in a placeholder is a whole
+number between −1,000,000,000 and 1,000,000,000; a sum that runs past either end
+stops there. Both rules are there so that the browser's copy of the engine gets
+the identical answer — see [Two engines, kept honest](#two-engines-kept-honest).
+Squares on a grid were never fractional anyway.
+
+`games/placeholders.json` is a small worked game that uses all of this — open it
+and read the rows.
 
 ### Which way am I pointing
 
@@ -413,6 +504,7 @@ Once `python3 spark.py install` has been run, every one of these works as plain
 | `python3 tests/check_sync.py` | check the GitHub push/pull logic |
 | `python3 tests/check_permissions.py` | check guests cannot exceed their code |
 | `python3 tests/check_open.py` | check the remember/open tiles and their fences |
+| `python3 tests/check_places.py` | check placeholders: the three faces and the sums |
 | `python3 tests/check_multiplayer.py` | check two players share one world |
 | `python3 tests/check_engines.py` | check the Python and JavaScript engines still agree |
 
@@ -448,6 +540,7 @@ Once `python3 spark.py install` has been run, every one of these works as plain
     tests/check_permissions.py  checks a guest can only do what their code allows
     tests/check_multiplayer.py  two players in one world, over real HTTP
     tests/check_open.py  checks remember/open, and that a guest cannot launch apps
+    tests/check_places.py       checks the placeholder tiles, their sums and their edges
     tests/check_engines.py      plays every game twice, once per engine, and compares
     tests/engine_trace.js       runs the JavaScript engine from a terminal, for that test
 

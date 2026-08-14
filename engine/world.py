@@ -62,6 +62,10 @@ class World:
         self.player_keys = {}       # player id -> keys, for a shared world
 
         self.memory = {}            # name -> value, written by the remember tile
+        # name -> {"name", "value", "x", "y", "z"}: the placeholders, each an
+        # arbitrary slot with three faces. Made on demand by the tiles that
+        # write to them -- see tiles.place.
+        self.places = {}
         # Handing a URL to another app is the one tile that reaches outside the
         # game, so it is off unless whoever is playing turned it on. A shared
         # world never does -- see the `open` tile.

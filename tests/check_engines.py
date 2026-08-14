@@ -57,6 +57,7 @@ def snapshot(world):
         "status": world.status,
         "message": world.message,
         "memory": world.memory,
+        "places": world.places,
         "things": [[t.kind, t.x, t.y, t.health, t.glyph, t.color,
                     t.facing[0], t.facing[1], t.age, t.travelled,
                     1 if t.solid else 0]
@@ -89,7 +90,7 @@ def first_difference(a, b):
     for i, (left, right) in enumerate(zip(a, b)):
         if left == right:
             continue
-        for key in ("tick", "score", "status", "message", "memory"):
+        for key in ("tick", "score", "status", "message", "memory", "places"):
             if left.get(key) != right.get(key):
                 return "tick %d: %s  python=%r  js=%r" % (
                     i, key, left.get(key), right.get(key))

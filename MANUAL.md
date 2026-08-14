@@ -13,13 +13,14 @@ turning on the browser interface and GitHub.
 - [Controls: the terminal menus](#controls-the-terminal-menus)
 - [Controls: the browser editor](#controls-the-browser-editor)
 - [Controls: the 3D view](#controls-the-3d-view)
+- [Placeholders: the exact rules](#placeholders-the-exact-rules)
 - [Every command](#every-command)
 - [Connecting the browser interface](#connecting-the-browser-interface)
 - [Connecting another person: live play](#connecting-another-person-live-play)
 - [Connecting GitHub](#connecting-github)
 - [Moving games between phone and GitHub](#moving-games-between-phone-and-github)
 - [Renaming a game](#renaming-a-game)
-- [What each of the three connections gives you](#what-each-of-the-three-connections-gives-you)
+- [What each of the four connections gives you](#what-each-of-the-four-connections-gives-you)
 
 ---
 
@@ -272,6 +273,107 @@ opening turned on, if a game depends on that tile.
 
 ---
 
+## Placeholders: the exact rules
+
+The README explains what a placeholder is and why you would want one. This is
+the precise reference: exactly what each box accepts and exactly what comes out.
+
+### The slot
+
+One placeholder is one slot in the world, under a name you invent. It has three
+faces at once, and every face exists from the moment the name does:
+
+| Face | Type | Empty means | Written by |
+|---|---|---|---|
+| name | text | `""` | name `<who>` is "`<text>`" |
+| value | one whole number | `0` | value `<who>` = ... |
+| x, y, z | three whole numbers | `0, 0, 0` | vector `<who>` `<axis>` = ... |
+
+- The name is **trimmed and lowercased**: ` Home `, `HOME` and `home` are the
+  one slot.
+- A **blank** placeholder name is nobody. Tiles given one do nothing.
+- Placeholders belong to the **world**, not to a character, so every character
+  reads and writes the same ones. There is no private placeholder.
+- They start **empty every time a game starts**, exactly like the score. They
+  are not saved into the game file.
+- **Writing** a placeholder creates it. **Reading** one does not: a name that
+  has never been written reads as 0 and leaves nothing behind, so a typo is a
+  quiet zero rather than a slot full of rubbish.
+
+### What a box of a sum accepts
+
+Each `=` tile has two boxes with an operation between them. A box is read in
+this order, and the first line that fits wins:
+
+| Box contains | Result |
+|---|---|
+| nothing, or only spaces | `0` |
+| `12`, `-3`, `+8` | that whole number |
+| `2.7`, `-2.7` | `2`, `-2` — the fraction is dropped, toward zero |
+| `my x` `my y` `my health` `my age` `my travelled` | that number about the character running the row |
+| `it x` `it y` `it health` `it age` `it travelled` | that number about whoever the WHEN half found; `0` if it found nobody |
+| `score` | the score |
+| `tick` | how many ticks the game has run |
+| `<name>` | the **value** face of that placeholder |
+| `<name> x`, `<name> y`, `<name> z` | that axis of that placeholder's **vector** face |
+| anything else | `0` |
+
+Boxes are lowercased before reading, so `My X` works. What a box is **not**: a
+formula. There is one operation per tile and no brackets — to build something
+longer, use several rows, or several tiles in the one row, writing into a
+placeholder each time.
+
+Two things that look like numbers are deliberately **not** numbers here, because
+Python and JavaScript disagree about them and a sum must not mean two different
+things depending on which engine is running:
+
+| Typed | Python alone would say | JavaScript alone would say | Spark says |
+|---|---|---|---|
+| `0x10` | error | 16 | `0` |
+| `1_0` | 10 | error | `0` |
+
+### The operations
+
+| Word | Result |
+|---|---|
+| plus | first + second |
+| minus | first − second |
+| times | first × second |
+| divided by | first ÷ second, fraction dropped toward zero. **Second box 0 gives 0** |
+
+### The fence
+
+Every number a placeholder holds is a whole number from **−1,000,000,000** to
+**1,000,000,000**. Anything larger, in a box or as the result of a sum, stops at
+the fence rather than wrapping or erroring.
+
+This is not tidiness. `world3d.html` carries a second copy of the rules in
+JavaScript, whose numbers stop being exact above about 9,000,000,000,000,000;
+clamping first is what lets `python3 tests/check_engines.py` prove the two
+engines compute every sum identically.
+
+### The vector tiles
+
+| Tile | Exactly what it does |
+|---|---|
+| copy my place into vector `<who>` | writes my x and my y into the vector. **z is left alone** |
+| jump to vector `<who>` | stands me on square (x, y). Obeys the edges: a vector pointing off the board does nothing. Ignores solidity, like the *jump to a random empty square* tile |
+| move by vector `<who>` | one step of (x, y), through the normal movement rules — walls block it, wrapping edges wrap it. Also sets my facing |
+
+`z` is stored and read back but never travelled. The world is a flat grid; z is
+there so a vector can carry a third number.
+
+### The two WHEN tiles
+
+| Tile | True when |
+|---|---|
+| placeholder `<who>` has `<face>` `<test>` `<n>` | the chosen face — **value**, **x**, **y** or **z** — is **at least** / **at most** / **exactly** `n`. An unwritten placeholder is 0 on every face |
+| placeholder `<who>` is named "`<text>`" | the **name** face is exactly that text. An unwritten placeholder is named nothing, so this is false |
+
+Neither produces an "it", so neither can feed *move toward it*.
+
+---
+
 ## Every command
 
 Run these from inside the spark folder (`cd ~/spark` in Termux) — or from
@@ -303,6 +405,8 @@ anywhere, as plain `spark ...`, once you have run the install command.
 | `python3 spark.py pull chase` | overwrite just that one here |
 | `python3 tests/check_docs.py` | check the README still matches the code |
 | `python3 tests/check_sync.py` | check the GitHub push/pull logic, offline |
+| `python3 tests/check_places.py` | check the placeholder tiles and their sums |
+| `python3 tests/check_engines.py` | check both engines still play games identically |
 | `node tests/store.test.js` | check the editor's save and load logic |
 
 ---

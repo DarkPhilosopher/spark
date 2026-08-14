@@ -1,0 +1,128 @@
+{
+  "name": "placeholders",
+  "world": {
+    "width": 18,
+    "height": 12,
+    "wrap": false,
+    "speed": 6
+  },
+  "characters": [
+    {
+      "kind": "hero",
+      "glyph": "@",
+      "color": "cyan",
+      "health": 3,
+      "count": 1,
+      "solid": false,
+      "role": "player",
+      "brain": [
+        {
+          "when": [{"tile": "always", "args": {}}],
+          "do": [{"tile": "place_name", "args": {"who": "target", "text": "apple"}}]
+        },
+        {
+          "when": [{"tile": "timer", "args": {"every": 1}}],
+          "do": [{"tile": "place_value",
+                  "args": {"who": "steps", "a": "steps", "op": "plus", "b": "1"}}]
+        },
+        {
+          "when": [{"tile": "timer", "args": {"every": 20}}],
+          "do": [{"tile": "place_here", "args": {"who": "home"}}]
+        },
+        {
+          "when": [{"tile": "key", "args": {"key": "up"}}],
+          "do": [{"tile": "place_vector",
+                  "args": {"who": "step", "axis": "x", "a": "0", "op": "plus", "b": "0"}},
+                 {"tile": "place_vector",
+                  "args": {"who": "step", "axis": "y", "a": "0", "op": "minus", "b": "1"}},
+                 {"tile": "place_move", "args": {"who": "step"}}]
+        },
+        {
+          "when": [{"tile": "key", "args": {"key": "down"}}],
+          "do": [{"tile": "place_vector",
+                  "args": {"who": "step", "axis": "x", "a": "0", "op": "plus", "b": "0"}},
+                 {"tile": "place_vector",
+                  "args": {"who": "step", "axis": "y", "a": "0", "op": "plus", "b": "1"}},
+                 {"tile": "place_move", "args": {"who": "step"}}]
+        },
+        {
+          "when": [{"tile": "key", "args": {"key": "left"}}],
+          "do": [{"tile": "place_vector",
+                  "args": {"who": "step", "axis": "x", "a": "0", "op": "minus", "b": "1"}},
+                 {"tile": "place_vector",
+                  "args": {"who": "step", "axis": "y", "a": "0", "op": "plus", "b": "0"}},
+                 {"tile": "place_move", "args": {"who": "step"}}]
+        },
+        {
+          "when": [{"tile": "key", "args": {"key": "right"}}],
+          "do": [{"tile": "place_vector",
+                  "args": {"who": "step", "axis": "x", "a": "0", "op": "plus", "b": "1"}},
+                 {"tile": "place_vector",
+                  "args": {"who": "step", "axis": "y", "a": "0", "op": "plus", "b": "0"}},
+                 {"tile": "place_move", "args": {"who": "step"}}]
+        },
+        {
+          "when": [{"tile": "place_named", "args": {"who": "target", "text": "apple"}},
+                   {"tile": "touch", "args": {"kind": "apple"}}],
+          "do": [{"tile": "place_vector",
+                  "args": {"who": "reach", "axis": "x", "a": "it x", "op": "minus", "b": "my x"}},
+                 {"tile": "place_vector",
+                  "args": {"who": "reach", "axis": "y", "a": "it y", "op": "minus", "b": "my y"}},
+                 {"tile": "place_value",
+                  "args": {"who": "eaten", "a": "eaten", "op": "plus", "b": "1"}},
+                 {"tile": "score", "args": {"amount": 1}},
+                 {"tile": "vanish", "args": {"target": "it"}},
+                 {"tile": "spawn", "args": {"kind": "apple"}}]
+        },
+        {
+          "when": [{"tile": "place_has",
+                    "args": {"who": "steps", "face": "value", "test": "at least", "amount": 40}}],
+          "do": [{"tile": "place_value",
+                  "args": {"who": "steps", "a": "0", "op": "plus", "b": "0"}},
+                 {"tile": "place_jump", "args": {"who": "home"}},
+                 {"tile": "say", "args": {"text": "back to where I was"}}]
+        },
+        {
+          "when": [{"tile": "place_has",
+                    "args": {"who": "eaten", "face": "value", "test": "at least", "amount": 5}}],
+          "do": [{"tile": "win", "args": {}}]
+        }
+      ]
+    },
+    {
+      "kind": "apple",
+      "glyph": "o",
+      "color": "green",
+      "health": 1,
+      "count": 4,
+      "solid": false,
+      "role": "prop",
+      "brain": []
+    },
+    {
+      "kind": "drifter",
+      "glyph": "x",
+      "color": "magenta",
+      "health": 2,
+      "count": 2,
+      "solid": false,
+      "role": "prop",
+      "brain": [
+        {
+          "when": [{"tile": "timer", "args": {"every": 3}}],
+          "do": [{"tile": "place_vector",
+                  "args": {"who": "drift", "axis": "x", "a": "tick", "op": "divided by", "b": "7"}},
+                 {"tile": "place_vector",
+                  "args": {"who": "drift", "axis": "y", "a": "0", "op": "plus", "b": "0"}},
+                 {"tile": "place_move", "args": {"who": "drift"}}]
+        },
+        {
+          "when": [{"tile": "place_has",
+                    "args": {"who": "drift", "face": "x", "test": "at least", "amount": 3}}],
+          "do": [{"tile": "place_vector",
+                  "args": {"who": "drift", "axis": "x", "a": "0", "op": "minus", "b": "1"}}]
+        }
+      ]
+    }
+  ]
+}

@@ -16,6 +16,57 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ### Added
 
+- **Placeholders: an arbitrary named slot you can regard three ways at once —
+  as a name, as a value, or as a vector.** Eight new tiles, six DO and two WHEN.
+  Invent any name and the slot appears underneath it; nothing has to be declared
+  or set up first.
+
+      WHEN always          DO name target is "apple"
+      WHEN every 1 ticks   DO value steps = steps plus 1
+      WHEN key h pressed   DO vector home x = my x plus 0
+                              vector home y = my y plus 0
+      WHEN key g pressed   DO jump to vector home
+
+  The three faces belong to the one slot, so `home` can be named, valued and
+  pointed at a square all at once, and each face is read back on its own. The
+  right-hand half of a `=` tile is a **sum**: two boxes with **plus**,
+  **minus**, **times** or **divided by** between them. A box takes a number, or
+  `my x` / `it y` / `score` / `tick`, or the name of another placeholder —
+  `speed` for its value, `home x` for one axis of its vector.
+
+  *Why:* every tile until now either moved something or named something.
+  Nothing could **hold a number and do arithmetic on it**, so a game could not
+  count its own steps, measure the gap between two characters, or remember a
+  square to come back to. `remember` was the closest thing and it only holds
+  text. Splitting the idea into a name face, a value face and a vector face —
+  rather than three separate kinds of variable — means the same slot can be
+  regarded whichever way the row happens to need, which is what makes the tiles
+  snap together instead of sitting next to each other.
+
+  The full list: `name <who> is "<text>"`, `value <who> = <box> <op> <box>`,
+  `vector <who> <axis> = <box> <op> <box>`, `copy my place into vector <who>`,
+  `jump to vector <who>`, `move by vector <who>`, and the two WHEN tiles
+  `placeholder <who> has <face> <test> <n>` and
+  `placeholder <who> is named "<text>"`. That takes Spark from 11 × 14 tiles to
+  **13 × 20**.
+
+  Two rules worth knowing, both in [MANUAL.md](MANUAL.md) in full: everything a
+  placeholder holds is a **whole number** between −1,000,000,000 and
+  1,000,000,000, stopping at the fence rather than wrapping; and an **unwritten
+  placeholder reads as 0** on every face and an empty name, so a row can read
+  one before any row has written it. Reading a name does not create it, so a
+  typo stays a quiet zero.
+
+- **`games/placeholders.json`** — a small worked game using all eight tiles: a
+  step counter, a home square you can jump back to, arrow keys driving a vector,
+  and a win condition read off a placeholder. It doubles as the parity fixture,
+  so `check_engines.py` now plays the new tiles in both engines too.
+
+- **`tests/check_places.py`** — 50 checks on the placeholder tiles: each face,
+  every operation, dividing by zero, the fence at both ends, what an empty box
+  means, what an unwritten placeholder means, and that `0x10` and `1_0` are not
+  numbers in either engine.
+
 - **Three tiles that work on names instead of the grid: `remember`, `I
   remember`, and `open`.** `remember chrome is com.android.chrome` ties a short
   name to a long value; `open chrome at home` hands a target to another app on

@@ -144,6 +144,69 @@
       "id": "spent",
       "label": "my range or time has run out",
       "params": []
+    },
+    {
+      "id": "place_has",
+      "label": "placeholder {who} has {face} {test} {amount}",
+      "params": [
+        {
+          "name": "who",
+          "prompt": "Which placeholder?",
+          "kind": "text",
+          "choices": [],
+          "default": "thing"
+        },
+        {
+          "name": "face",
+          "prompt": "Regard it as what?",
+          "kind": "choice",
+          "choices": [
+            "value",
+            "x",
+            "y",
+            "z"
+          ],
+          "default": "value"
+        },
+        {
+          "name": "test",
+          "prompt": "Compared how?",
+          "kind": "choice",
+          "choices": [
+            "at least",
+            "at most",
+            "exactly"
+          ],
+          "default": "at least"
+        },
+        {
+          "name": "amount",
+          "prompt": "Compared with what number?",
+          "kind": "int",
+          "choices": [],
+          "default": 1
+        }
+      ]
+    },
+    {
+      "id": "place_named",
+      "label": "placeholder {who} is named \"{text}\"",
+      "params": [
+        {
+          "name": "who",
+          "prompt": "Which placeholder?",
+          "kind": "text",
+          "choices": [],
+          "default": "thing"
+        },
+        {
+          "name": "text",
+          "prompt": "Named what?",
+          "kind": "text",
+          "choices": [],
+          "default": "hero"
+        }
+      ]
     }
   ],
   "actions": [
@@ -364,6 +427,154 @@
       "id": "teleport",
       "label": "jump to a random empty square",
       "params": []
+    },
+    {
+      "id": "place_name",
+      "label": "name {who} is \"{text}\"",
+      "params": [
+        {
+          "name": "who",
+          "prompt": "Which placeholder?",
+          "kind": "text",
+          "choices": [],
+          "default": "thing"
+        },
+        {
+          "name": "text",
+          "prompt": "Name it what?",
+          "kind": "text",
+          "choices": [],
+          "default": "hero"
+        }
+      ]
+    },
+    {
+      "id": "place_value",
+      "label": "value {who} = {a} {op} {b}",
+      "params": [
+        {
+          "name": "who",
+          "prompt": "Which placeholder?",
+          "kind": "text",
+          "choices": [],
+          "default": "thing"
+        },
+        {
+          "name": "a",
+          "prompt": "First box of the sum?",
+          "kind": "text",
+          "choices": [],
+          "default": "0"
+        },
+        {
+          "name": "op",
+          "prompt": "And then?",
+          "kind": "choice",
+          "choices": [
+            "plus",
+            "minus",
+            "times",
+            "divided by"
+          ],
+          "default": "plus"
+        },
+        {
+          "name": "b",
+          "prompt": "Second box of the sum?",
+          "kind": "text",
+          "choices": [],
+          "default": "1"
+        }
+      ]
+    },
+    {
+      "id": "place_vector",
+      "label": "vector {who} {axis} = {a} {op} {b}",
+      "params": [
+        {
+          "name": "who",
+          "prompt": "Which placeholder?",
+          "kind": "text",
+          "choices": [],
+          "default": "thing"
+        },
+        {
+          "name": "axis",
+          "prompt": "Which axis -- x, y or z?",
+          "kind": "choice",
+          "choices": [
+            "x",
+            "y",
+            "z"
+          ],
+          "default": "x"
+        },
+        {
+          "name": "a",
+          "prompt": "First box of the sum?",
+          "kind": "text",
+          "choices": [],
+          "default": "0"
+        },
+        {
+          "name": "op",
+          "prompt": "And then?",
+          "kind": "choice",
+          "choices": [
+            "plus",
+            "minus",
+            "times",
+            "divided by"
+          ],
+          "default": "plus"
+        },
+        {
+          "name": "b",
+          "prompt": "Second box of the sum?",
+          "kind": "text",
+          "choices": [],
+          "default": "1"
+        }
+      ]
+    },
+    {
+      "id": "place_here",
+      "label": "copy my place into vector {who}",
+      "params": [
+        {
+          "name": "who",
+          "prompt": "Which placeholder?",
+          "kind": "text",
+          "choices": [],
+          "default": "home"
+        }
+      ]
+    },
+    {
+      "id": "place_jump",
+      "label": "jump to vector {who}",
+      "params": [
+        {
+          "name": "who",
+          "prompt": "Which placeholder?",
+          "kind": "text",
+          "choices": [],
+          "default": "home"
+        }
+      ]
+    },
+    {
+      "id": "place_move",
+      "label": "move by vector {who}",
+      "params": [
+        {
+          "name": "who",
+          "prompt": "Which placeholder?",
+          "kind": "text",
+          "choices": [],
+          "default": "step"
+        }
+      ]
     },
     {
       "id": "win",

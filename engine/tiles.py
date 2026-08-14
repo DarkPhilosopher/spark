@@ -13,6 +13,7 @@ in the project needs to change -- it shows up on the menus automatically.
 """
 
 import random
+import re
 import subprocess
 from dataclasses import dataclass, field
 from typing import Any, Callable
@@ -129,6 +130,151 @@ def remembered(world, text):
 
 
 # --------------------------------------------------------------------------
+# placeholders: one arbitrary slot, regarded three ways
+# --------------------------------------------------------------------------
+#
+# A placeholder is a name you invent -- `speed`, `home`, `thing`, anything --
+# that the world keeps a slot for. The slot has three faces at once and you
+# choose which one a tile regards:
+#
+#     its NAME     a piece of text, for labelling
+#     its VALUE    one whole number
+#     its VECTOR   three whole numbers, x, y and z
+#
+# Nothing has to be filled in first. A placeholder nobody has written to has an
+# empty name, a value of 0 and a vector of (0, 0, 0), so a row may read one
+# before any row has written it and still get a sensible answer. That is what
+# makes it a placeholder rather than a declaration: you use the name, and the
+# slot appears underneath it.
+
+FACES = ["value", "x", "y", "z"]        # which face a tile regards
+AXES = ["x", "y", "z"]
+TESTS = ["at least", "at most", "exactly"]
+OPS = ["plus", "minus", "times", "divided by"]
+
+# Every number in a placeholder is a whole number inside this fence. Both the
+# fence and the whole-number rule are here for the same reason: world3d.html
+# has to compute the identical answer in JavaScript, whose numbers stop being
+# exact above about nine thousand million million. Clamping first means the two
+# engines agree on every sum anybody can actually write, and squares on a grid
+# were never fractional anyway.
+LIMIT = 1000000000
+
+# What counts as typed-in number. Deliberately stricter than either language's
+# own parser -- Python reads "1_0" as ten and JavaScript reads "0x10" as
+# sixteen, and a sum must not mean two different things in the two engines.
+NUMBER = re.compile(r"^([+-]?)(\d+)(?:\.\d+)?$")
+
+
+def clamp(n):
+    return max(-LIMIT, min(LIMIT, int(n)))
+
+
+def place(world, who):
+    """The placeholder called `who`, made empty the first time it is written.
+
+    Names are trimmed and lowercased, so `Home` and `home` are the one slot --
+    a placeholder is meant to be typed twice from memory without ceremony.
+    An empty name is nobody, and the tiles that get None here do nothing.
+    """
+    who = str(who or "").strip().lower()
+    if not who:
+        return None
+    spot = world.places.get(who)
+    if spot is None:
+        spot = {"name": "", "value": 0, "x": 0, "y": 0, "z": 0}
+        world.places[who] = spot
+    return spot
+
+
+def about(thing, what):
+    """One number off a character, for the `my ...` and `it ...` words."""
+    if thing is None:
+        return 0
+    if what == "x":
+        return thing.x
+    if what == "y":
+        return thing.y
+    if what == "health":
+        return thing.health
+    if what == "age":
+        return thing.age
+    if what == "travelled":
+        return thing.travelled
+    return 0
+
+
+def number(text, obj, world, it):
+    """What one box of a sum means, as a whole number.
+
+    Read in this order, and the first that fits wins:
+
+        (nothing)          0
+        12  -3  2.7        that number, with any fraction dropped
+        my x, my y,        about me: also health, age, travelled
+        my health ...
+        it x, it y,        about whoever the WHEN half found -- 0 if it found
+        it health ...      nobody, so a row can never break for want of an `it`
+        score, tick        about the world
+        speed              the VALUE of the placeholder called speed
+        home x             one axis of the VECTOR of the placeholder home
+
+    Anything else is 0. Reading an unknown name does not create it: only the
+    writing tiles do that, so a typo stays a quiet zero instead of quietly
+    filling the world with slots.
+    """
+    text = str(text if text is not None else "").strip().lower()
+    if not text:
+        return 0
+    digits = NUMBER.match(text)
+    if digits:
+        got = int(digits.group(2))
+        return clamp(-got if digits.group(1) == "-" else got)
+    head, _, tail = text.partition(" ")
+    tail = tail.strip()
+    if head == "my":
+        return clamp(about(obj, tail))
+    if head == "it":
+        return clamp(about(it, tail))
+    if text == "score":
+        return clamp(world.score)
+    if text == "tick":
+        return clamp(world.tick)
+    spot = world.places.get(text)
+    if spot is not None:
+        return clamp(spot["value"])
+    if tail in AXES:
+        spot = world.places.get(head)
+        if spot is not None:
+            return clamp(spot[tail])
+    return 0
+
+
+def total(a, op, b, obj, world, it):
+    """The sum in the right-hand half of a `=` tile: one box, a word, one box."""
+    left = number(a, obj, world, it)
+    right = number(b, obj, world, it)
+    if op == "minus":
+        return clamp(left - right)
+    if op == "times":
+        return clamp(left * right)
+    if op == "divided by":
+        if not right:
+            return 0                    # nothing sensible to return, so zero
+        whole = abs(left) // abs(right)
+        return clamp(-whole if (left < 0) != (right < 0) else whole)
+    return clamp(left + right)
+
+
+def compare(got, test, amount):
+    if test == "at most":
+        return got <= amount
+    if test == "exactly":
+        return got == amount
+    return got >= amount
+
+
+# --------------------------------------------------------------------------
 # SENSORS -- the WHEN half
 # --------------------------------------------------------------------------
 
@@ -211,6 +357,37 @@ def s_spent(obj, world, a):
     if obj.max_range and obj.travelled >= obj.max_range:
         return True
     return bool(obj.max_life and obj.age >= obj.max_life)
+
+
+@sensor("place_has", "placeholder {who} has {face} {test} {amount}",
+        Param("who", "Which placeholder?", "text", [], "thing"),
+        Param("face", "Regard it as what?", "choice", FACES, "value"),
+        Param("test", "Compared how?", "choice", TESTS, "at least"),
+        Param("amount", "Compared with what number?", "int", [], 1))
+def s_place_has(obj, world, a):
+    """True when one face of a placeholder stands in the stated relation.
+
+    An untouched placeholder reads as 0 on every face, so this answers before
+    anything has written to it rather than refusing to.
+    """
+    spot = world.places.get(str(a.get("who", "")).strip().lower())
+    face = a.get("face", "value")
+    got = clamp(spot[face]) if spot is not None and face in spot else 0
+    return compare(got, a.get("test", "at least"), int(a.get("amount", 1)))
+
+
+@sensor("place_named", "placeholder {who} is named \"{text}\"",
+        Param("who", "Which placeholder?", "text", [], "thing"),
+        Param("text", "Named what?", "text", [], "hero"))
+def s_place_named(obj, world, a):
+    """True when a placeholder's NAME face is exactly this text.
+
+    The name face is the one that is text rather than arithmetic, so this is
+    how a row asks which of several things a placeholder is currently standing
+    in for -- `placeholder target is named "apple"`.
+    """
+    spot = world.places.get(str(a.get("who", "")).strip().lower())
+    return spot is not None and spot["name"] == str(a.get("text", ""))
 
 
 # --------------------------------------------------------------------------
@@ -349,6 +526,98 @@ def a_teleport(obj, world, a, it):
     spot = world.empty_cell()
     if spot:
         obj.x, obj.y = spot
+
+
+@action("place_name", "name {who} is \"{text}\"",
+        Param("who", "Which placeholder?", "text", [], "thing"),
+        Param("text", "Name it what?", "text", [], "hero"))
+def a_place_name(obj, world, a, it):
+    """Regard a placeholder as a name, and write that name."""
+    spot = place(world, a.get("who"))
+    if spot is not None:
+        spot["name"] = str(a.get("text", ""))
+
+
+@action("place_value", "value {who} = {a} {op} {b}",
+        Param("who", "Which placeholder?", "text", [], "thing"),
+        Param("a", "First box of the sum?", "text", [], "0"),
+        Param("op", "And then?", "choice", OPS, "plus"),
+        Param("b", "Second box of the sum?", "text", [], "1"))
+def a_place_value(obj, world, a, it):
+    """Regard a placeholder as a value, and write the sum into it.
+
+    Both boxes take a number, a `my`/`it`/`score`/`tick` word, or the name of
+    another placeholder -- so `value score = score plus 1` counts, and
+    `value gap = my x minus it x` measures.
+    """
+    spot = place(world, a.get("who"))
+    if spot is not None:
+        spot["value"] = total(a.get("a"), a.get("op"), a.get("b"),
+                              obj, world, it)
+
+
+@action("place_vector", "vector {who} {axis} = {a} {op} {b}",
+        Param("who", "Which placeholder?", "text", [], "thing"),
+        Param("axis", "Which axis -- x, y or z?", "choice", AXES, "x"),
+        Param("a", "First box of the sum?", "text", [], "0"),
+        Param("op", "And then?", "choice", OPS, "plus"),
+        Param("b", "Second box of the sum?", "text", [], "1"))
+def a_place_vector(obj, world, a, it):
+    """Regard a placeholder as a vector, and write one axis of it.
+
+    One axis per tile, so a row that sets all three is three of these -- which
+    is also what lets a row set only the one axis it cares about and leave the
+    others where they were.
+    """
+    spot = place(world, a.get("who"))
+    axis = a.get("axis", "x")
+    if spot is not None and axis in AXES:
+        spot[axis] = total(a.get("a"), a.get("op"), a.get("b"), obj, world, it)
+
+
+@action("place_here", "copy my place into vector {who}",
+        Param("who", "Which placeholder?", "text", [], "home"))
+def a_place_here(obj, world, a, it):
+    """Write where I am standing into a vector, x and y, leaving z alone."""
+    spot = place(world, a.get("who"))
+    if spot is not None:
+        spot["x"], spot["y"] = clamp(obj.x), clamp(obj.y)
+
+
+@action("place_jump", "jump to vector {who}",
+        Param("who", "Which placeholder?", "text", [], "home"))
+def a_place_jump(obj, world, a, it):
+    """Stand at the square a vector points to, if there is such a square.
+
+    Deliberately obeys the edges but not solidity: it is a teleport, and the
+    matching `teleport` tile does not check either. A vector pointing off the
+    board does nothing rather than pinning you to the rim.
+    """
+    spot = world.places.get(str(a.get("who", "")).strip().lower())
+    if spot is None:
+        return
+    x, y = clamp(spot["x"]), clamp(spot["y"])
+    if world.in_bounds(x, y):
+        obj.x, obj.y = x, y
+
+
+@action("place_move", "move by vector {who}",
+        Param("who", "Which placeholder?", "text", [], "step"))
+def a_place_move(obj, world, a, it):
+    """Take one step of the size and direction a vector holds.
+
+    This goes through the same try_move as the `move` tile, so walls stop it
+    and wrapping edges wrap it. z is ignored: the world is flat, and z is there
+    for keeping a third number, not for a third direction of travel.
+    """
+    spot = world.places.get(str(a.get("who", "")).strip().lower())
+    if spot is None:
+        return
+    dx, dy = clamp(spot["x"]), clamp(spot["y"])
+    if dx or dy:
+        obj.facing = (1 if dx > 0 else -1 if dx else 0,
+                      1 if dy > 0 else -1 if dy else 0)
+        world.try_move(obj, dx, dy)
 
 
 @action("win", "win the game")

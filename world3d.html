@@ -215,6 +215,83 @@ function remembered(world, text) {
   return String(has(world.memory, t) ? world.memory[t] : t);
 }
 
+// -- placeholders: one arbitrary slot, regarded three ways -----------------
+// The mirror of the same section in engine/tiles.py. Every rule here has a
+// twin there, including the clamp and the strict number pattern, which exist
+// precisely so that these two engines cannot disagree about a sum.
+
+const AXES = ["x", "y", "z"];
+const LIMIT = 1000000000;
+const NUMBER = /^([+-]?)(\d+)(?:\.\d+)?$/;
+
+const clamp = n => Math.max(-LIMIT, Math.min(LIMIT, Math.trunc(n)));
+
+function place(world, who) {
+  const name = String(who === undefined || who === null ? "" : who)
+    .trim().toLowerCase();
+  if (!name) return null;
+  if (!has(world.places, name))
+    world.places[name] = {name: "", value: 0, x: 0, y: 0, z: 0};
+  return world.places[name];
+}
+
+function placed(world, who) {
+  const name = String(who === undefined || who === null ? "" : who)
+    .trim().toLowerCase();
+  return has(world.places, name) ? world.places[name] : null;
+}
+
+function about(thing, what) {
+  if (!thing) return 0;
+  if (what === "x") return thing.x;
+  if (what === "y") return thing.y;
+  if (what === "health") return thing.health;
+  if (what === "age") return thing.age;
+  if (what === "travelled") return thing.travelled;
+  return 0;
+}
+
+function number(text, obj, world, it) {
+  const t = String(text === undefined || text === null ? "" : text)
+    .trim().toLowerCase();
+  if (!t) return 0;
+  const digits = NUMBER.exec(t);
+  if (digits) {
+    const got = Number(digits[2]);
+    return clamp(digits[1] === "-" ? -got : got);
+  }
+  const cut = t.indexOf(" ");
+  const head = cut < 0 ? t : t.slice(0, cut);
+  const tail = cut < 0 ? "" : t.slice(cut + 1).trim();
+  if (head === "my") return clamp(about(obj, tail));
+  if (head === "it") return clamp(about(it, tail));
+  if (t === "score") return clamp(world.score);
+  if (t === "tick") return clamp(world.tick);
+  if (has(world.places, t)) return clamp(world.places[t].value);
+  if (AXES.indexOf(tail) >= 0 && has(world.places, head))
+    return clamp(world.places[head][tail]);
+  return 0;
+}
+
+function total(a, op, b, obj, world, it) {
+  const left = number(a, obj, world, it);
+  const right = number(b, obj, world, it);
+  if (op === "minus") return clamp(left - right);
+  if (op === "times") return clamp(left * right);
+  if (op === "divided by") {
+    if (!right) return 0;
+    const whole = Math.floor(Math.abs(left) / Math.abs(right));
+    return clamp((left < 0) !== (right < 0) ? -whole : whole);
+  }
+  return clamp(left + right);
+}
+
+function compare(got, test, amount) {
+  if (test === "at most") return got <= amount;
+  if (test === "exactly") return got === amount;
+  return got >= amount;
+}
+
 const SHOT_BRAIN = [
   {when: [{tile: "always", args: {}}],
    do: [{tile: "move", args: {dir: "forward"}}]},
@@ -269,6 +346,18 @@ const SENSORS = {
   spent: (obj) => {
     if (obj.maxRange && obj.travelled >= obj.maxRange) return true;
     return !!(obj.maxLife && obj.age >= obj.maxLife);
+  },
+  place_has: (obj, world, a) => {
+    const spot = placed(world, a.who);
+    const face = a.face === undefined ? "value" : a.face;
+    const got = spot && has(spot, face) ? clamp(spot[face]) : 0;
+    return compare(got, a.test === undefined ? "at least" : a.test,
+                   num(a.amount, 1));
+  },
+  place_named: (obj, world, a) => {
+    const spot = placed(world, a.who);
+    return !!spot &&
+      spot.name === String(a.text === undefined ? "" : a.text);
   },
 };
 
@@ -330,6 +419,39 @@ const ACTIONS = {
     const spot = world.emptyCell();
     if (spot) { obj.x = spot[0]; obj.y = spot[1]; }
   },
+  place_name: (obj, world, a) => {
+    const spot = place(world, a.who);
+    if (spot) spot.name = String(a.text === undefined ? "" : a.text);
+  },
+  place_value: (obj, world, a, it) => {
+    const spot = place(world, a.who);
+    if (spot) spot.value = total(a.a, a.op, a.b, obj, world, it);
+  },
+  place_vector: (obj, world, a, it) => {
+    const spot = place(world, a.who);
+    const axis = a.axis === undefined ? "x" : a.axis;
+    if (spot && AXES.indexOf(axis) >= 0)
+      spot[axis] = total(a.a, a.op, a.b, obj, world, it);
+  },
+  place_here: (obj, world, a) => {
+    const spot = place(world, a.who);
+    if (spot) { spot.x = clamp(obj.x); spot.y = clamp(obj.y); }
+  },
+  place_jump: (obj, world, a) => {
+    const spot = placed(world, a.who);
+    if (!spot) return;
+    const x = clamp(spot.x), y = clamp(spot.y);
+    if (world.inBounds(x, y)) { obj.x = x; obj.y = y; }
+  },
+  place_move: (obj, world, a) => {
+    const spot = placed(world, a.who);
+    if (!spot) return;
+    const dx = clamp(spot.x), dy = clamp(spot.y);
+    if (dx || dy) {
+      obj.facing = [dx > 0 ? 1 : (dx ? -1 : 0), dy > 0 ? 1 : (dy ? -1 : 0)];
+      world.tryMove(obj, dx, dy);
+    }
+  },
   win: (obj, world) => { world.status = "win"; },
   lose: (obj, world) => { world.status = "lose"; },
 };
@@ -359,6 +481,7 @@ class World {
     this.keys = new Set();
     this.playerKeys = {};
     this.memory = {};
+    this.places = {};
     this.mayOpen = false;
     this.opened = {};
 
