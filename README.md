@@ -248,8 +248,8 @@ and each tile says which face it is regarding:
 | Face | What it holds | The tile that writes it |
 |---|---|---|
 | its **name** | a piece of text | name `<who>` is "`<text>`" |
-| its **value** | one whole number | value `<who>` = `<box>` `<op>` `<box>` |
-| its **vector** | three whole numbers — x, y and z | vector `<who>` `<axis>` = `<box>` `<op>` `<box>` |
+| its **value** | one number, decimals and all | value `<who>` = `<box>` `<op>` `<box>` |
+| its **vector** | three numbers — x, y and z | vector `<who>` `<axis>` = `<box>` `<op>` `<box>` |
 
 They are three faces of the same slot, not three slots. `home` can be named,
 valued and pointed at a square all at the same time, and each face is read back
@@ -270,7 +270,7 @@ slot.
 | **plus** | add the two boxes | `value gold = gold plus 5` |
 | **minus** | take the second from the first | `value gap = it x minus my x` |
 | **times** | multiply them | `value area = side times side` |
-| **divided by** | divide, dropping any fraction. Dividing by 0 gives 0 | `value half = gold divided by 2` |
+| **divided by** | divide. `7 divided by 2` is `3.5`. Dividing by 0 gives 0 | `value half = gold divided by 2` |
 | **remainder** | what is left over after dividing — the `%` you were thinking of | `value spin = tick remainder 4` |
 | **to the power of** | the first multiplied by itself that many times | `value big = 2 to the power of 8` |
 | **but no more than** | the smaller of the two — a ceiling | `value speed = speed but no more than 5` |
@@ -292,34 +292,52 @@ would otherwise need several rows to fake:
 - **how far from** is distance along one axis, and it never comes out negative.
   Against `0` it is plain absolute value, which nothing else here gives you.
 
-**Signs, pinned down.** Two of these have a trap in them, and Spark picks one
-answer for both engines rather than letting each language decide:
+**Signs, pinned down.** `remainder` has a trap in it, and Spark picks one answer
+for both engines rather than letting each language decide:
 
 | | Spark says | Python alone would say | JavaScript alone would say |
 |---|---|---|---|
-| `-7 divided by 5` | `-1` — cut toward zero | −2 | −1 |
 | `-7 remainder 5` | `-2` — the sign of the **left** box | 3 | −2 |
+| `7 remainder -5` | `2` | −3 | 2 |
 
-They are defined off each other, so `divided by` and `remainder` always fit
-back together: −1 × 5 + −2 = −7.
+The leftover always takes the sign of the thing being divided up. It is measured
+against a division cut *toward zero*, which is not quite what `divided by` does
+now that it keeps the fraction — so at or above zero the two reconcile as
+`down (7 divided by 5) times 5 plus (7 remainder 5) = 7`, and below zero `down`
+cuts the other way and they no longer line up in tiles.
 
-**to the power of** has no negative exponents — that would be a fraction, and
-there are none here — so `2 to the power of -1` is 0. Anything to the power of
-0 is 1, including 0 itself. A power that runs off the end stops at the fence
-with the right sign rather than building a thousand-digit number.
+**to the power of** rounds its exponent to a whole number, and a negative one
+gives 0 — a fractional power is what `root` is for. Anything to the power of 0
+is 1, including 0 itself. A power that runs off the end stops at the fence with
+the right sign rather than building a thousand-digit number.
 
 **What you can put in a box.** Read in this order, first match wins:
 
 | In the box | What it means |
 |---|---|
 | *(empty)* | 0 |
-| `12`, `-3`, `2.7` | that number, with any fraction dropped |
+| `12`, `-3`, `2.5`, `.5` | that number, fraction and all |
+| `root <box>` | its square root — below zero there is none, so 0 |
+| `round <box>` | the nearest whole number, halves away from zero |
+| `down <box>` | the whole number at or below it |
+| `up <box>` | the whole number at or above it |
+| `random <box>` | a whole number from 0 up to but **not including** it |
 | `my x`, `my y`, `my health`, `my age`, `my travelled` | about me |
 | `it x`, `it y`, `it health`, `it age`, `it travelled` | about whoever the WHEN half found |
 | `score`, `tick` | about the world |
 | `speed` | the **value** face of the placeholder called speed |
 | `home x` | one axis of the **vector** face of the placeholder home |
 | anything else | 0 |
+
+The five word forms take a box of their own, so they nest one deep:
+`root home x`, `random my health`, `round root 17`. A box holds **one** thing —
+it is not a formula, and `7 divided by 5` is a whole tile, not something you can
+write inside a box.
+
+**Dice.** `random 6` gives 0, 1, 2, 3, 4 or 5, so ordinary dice are
+`random 6 plus 1`. It rolls the world's own dice, which means a seeded world
+rolls the same numbers in both engines. `random` of zero or less is 0 rather
+than an error.
 
 So a counter is one row, reading its own placeholder and writing it back:
 
@@ -347,15 +365,36 @@ travelled: the world is flat, and z is there for holding a third number.
     WHEN placeholder target is named "apple"       DO ...
 
 The first picks its face — **value**, **x**, **y** or **z** — and its
-comparison — **at least**, **at most** or **exactly**. The second is the one
-that reads the name face, which is how a row asks *which thing is this
-placeholder standing in for at the moment*.
+comparison — **at least**, **at most** or **exactly**. Its right-hand side is a
+whole **box**, not merely a number, so it compares two moving things as readily
+as one against a constant:
 
-**Whole numbers only, inside a fence.** Every number in a placeholder is a whole
-number between −1,000,000,000 and 1,000,000,000; a sum that runs past either end
-stops there. Both rules are there so that the browser's copy of the engine gets
-the identical answer — see [Two engines, kept honest](#two-engines-kept-honest).
-Squares on a grid were never fractional anyway.
+    WHEN placeholder gap has value at least my health   DO ...
+
+(There is no `it` in the WHEN half — `it` is what the sensors produce — so
+`it x` in that box reads as 0.)
+
+The second tile reads the name face, which is how a row asks *which thing is
+this placeholder standing in for at the moment*.
+
+**Decimals, inside a fence.** A placeholder holds ordinary decimal numbers — a
+half stays a half — between −1,000,000,000 and 1,000,000,000. A sum that runs
+past either end stops there.
+
+The fence is what keeps the browser's copy of the engine in step. Both engines
+use the very same 64-bit numbers, so `+`, `−`, `×`, `÷` and `root` give
+bit-for-bit identical answers on each — but only while values stay in a sane
+range. See [Two engines, kept honest](#two-engines-kept-honest).
+
+**Squares are still whole.** The grid has not become fractional: *jump to
+vector* and *move by vector* round to the nearest square, so a vector of `0.4`
+moves you nowhere and `0.6` moves you a full square. To creep along slower than
+a square a tick, add the fraction to a placeholder every tick and move by the
+whole part of it:
+
+    WHEN always  DO value creep = creep plus 0.25
+                    vector step x = down creep plus 0
+                    value creep = creep remainder 1
 
 `games/placeholders.json` is a small worked game that uses all of this — open it
 and read the rows.

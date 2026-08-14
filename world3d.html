@@ -221,10 +221,26 @@ function remembered(world, text) {
 // precisely so that these two engines cannot disagree about a sum.
 
 const AXES = ["x", "y", "z"];
+const FUNCTIONS = ["root", "round", "down", "up", "random"];
 const LIMIT = 1000000000;
-const NUMBER = /^([+-]?)(\d+)(?:\.\d+)?$/;
+const NUMBER = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
 
-const clamp = n => Math.max(-LIMIT, Math.min(LIMIT, Math.trunc(n)));
+// Anything leaving clamp is finite, so every tile downstream can do plain
+// arithmetic without checking. JSON can write neither NaN nor Infinity, so one
+// loose in a placeholder would make a snapshot unreadable, not merely wrong.
+function clamp(n) {
+  const v = Number(n);
+  if (v !== v) return 0;               // NaN is the only value unequal to itself
+  return Math.max(-LIMIT, Math.min(LIMIT, v));
+}
+
+// Not Math.round: that sends exact halves upward, so Math.round(-2.5) is -2.
+// Python's round sends them to the nearest even. This agrees with neither, and
+// with itself in both engines, which is the point.
+function whole(n) {
+  const v = clamp(n);
+  return v >= 0 ? Math.floor(v + 0.5) : Math.ceil(v - 0.5);
+}
 
 function place(world, who) {
   const name = String(who === undefined || who === null ? "" : who)
@@ -251,18 +267,28 @@ function about(thing, what) {
   return 0;
 }
 
+function apply(word, got, world) {
+  if (word === "root") return got > 0 ? clamp(Math.sqrt(got)) : 0;
+  if (word === "round") return whole(got);
+  if (word === "down") return Math.floor(clamp(got));
+  if (word === "up") return Math.ceil(clamp(got));
+  if (word === "random") {
+    const sides = Math.floor(clamp(got));
+    return sides > 0 ? world.rng.randrange(sides) : 0;
+  }
+  return got;
+}
+
 function number(text, obj, world, it) {
   const t = String(text === undefined || text === null ? "" : text)
     .trim().toLowerCase();
   if (!t) return 0;
-  const digits = NUMBER.exec(t);
-  if (digits) {
-    const got = Number(digits[2]);
-    return clamp(digits[1] === "-" ? -got : got);
-  }
+  if (NUMBER.test(t)) return clamp(Number(t));
   const cut = t.indexOf(" ");
   const head = cut < 0 ? t : t.slice(0, cut);
   const tail = cut < 0 ? "" : t.slice(cut + 1).trim();
+  if (FUNCTIONS.indexOf(head) >= 0 && tail)
+    return apply(head, number(tail, obj, world, it), world);
   if (head === "my") return clamp(about(obj, tail));
   if (head === "it") return clamp(about(it, tail));
   if (t === "score") return clamp(world.score);
@@ -274,27 +300,33 @@ function number(text, obj, world, it) {
 }
 
 function divide(left, right) {
-  if (!right) return 0;
-  const whole = Math.floor(Math.abs(left) / Math.abs(right));
-  return (left < 0) !== (right < 0) ? -whole : whole;
+  return right ? clamp(left / right) : 0;
 }
 
 // Longhand, and not JavaScript's own %, for the reason spelt out in tiles.py:
 // the two languages disagree about the sign. Left box wins, in both engines.
+// (JavaScript's % happens to agree; Python's does not, so neither is trusted.)
 function remainder(left, right) {
   if (!right) return 0;
   const over = Math.abs(left) % Math.abs(right);
-  return left < 0 ? -over : over;
+  return clamp(left < 0 ? -over : over);
 }
 
-function power(base, exp) {
+// The exponent is rounded to a whole number and fractional powers are left out
+// on purpose -- that is what `root` is for, and asking either language for
+// 2 ** 0.5 risks the engines differing in the last bit.
+function power(base, exponent) {
+  const exp = whole(exponent);
   if (exp < 0) return 0;
   if (exp === 0) return 1;
   if (base === 0 || base === 1) return base;
   if (base === -1) return exp % 2 ? -1 : 1;
   const steps = exp <= 64 ? exp : 64 + (exp % 2);
   let out = 1;
-  for (let i = 0; i < steps; i++) out = clamp(out * base);
+  for (let i = 0; i < steps; i++) {
+    out = clamp(out * base);
+    if (out === 0) break;
+  }
   return out;
 }
 
@@ -378,7 +410,8 @@ const SENSORS = {
     const face = a.face === undefined ? "value" : a.face;
     const got = spot && has(spot, face) ? clamp(spot[face]) : 0;
     return compare(got, a.test === undefined ? "at least" : a.test,
-                   num(a.amount, 1));
+                   number(a.amount === undefined ? 1 : a.amount,
+                          obj, world, null));
   },
   place_named: (obj, world, a) => {
     const spot = placed(world, a.who);
@@ -466,13 +499,13 @@ const ACTIONS = {
   place_jump: (obj, world, a) => {
     const spot = placed(world, a.who);
     if (!spot) return;
-    const x = clamp(spot.x), y = clamp(spot.y);
+    const x = whole(spot.x), y = whole(spot.y);
     if (world.inBounds(x, y)) { obj.x = x; obj.y = y; }
   },
   place_move: (obj, world, a) => {
     const spot = placed(world, a.who);
     if (!spot) return;
-    const dx = clamp(spot.x), dy = clamp(spot.y);
+    const dx = whole(spot.x), dy = whole(spot.y);
     if (dx || dy) {
       obj.facing = [dx > 0 ? 1 : (dx ? -1 : 0), dy > 0 ? 1 : (dy ? -1 : 0)];
       world.tryMove(obj, dx, dy);

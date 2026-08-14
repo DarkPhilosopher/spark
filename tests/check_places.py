@@ -128,11 +128,16 @@ cases = [
     ("minus", "5", "7", -2),
     ("times", "7", "5", 35),
     ("times", "-3", "5", -15),
-    ("divided by", "7", "5", 1),
-    ("divided by", "-7", "5", -1),        # cut toward zero, both engines alike
+    ("divided by", "7", "5", 1.4),        # a real division now, not a cut
+    ("divided by", "-7", "5", -1.4),
+    ("divided by", "7", "2", 3.5),
+    ("divided by", "1", "8", 0.125),
     ("divided by", "7", "0", 0),          # nothing sensible, so zero
-    ("plus", "2.9", "0", 2),              # the fraction is dropped
-    ("plus", "-2.9", "0", -2),
+    ("plus", "2.9", "0", 2.9),            # the fraction is kept
+    ("plus", "-2.9", "0", -2.9),
+    ("plus", "0.1", "0.2", 0.1 + 0.2),    # whatever binary floats say, exactly
+    ("plus", ".5", ".5", 1),              # a leading dot is a number
+    ("plus", "3.", "0", 3),               # so is a trailing one
     ("plus", "", "3", 3),                 # an empty box is nothing
     ("plus", "banana", "3", 3),           # so is a word that means nothing
 
@@ -144,6 +149,7 @@ cases = [
     ("remainder", "-7", "-5", -2),
     ("remainder", "7", "0", 0),
     ("remainder", "10", "5", 0),
+    ("remainder", "7.5", "2", 1.5),       # fractions welcome on both sides
 
     ("to the power of", "2", "8", 256),
     ("to the power of", "-2", "3", -8),
@@ -151,8 +157,11 @@ cases = [
     ("to the power of", "5", "0", 1),
     ("to the power of", "0", "0", 1),
     ("to the power of", "0", "3", 0),
-    ("to the power of", "2", "-1", 0),    # a fraction, and there are none here
+    ("to the power of", "2", "-1", 0),    # that is what `root` is for
     ("to the power of", "1", "999999", 1),
+    ("to the power of", "1.5", "2", 2.25),   # a fractional BASE is fine
+    ("to the power of", "2", "3.4", 8),      # a fractional exponent is rounded
+    ("to the power of", "2", "3.6", 16),
 
     ("but no more than", "9", "5", 5),
     ("but no more than", "3", "5", 3),
@@ -169,7 +178,76 @@ cases = [
 for op, a, b, want in cases:
     world = run([value("thing", a, op, b)])
     got = slot(world, "thing").get("value")
-    check("%-11s %-8s %-4s = %d" % (op, repr(a), repr(b), want), got == want, got)
+    check("%-16s %-8s %-6s = %s" % (op, repr(a), repr(b), want),
+          got == want, got)
+
+# -- the five words that work on one box ------------------------------------
+
+print("\nthe words that take a single box")
+
+word_cases = [
+    ("root 9", 3), ("root 2", 2 ** 0.5), ("root 0", 0),
+    ("root -4", 0),                       # no such number, so zero
+    ("round 2.4", 2), ("round 2.5", 3), ("round 2.6", 3),
+    ("round -2.4", -2), ("round -2.5", -3),   # halves go AWAY from zero
+    ("down 2.9", 2), ("down -2.1", -3),
+    ("up 2.1", 3), ("up -2.9", -2),
+    ("root", 0),                          # a word with no box is not a word
+    ("rootle 9", 0),                      # nor is something that merely starts
+]
+for text, want in word_cases:
+    world = run([value("thing", text, "plus", "0")])
+    got = slot(world, "thing").get("value")
+    check("%-12s = %s" % (repr(text), want), got == want, got)
+
+world = run([value("side", "16"), value("thing", "root side", "plus", "0")])
+check("a word takes a placeholder, not only a number",
+      slot(world, "thing").get("value") == 4, world.places)
+
+world = run([vector("home", "x", "6.25"),
+             value("thing", "root home x", "plus", "0")])
+check("a word takes one axis of a vector too",
+      slot(world, "thing").get("value") == 2.5, world.places)
+
+world = run([value("thing", "round root 17", "plus", "0")])
+check("words nest, innermost first", slot(world, "thing").get("value") == 4,
+      world.places)
+
+# -- random -----------------------------------------------------------------
+
+print("\nrolling dice inside a sum")
+
+rolls = set()
+for _ in range(60):
+    world = run([value("thing", "random 6", "plus", "1")])
+    rolls.add(slot(world, "thing").get("value"))
+check("random 6 plus 1 only ever gives 1 to 6",
+      rolls and rolls <= {1, 2, 3, 4, 5, 6}, sorted(rolls))
+check("...and does actually vary", len(rolls) > 1, sorted(rolls))
+
+for text in ("random 0", "random -3", "random 0.4"):
+    world = run([value("thing", text, "plus", "0")])
+    check("%-12s is 0 rather than an error" % repr(text),
+          slot(world, "thing").get("value") == 0, world.places)
+
+world = run([value("thing", "random 6", "plus", "0")])
+check("a roll is always a whole number",
+      slot(world, "thing").get("value") ==
+      int(slot(world, "thing").get("value")), world.places)
+
+
+def seeded_roll(seed):
+    from engine.world import World as W
+    w = W(game([{"when": ALWAYS,
+                 "do": [value("thing", "random 1000", "plus", "0")]}]), seed=seed)
+    w.step()
+    return w.places["thing"]["value"]
+
+
+check("a seeded world rolls the same number twice",
+      seeded_roll(7) == seeded_roll(7), (seeded_roll(7), seeded_roll(7)))
+check("...and different seeds differ", seeded_roll(7) != seeded_roll(99),
+      (seeded_roll(7), seeded_roll(99)))
 
 world = run([value("thing", "1000000001", "plus", "0")])
 check("a number past the fence is held at the fence",
@@ -191,11 +269,27 @@ world = run([value("thing", "-10", "to the power of", "1000")])
 check("...and the sign an even power gives it",
       slot(world, "thing").get("value") == tiles.LIMIT, world.places)
 
-world = run([value("thing", "-7", "divided by", "5"),
-             value("check", "thing", "times", "5")])
-check("divide and remainder still fit back together",
-      slot(world, "check")["value"] + tiles.remainder(-7, 5) == -7,
-      (slot(world, "check"), tiles.remainder(-7, 5)))
+# `divided by` keeps the fraction now, so the old whole-number identity
+# (divide * right + remainder == left) no longer applies to it directly. What
+# still holds is that remainder is the leftover of a division cut TOWARD ZERO.
+# For numbers at or above zero that cut is `down`, so the identity is writable
+# in tiles; below zero it is not, because `down` cuts the other way.
+# One operation per tile and no brackets, so this takes four of them -- which
+# is itself the thing being demonstrated.
+world = run([value("q", "7", "divided by", "5"),      # 1.4
+             value("q", "down q", "plus", "0"),       # 1
+             value("q", "q", "times", "5"),           # 5
+             value("r", "7", "remainder", "5"),       # 2
+             value("thing", "q", "plus", "r")])       # 7
+check("down, times and remainder rebuild the original number",
+      slot(world, "thing").get("value") == 7, world.places)
+
+for left, right in ((7, 5), (-7, 5), (7, -5), (-7, -5), (7.5, 2)):
+    cut = int(left / right)             # toward zero, which is what int() does
+    check("%-5s remainder %-3s is the leftover of cutting toward zero"
+          % (left, right),
+          abs(cut * right + tiles.remainder(left, right) - left) < 1e-9,
+          (cut, tiles.remainder(left, right)))
 
 world = run([value("thing", "0x10", "plus", "0")])
 check("hexadecimal is not a number here (JavaScript would say 16)",

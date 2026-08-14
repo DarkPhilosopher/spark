@@ -181,10 +181,10 @@
         },
         {
           "name": "amount",
-          "prompt": "Compared with what number?",
-          "kind": "int",
+          "prompt": "Compared with what? (a number, or any box)",
+          "kind": "text",
           "choices": [],
-          "default": 1
+          "default": "1"
         }
       ]
     },

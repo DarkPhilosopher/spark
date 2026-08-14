@@ -84,7 +84,8 @@
         },
         {
           "when": [{"tile": "place_has",
-                    "args": {"who": "eaten", "face": "value", "test": "at least", "amount": 5}}],
+                    "args": {"who": "eaten", "face": "value",
+                             "test": "at least", "amount": "root 25"}}],
           "do": [{"tile": "win", "args": {}}]
         },
         {
@@ -98,7 +99,16 @@
                  {"tile": "place_value",
                   "args": {"who": "grow", "a": "grow", "op": "but no less than", "b": "-9"}},
                  {"tile": "place_value",
-                  "args": {"who": "away", "a": "my x", "op": "how far from", "b": "my y"}}]
+                  "args": {"who": "away", "a": "my x", "op": "how far from", "b": "my y"}},
+                 {"tile": "place_value",
+                  "args": {"who": "creep", "a": "creep", "op": "plus", "b": "0.25"}},
+                 {"tile": "place_value",
+                  "args": {"who": "root", "a": "root away", "op": "divided by", "b": "3"}},
+                 {"tile": "place_value",
+                  "args": {"who": "roll", "a": "random 6", "op": "plus", "b": "1"}},
+                 {"tile": "place_vector",
+                  "args": {"who": "creepstep", "axis": "x",
+                           "a": "down creep", "op": "remainder", "b": "2"}}]
         }
       ]
     },

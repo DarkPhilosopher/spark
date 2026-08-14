@@ -14,7 +14,75 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ## Unreleased
 
+### Changed
+
+- **Placeholders hold decimals now, not just whole numbers.** `7 divided by 2`
+  is `3.5` where it used to be `3`, and `value creep = creep plus 0.25` counts
+  up in quarters. Every face takes them — the value and all three axes of a
+  vector.
+
+  *Why:* whole numbers were a shortcut taken to guarantee the two engines could
+  never disagree, and it turned out not to be needed. Python and JavaScript use
+  the very same 64-bit floating-point numbers, so `+`, `−`, `×`, `÷` and square
+  root are bit-for-bit identical on both. What actually keeps them in step is
+  the fence, which stays, plus refusing the few operations where the languages
+  really do differ — see the sign rules below.
+
+  **The grid has not become fractional.** *jump to vector* and *move by vector*
+  round to the nearest square, halves away from zero, so a vector of `0.4` moves
+  you nowhere and `0.6` moves you a full square. To creep along slower than a
+  square a tick, keep the fraction in a placeholder and move by its whole part:
+
+      WHEN always  DO value creep = creep plus 0.25
+                      vector step x = down creep plus 0
+                      value creep = creep remainder 1
+
+  Two consequences worth knowing. `divided by` no longer cuts toward zero, so
+  the old identity with `remainder` needs the cut written back in explicitly —
+  `down (7 divided by 5) times 5 plus (7 remainder 5)` is 7 — and only at or
+  above zero, since `down` cuts the other way below it. And `to the power of`
+  now **rounds** its exponent rather than requiring a whole one; fractional
+  powers stay out on purpose, because `2 ** 0.5` is where the two languages can
+  differ in the last bit, and that is what `root` is for.
+
 ### Added
+
+- **Five words that work on a single box: `root`, `round`, `down`, `up` and
+  `random`.** They complete the arithmetic — square roots, all three kinds of
+  rounding, and dice — without a single new tile, because they are read inside
+  a box rather than being tiles of their own:
+
+      value side = root area plus 0
+      value roll = random 6 plus 1
+      value step = down creep plus 0
+
+  Each takes a box of its own, so they nest one level: `root home x`,
+  `round root 17`, `random my health`.
+
+  `random` rolls the **world's own dice** — the same source `move random` uses —
+  so a seeded world rolls the same numbers in both engines, and
+  `check_engines.py` proves it. `random 6` gives 0 to 5, making ordinary dice
+  `random 6 plus 1`; the number of sides is rounded down first, and zero or
+  fewer sides gives 0 rather than an error, because a sum is not a place a game
+  may fall over.
+
+  `round` is spelt out rather than handed to either language, which disagree
+  with each other and with intuition: Python's `round(2.5)` is `2` (nearest
+  even) and JavaScript's `Math.round(-2.5)` is `-2` (halves upward). Spark sends
+  exact halves **away from zero**, in both engines.
+
+- **The `placeholder ... has ...` WHEN tile compares against a whole box**, not
+  just a fixed number. So a row can now compare two moving things:
+
+      WHEN placeholder gap has value at least my health   DO ...
+
+  *Why:* it was the one place a number had to be typed literally, which made
+  half the box vocabulary unreachable from the WHEN half. Old games are
+  unaffected — a stored number still reads as itself. There is no `it` while a
+  WHEN tile is being read, `it` being what the sensors produce, so `it x` in
+  that box is 0.
+
+  `tests/check_places.py` grows to 118 checks.
 
 - **Nine operations in a sum, up from four.** The `=` tiles now offer
   `remainder`, `to the power of`, `but no more than`, `but no less than` and

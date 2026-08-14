@@ -286,8 +286,8 @@ faces at once, and every face exists from the moment the name does:
 | Face | Type | Empty means | Written by |
 |---|---|---|---|
 | name | text | `""` | name `<who>` is "`<text>`" |
-| value | one whole number | `0` | value `<who>` = ... |
-| x, y, z | three whole numbers | `0, 0, 0` | vector `<who>` `<axis>` = ... |
+| value | one number, decimals allowed | `0` | value `<who>` = ... |
+| x, y, z | three numbers, decimals allowed | `0, 0, 0` | vector `<who>` `<axis>` = ... |
 
 - The name is **trimmed and lowercased**: ` Home `, `HOME` and `home` are the
   one slot.
@@ -309,7 +309,12 @@ this order, and the first line that fits wins:
 |---|---|
 | nothing, or only spaces | `0` |
 | `12`, `-3`, `+8` | that whole number |
-| `2.7`, `-2.7` | `2`, `-2` — the fraction is dropped, toward zero |
+| `2.7`, `-2.7`, `.5`, `3.` | that number, fraction kept |
+| `root <box>` | its square root. `root 9` is `3`. **Below zero there is none, so `0`** |
+| `round <box>` | nearest whole number, exact halves going **away from zero** |
+| `down <box>` | the whole number at or below it. `down -2.1` is `-3` |
+| `up <box>` | the whole number at or above it. `up -2.9` is `-2` |
+| `random <box>` | a whole number from `0` to that number minus one. `0` or less gives `0` |
 | `my x` `my y` `my health` `my age` `my travelled` | that number about the character running the row |
 | `it x` `it y` `it health` `it age` `it travelled` | that number about whoever the WHEN half found; `0` if it found nobody |
 | `score` | the score |
@@ -318,10 +323,47 @@ this order, and the first line that fits wins:
 | `<name> x`, `<name> y`, `<name> z` | that axis of that placeholder's **vector** face |
 | anything else | `0` |
 
-Boxes are lowercased before reading, so `My X` works. What a box is **not**: a
-formula. There is one operation per tile and no brackets — to build something
-longer, use several rows, or several tiles in the one row, writing into a
-placeholder each time.
+Boxes are lowercased before reading, so `My X` works.
+
+The five word forms take a box of their own and so nest one level:
+`root home x`, `round root 17`, `random my health`. The word must be followed by
+something — a bare `root` is `0` — and a word that merely *starts* with one of
+them (`rootle 9`) is not a word form.
+
+What a box is **not**: a formula. There is one operation per tile and no
+brackets, so `7 divided by 5` cannot go inside a box. To build something longer,
+use several tiles in the one row, each writing a placeholder the next one reads:
+
+    DO value q = 7 divided by 5       (1.4)
+       value q = down q plus 0        (1)
+       value q = q times 5            (5)
+
+### Rounding, exactly
+
+`round` is spelt out rather than handed to either language, because they
+disagree and so does everybody's intuition:
+
+| | Spark | Python's `round` | JavaScript's `Math.round` |
+|---|---|---|---|
+| `round 2.5` | `3` | `2` (nearest even) | `3` |
+| `round -2.5` | `-3` | `-2` | `-2` (halves go up) |
+
+Spark sends exact halves **away from zero**, in both engines.
+
+### Dice
+
+`random <box>` rolls the world's own dice — the same source `move random` uses —
+so a **seeded** world rolls the same numbers in both engines, and an unseeded one
+is real randomness.
+
+| Written | Gives |
+|---|---|
+| `random 6` | `0` to `5` |
+| `random 6` plus `1` | `1` to `6` — ordinary dice |
+| `random 0`, `random -3`, `random 0.4` | `0`. Not an error: a sum is not a place a game may fall over |
+
+The number of sides is rounded **down** first, so `random 6.9` is a six-sided
+die.
 
 Two things that look like numbers are deliberately **not** numbers here, because
 Python and JavaScript disagree about them and a sum must not mean two different
@@ -343,7 +385,7 @@ the one row, each writing a placeholder the next one reads.
 | plus | first + second | `12` | `-2` | `7` |
 | minus | first − second | `2` | `-12` | `7` |
 | times | first × second | `35` | `-35` | `0` |
-| divided by | first ÷ second, fraction dropped **toward zero** | `1` | `-1` | `0` |
+| divided by | first ÷ second, **fraction kept** | `1.4` | `-1.4` | `0` |
 | remainder | what is left over, taking the sign of the **first** box | `2` | `-2` | `0` |
 | to the power of | first multiplied by itself `second` times | `16807` | `-16807` | `1` |
 | but no more than | the smaller of the two | `5` | `-7` | `0` |
@@ -357,44 +399,65 @@ here rather than refusing to.
 not a stopped game: a row sitting on `always` must not be able to break the
 world, so the answer is the least surprising number and play continues.
 
-**The two sign traps.** Python and JavaScript disagree about both of these, so
-Spark defines them itself and neither language's own operator is used:
+**The sign trap.** Python and JavaScript disagree about the sign of a
+remainder, so Spark defines it itself and neither language's own operator is
+used — not even JavaScript's, which happens to agree:
 
 | | Spark | Python alone | JavaScript alone |
 |---|---|---|---|
-| `-7 divided by 5` | `-1` | `-2` | `-1` |
-| `7 divided by -5` | `-1` | `-2` | `-1` |
 | `-7 remainder 5` | `-2` | `3` | `-2` |
 | `7 remainder -5` | `2` | `-3` | `2` |
+| `-7 remainder -5` | `-2` | `-2` | `-2` |
+| `7.5 remainder 2` | `1.5` | `1.5` | `1.5` |
 
-Division cuts **toward zero** and remainder takes the sign of the **left** box.
-The two are defined off one another, so they always reconcile:
+The leftover always takes the sign of the **left** box — the thing being divided
+up.
 
-    first  =  (first divided by second) × second  +  (first remainder second)
+It is measured against a division cut **toward zero**, which is no longer what
+`divided by` does now that it keeps the fraction. So the two reconcile only with
+the cut written back in, and only at or above zero, where cutting toward zero
+and `down` are the same thing:
+
+    down (first ÷ second) × second  +  (first remainder second)  =  first
+
+Below zero, `down` cuts the other way and the pair does not line up in tiles.
 
 **to the power of**, exactly:
 
 | Case | Result |
 |---|---|
-| exponent below 0 | `0` — it would be a fraction, and there are none here |
+| fractional exponent | **rounded** to a whole number first — `2 to the power of 3.6` is `16` |
+| exponent below 0 | `0`. A fractional power is what `root` is for |
 | exponent 0 | `1`, including `0 to the power of 0` |
+| fractional base | fine — `1.5 to the power of 2` is `2.25` |
 | result past the fence | the fence, **with the correct sign** — `-10 to the power of 999` is −1,000,000,000 and `-10 to the power of 1000` is +1,000,000,000 |
 
 It is worked out by multiplying step by step and clamping at each step, never
 by asking either language for a power — `10 to the power of 999` would build a
 thousand-digit number in Python and an infinity in JavaScript, and both engines
-have to arrive at the same fenced answer instead.
+have to arrive at the same fenced answer instead. Fractional exponents are left
+out for the same reason: `2 ** 0.5` risks the two engines differing in the last
+bit, and `root` gives that answer exactly on both.
 
 ### The fence
 
-Every number a placeholder holds is a whole number from **−1,000,000,000** to
+Every number a placeholder holds runs from **−1,000,000,000** to
 **1,000,000,000**. Anything larger, in a box or as the result of a sum, stops at
-the fence rather than wrapping or erroring.
+the fence rather than wrapping or erroring. Fractions are not fenced — they are
+as fine as the numbers themselves go.
 
 This is not tidiness. `world3d.html` carries a second copy of the rules in
-JavaScript, whose numbers stop being exact above about 9,000,000,000,000,000;
-clamping first is what lets `python3 tests/check_engines.py` prove the two
-engines compute every sum identically.
+JavaScript. Both languages use the very same 64-bit floating-point numbers, so
+`+`, `−`, `×`, `÷` and square root are bit-for-bit identical on each — but only
+while values stay in a sane range, since above about 9,000,000,000,000,000 they
+stop being exact. Clamping first is what lets
+`python3 tests/check_engines.py` prove the two engines compute every sum
+identically.
+
+Nothing that comes out of a sum can ever be infinite or not-a-number. That is
+enforced rather than hoped for: JSON can write neither, so one loose in a
+placeholder would make a saved game or a live snapshot unreadable instead of
+merely wrong.
 
 ### The vector tiles
 
@@ -404,6 +467,18 @@ engines compute every sum identically.
 | jump to vector `<who>` | stands me on square (x, y). Obeys the edges: a vector pointing off the board does nothing. Ignores solidity, like the *jump to a random empty square* tile |
 | move by vector `<who>` | one step of (x, y), through the normal movement rules — walls block it, wrapping edges wrap it. Also sets my facing |
 
+**Squares are whole even though vectors are not.** Both movement tiles
+**round** the vector — nearest square, halves away from zero — so `3.4` lands on
+`3` and `3.6` on `4`. A vector of `0.4` moves you nowhere; one of `0.6` moves
+you a full square.
+
+To travel slower than a square a tick, keep the fraction in a placeholder and
+move by its whole part, putting the remainder back:
+
+    WHEN always  DO value creep = creep plus 0.25
+                    vector step x = down creep plus 0
+                    value creep = creep remainder 1
+
 `z` is stored and read back but never travelled. The world is a flat grid; z is
 there so a vector can carry a third number.
 
@@ -411,10 +486,18 @@ there so a vector can carry a third number.
 
 | Tile | True when |
 |---|---|
-| placeholder `<who>` has `<face>` `<test>` `<n>` | the chosen face — **value**, **x**, **y** or **z** — is **at least** / **at most** / **exactly** `n`. An unwritten placeholder is 0 on every face |
+| placeholder `<who>` has `<face>` `<test>` `<box>` | the chosen face — **value**, **x**, **y** or **z** — is **at least** / **at most** / **exactly** what the box says. An unwritten placeholder is 0 on every face |
 | placeholder `<who>` is named "`<text>`" | the **name** face is exactly that text. An unwritten placeholder is named nothing, so this is false |
 
-Neither produces an "it", so neither can feed *move toward it*.
+The right-hand side of the first is a **whole box**, not merely a number, so it
+compares two moving things as readily as one against a constant:
+
+    WHEN placeholder gap has value at least my health
+    WHEN placeholder loot has value at least root 100
+
+`it` is what the sensors *produce*, so there is none available while a WHEN tile
+is being read: `it x` in that box is `0`. Neither tile produces an "it" either,
+so neither can feed *move toward it*.
 
 ---
 

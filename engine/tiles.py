@@ -12,6 +12,7 @@ in the project needs to change -- it shows up on the menus automatically.
         return obj.health < a["value"]
 """
 
+import math
 import random
 import re
 import subprocess
@@ -157,22 +158,53 @@ TESTS = ["at least", "at most", "exactly"]
 OPS = ["plus", "minus", "times", "divided by", "remainder", "to the power of",
        "but no more than", "but no less than", "how far from"]
 
-# Every number in a placeholder is a whole number inside this fence. Both the
-# fence and the whole-number rule are here for the same reason: world3d.html
-# has to compute the identical answer in JavaScript, whose numbers stop being
-# exact above about nine thousand million million. Clamping first means the two
-# engines agree on every sum anybody can actually write, and squares on a grid
-# were never fractional anyway.
+# The words that take a box and give a number back, rather than joining two.
+# They are read as the first word of a box -- `root speed`, `random 6` -- and
+# what follows is itself a box, so `root home x` and `round my health` work.
+FUNCTIONS = ["root", "round", "down", "up", "random"]
+
+# How big a number a placeholder may hold. Sums that run past it stop here
+# rather than wrapping or erroring.
+#
+# Numbers themselves are ordinary decimals -- 2.5 is 2.5, and a half stays a
+# half. What the fence is really protecting is the agreement between the two
+# engines: world3d.html carries a second copy of these rules in JavaScript, and
+# both languages use the very same 64-bit floating-point numbers, so +, -, *, /
+# and square root give bit-for-bit identical answers on both -- but only while
+# the values stay in a sane range. Clamping keeps them there.
 LIMIT = 1000000000
 
-# What counts as typed-in number. Deliberately stricter than either language's
+# What counts as a typed-in number. Deliberately stricter than either language's
 # own parser -- Python reads "1_0" as ten and JavaScript reads "0x10" as
 # sixteen, and a sum must not mean two different things in the two engines.
-NUMBER = re.compile(r"^([+-]?)(\d+)(?:\.\d+)?$")
+NUMBER = re.compile(r"^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$")
 
 
 def clamp(n):
-    return max(-LIMIT, min(LIMIT, int(n)))
+    """Hold a number inside the fence, and turn nonsense into 0.
+
+    Nothing that leaves this function can be infinite or not-a-number, which is
+    what lets every tile downstream do plain arithmetic without checking. It
+    matters more than it looks: JSON cannot write either of those, so a NaN
+    loose in a placeholder would make a saved game or a live snapshot
+    unreadable rather than merely wrong.
+    """
+    n = float(n)
+    if n != n:                          # not-a-number: the only value unequal
+        return 0.0                      # to itself, and the only way to spot it
+    return max(-float(LIMIT), min(float(LIMIT), n))
+
+
+def whole(n):
+    """The nearest whole number, halves going away from zero.
+
+    Spelt out rather than handed to either language's rounding: Python's own
+    `round` sends exact halves to the nearest EVEN number (round(2.5) is 2) and
+    JavaScript's `Math.round` sends them upward (Math.round(-2.5) is -2). This
+    agrees with neither, and with itself in both engines, which is the point.
+    """
+    n = clamp(n)
+    return math.floor(n + 0.5) if n >= 0 else math.ceil(n - 0.5)
 
 
 def place(world, who):
@@ -210,12 +242,17 @@ def about(thing, what):
 
 
 def number(text, obj, world, it):
-    """What one box of a sum means, as a whole number.
+    """What one box of a sum means, as a number.
 
     Read in this order, and the first that fits wins:
 
         (nothing)          0
-        12  -3  2.7        that number, with any fraction dropped
+        12  -3  2.5  .5    that number, fraction and all
+        root <box>         its square root. Below zero there is none, so 0
+        round <box>        the nearest whole number, halves away from zero
+        down <box>         the whole number at or below it
+        up <box>           the whole number at or above it
+        random <box>       a whole number from 0 up to but not including it
         my x, my y,        about me: also health, age, travelled
         my health ...
         it x, it y,        about whoever the WHEN half found -- 0 if it found
@@ -227,16 +264,20 @@ def number(text, obj, world, it):
     Anything else is 0. Reading an unknown name does not create it: only the
     writing tiles do that, so a typo stays a quiet zero instead of quietly
     filling the world with slots.
+
+    The five word forms take a box of their own, so they nest one deep and no
+    further: `root home x` and `random my health` both read, and the thing
+    after the word is looked up by this very function.
     """
     text = str(text if text is not None else "").strip().lower()
     if not text:
         return 0
-    digits = NUMBER.match(text)
-    if digits:
-        got = int(digits.group(2))
-        return clamp(-got if digits.group(1) == "-" else got)
+    if NUMBER.match(text):
+        return clamp(float(text))
     head, _, tail = text.partition(" ")
     tail = tail.strip()
+    if head in FUNCTIONS and tail:
+        return apply(head, number(tail, obj, world, it), world)
     if head == "my":
         return clamp(about(obj, tail))
     if head == "it":
@@ -255,60 +296,99 @@ def number(text, obj, world, it):
     return 0
 
 
-def divide(left, right):
-    """Whole-number division, cut toward zero. Dividing by nothing is 0.
+def apply(word, got, world):
+    """One of the five words that work on a single box.
 
-    Cut toward zero rather than downward because that is the only rounding the
-    two engines can both do without thinking about it: -7 / 5 is -1 here, not
-    -2. The matching `remainder` below is defined off this one, so the pair
-    always fits back together as  left = divide * right + remainder.
+    `random` is the only one that reaches outside its argument: it rolls the
+    world's own dice, so a seeded world rolls the same numbers here as it does
+    for `move random`, in both engines. It asks for a whole number of sides and
+    a positive one, giving 0 rather than raising when handed neither -- a sum is
+    not a place a game may fall over.
     """
-    if not right:
-        return 0
-    whole = abs(left) // abs(right)
-    return -whole if (left < 0) != (right < 0) else whole
+    if word == "root":
+        return clamp(math.sqrt(got)) if got > 0 else 0
+    if word == "round":
+        return float(whole(got))
+    if word == "down":
+        return float(math.floor(clamp(got)))
+    if word == "up":
+        return float(math.ceil(clamp(got)))
+    if word == "random":
+        sides = int(math.floor(clamp(got)))
+        return float(world.rng.randrange(sides)) if sides > 0 else 0
+    return got
+
+
+def divide(left, right):
+    """Ordinary division. Dividing by nothing is 0.
+
+    7 divided by 2 is 3.5, not 3. Dividing by zero has no answer worth having,
+    and a row sitting on `always` must not be able to stop the world, so it is
+    0 rather than an error or an infinity.
+    """
+    return clamp(left / right) if right else 0
 
 
 def remainder(left, right):
-    """What is left over. Takes the sign of the LEFT box, and 0 leaves 0.
+    """What is left over after taking out whole multiples of the right box.
 
-    Spelt out longhand on purpose: Python's own `%` takes the sign of the
-    right-hand box and JavaScript's takes the sign of the left, so -7 remainder
-    5 would be 3 in one engine and -2 in the other if either language were
-    trusted to answer. It is -2 in both, here.
+    Takes the sign of the LEFT box, and a right box of 0 leaves 0. Spelt out
+    longhand on purpose: Python's own `%` takes the sign of the right-hand box
+    and JavaScript's takes the sign of the left, so -7 remainder 5 would be 3
+    in one engine and -2 in the other if either language were trusted to
+    answer. It is -2 in both, here.
+
+    Fractions are welcome on both sides: 7.5 remainder 2 is 1.5.
+
+    What is left over is measured against a division cut TOWARD ZERO, which is
+    no longer what `divided by` does -- that keeps the fraction now. So the two
+    reconcile only with the cut put back explicitly, and only at or above zero,
+    where cutting toward zero and `down` are the same thing:
+
+        down (7 divided by 5) times 5  plus  (7 remainder 5)  =  7
+
+    Below zero `down` cuts the other way and the pair no longer lines up in
+    tiles. The sign rule is unchanged and is the useful part: the leftover
+    always has the sign of the thing being divided up.
     """
     if not right:
         return 0
-    over = abs(left) % abs(right)
-    return -over if left < 0 else over
+    over = math.fmod(abs(left), abs(right))
+    return clamp(-over if left < 0 else over)
 
 
 def power(base, exp):
     """`base` multiplied by itself `exp` times, clamped at every step.
 
-    A negative exponent would be a fraction, and there are no fractions here,
-    so it is 0. Anything to the power of 0 is 1, including 0 itself.
+    The exponent is rounded to a whole number, and a negative one gives 0.
+    Anything to the power of 0 is 1, including 0 itself. Fractional powers are
+    the one piece of arithmetic deliberately left out: they are what `root`
+    is for, and asking either language for `2 ** 0.5` risks the two engines
+    differing in the last bit, which is exactly what all of this avoids.
 
-    Multiplying step by step rather than asking either language for a power is
-    what keeps this safe and identical: `10 to the power of 999` would build a
-    thousand-digit number in Python and an infinity in JavaScript, and both
-    engines have to end up at the fence instead. Once the size is past the
-    fence only the SIGN can still change, so the loop stops early -- but at a
-    length with the same odd-or-evenness as `exp`, because that is what decides
-    the sign when the base is negative.
+    Multiplying step by step rather than asking for a power keeps it safe as
+    well as identical: `10 to the power of 999` would be a thousand-digit
+    number in Python and an infinity in JavaScript, and both engines have to
+    end up at the fence instead. Once the size is fenced only the SIGN can
+    still change, so the loop stops early -- but at a length with the same
+    odd-or-evenness as the exponent, because that is what decides the sign
+    when the base is negative.
     """
+    exp = whole(exp)
     if exp < 0:
         return 0
     if exp == 0:
         return 1
-    if base in (0, 1):
+    if base == 0 or base == 1:
         return base
     if base == -1:
         return -1 if exp % 2 else 1
     steps = exp if exp <= 64 else 64 + (exp % 2)
-    out = 1
+    out = 1.0
     for _ in range(steps):
         out = clamp(out * base)
+        if out == 0:
+            break                       # a fraction has shrunk away to nothing
     return out
 
 
@@ -436,17 +516,27 @@ def s_spent(obj, world, a):
         Param("who", "Which placeholder?", "text", [], "thing"),
         Param("face", "Regard it as what?", "choice", FACES, "value"),
         Param("test", "Compared how?", "choice", TESTS, "at least"),
-        Param("amount", "Compared with what number?", "int", [], 1))
+        Param("amount", "Compared with what? (a number, or any box)",
+              "text", [], "1"))
 def s_place_has(obj, world, a):
     """True when one face of a placeholder stands in the stated relation.
 
+    The right-hand side is a whole box, not merely a number, so this compares
+    two moving things as readily as one against a constant:
+
+        placeholder gap has value at least my health
+        placeholder loot has value at least root 100
+
     An untouched placeholder reads as 0 on every face, so this answers before
-    anything has written to it rather than refusing to.
+    anything has written to it rather than refusing to. There is no `it` in the
+    WHEN half yet -- `it` is what the sensors produce -- so `it x` in this box
+    reads as 0.
     """
     spot = world.places.get(str(a.get("who", "")).strip().lower())
     face = a.get("face", "value")
     got = clamp(spot[face]) if spot is not None and face in spot else 0
-    return compare(got, a.get("test", "at least"), int(a.get("amount", 1)))
+    return compare(got, a.get("test", "at least"),
+                   number(a.get("amount", 1), obj, world, None))
 
 
 @sensor("place_named", "placeholder {who} is named \"{text}\"",
@@ -662,14 +752,16 @@ def a_place_here(obj, world, a, it):
 def a_place_jump(obj, world, a, it):
     """Stand at the square a vector points to, if there is such a square.
 
-    Deliberately obeys the edges but not solidity: it is a teleport, and the
-    matching `teleport` tile does not check either. A vector pointing off the
-    board does nothing rather than pinning you to the rim.
+    Squares are whole, so a vector holding 3.4 lands on 3 -- rounded, not cut,
+    which is why 3.6 lands on 4. Deliberately obeys the edges but not solidity:
+    it is a teleport, and the matching `teleport` tile does not check either. A
+    vector pointing off the board does nothing rather than pinning you to the
+    rim.
     """
     spot = world.places.get(str(a.get("who", "")).strip().lower())
     if spot is None:
         return
-    x, y = clamp(spot["x"]), clamp(spot["y"])
+    x, y = whole(spot["x"]), whole(spot["y"])
     if world.in_bounds(x, y):
         obj.x, obj.y = x, y
 
@@ -682,11 +774,16 @@ def a_place_move(obj, world, a, it):
     This goes through the same try_move as the `move` tile, so walls stop it
     and wrapping edges wrap it. z is ignored: the world is flat, and z is there
     for keeping a third number, not for a third direction of travel.
+
+    The step is rounded to whole squares, so a vector of 0.4 does not move you
+    at all and one of 0.6 moves you a full square. A character meant to creep
+    along at a third of a square a tick should add that third to a placeholder
+    every tick and move by the whole part of it.
     """
     spot = world.places.get(str(a.get("who", "")).strip().lower())
     if spot is None:
         return
-    dx, dy = clamp(spot["x"]), clamp(spot["y"])
+    dx, dy = whole(spot["x"]), whole(spot["y"])
     if dx or dy:
         obj.facing = (1 if dx > 0 else -1 if dx else 0,
                       1 if dy > 0 else -1 if dy else 0)
