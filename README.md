@@ -33,6 +33,7 @@ a name and it joins the palette like the rest.
 - [How a brain runs](#how-a-brain-runs)
 - [Seeing it in 3D](#seeing-it-in-3d)
 - [Every command](#every-command)
+- [Keeping it up to date](#keeping-it-up-to-date)
 - [Where things live](#where-things-live)
 - [What a game file looks like](#what-a-game-file-looks-like)
 - [Playing with someone else](#playing-with-someone-else)
@@ -757,7 +758,11 @@ Once `python3 spark.py install` has been run, every one of these works as plain
 
 | Command | What it does |
 |---|---|
-| `python3 spark.py install` | make `spark` work as a command (do this once) |
+| `python3 spark.py install` | make `spark` and `/update` work as commands (do this once) |
+| `/update spark` | pull the newest Spark from GitHub |
+| `update spark` | the same, and works in Termux too |
+| `python3 spark.py update` | the same again, the long way |
+| `python3 spark.py update --check` | say what an update would bring, and stop |
 | `python3 spark.py tutorial` | ten guided lessons that build your first game |
 | `python3 spark.py` | the terminal menus |
 | `python3 spark.py edit` | the browser editor on port 8765 |
@@ -784,8 +789,53 @@ Once `python3 spark.py install` has been run, every one of these works as plain
 | `python3 tests/check_undo.py` | check the undo stack behind both brain editors |
 | `python3 tests/check_tiles_of_mine.py` | check your own named tiles, and the ways they can be malformed |
 | `python3 tests/check_mytiles.py` | check the gate in front of Python tiles, and who may write one |
+| `python3 tests/check_update.py` | check updating, and that it never eats your games |
 | `python3 tests/check_multiplayer.py` | check two players share one world |
 | `python3 tests/check_engines.py` | check the Python and JavaScript engines still agree |
+
+---
+
+## Keeping it up to date
+
+    /update spark
+
+That is the whole thing. It pulls the newest Spark from GitHub into the folder
+you already have.
+
+| | |
+|---|---|
+| `/update spark` | works inside the PRoot Linux distro |
+| `update spark` | works there **and** in Termux proper |
+| `python3 spark.py update` | works anywhere, and needs no install |
+
+**Why two of them.** A shell reads a leading `/` as *a file at the very root of
+the filesystem*, so `/update` has to literally be that file — it cannot be an
+alias, because bash will not allow `/` in an alias name. Inside the PRoot distro
+the root belongs to the distro and can be written, so it is. In Termux proper
+the root is Android's own and is read-only to apps, so `/update` cannot exist
+there and `update spark` is the one to use. `python3 spark.py install` writes
+whichever of them it can.
+
+**Your games are safe.** `games/*.json` are tracked files, so a phone you have
+built anything on has local changes. They are put aside before the pull and put
+back after. If putting them back ever collides, it says so plainly and tells you
+where they are, rather than leaving you a half-merged file to find later.
+
+**It refuses rather than guessing.** No `origin`, not a clone, GitHub
+unreachable, or commits here that GitHub does not have — each one stops, changes
+nothing, and says which it was.
+
+`--check` says what an update would bring and stops:
+
+    python3 spark.py update --check
+
+**Nothing checks for updates by itself**, and nothing ever will. A game builder
+that quietly rewrites itself while you are using it is worse than an out-of-date
+one.
+
+**Python tiles stay off.** `mytiles/approved.json` is not tracked, so an update
+can never switch one on. A tile file that arrives or changes in the pull lands
+inert, exactly as it would arriving any other way.
 
 ---
 
@@ -805,6 +855,7 @@ Once `python3 spark.py install` has been run, every one of these works as plain
     mytiles/approved.json  which of them THIS device runs (never committed)
     engine/tiles.py      the tile library      <- add new pieces here
     engine/mytiles.py    loads mytiles/, and the gate that decides what runs
+    engine/updater.py    `/update spark` -- pulls from GitHub, keeping your games
     engine/world.py      the grid, the characters, and the rule engine
     engine/brain.py      reading and writing game files
     engine/builder.py    the terminal menus
@@ -828,6 +879,7 @@ Once `python3 spark.py install` has been run, every one of these works as plain
     tests/check_undo.py         checks the undo stack both brain editors keep
     tests/check_tiles_of_mine.py  checks named tiles, nesting, and self-reference
     tests/check_mytiles.py      checks the approval gate, and that a guest cannot write code
+    tests/check_update.py       clones a fake GitHub and updates from it, games and all
     tests/check_engines.py      plays every game twice, once per engine, and compares
     tests/engine_trace.js       runs the JavaScript engine from a terminal, for that test
 

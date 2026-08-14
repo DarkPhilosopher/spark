@@ -14,6 +14,46 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ## Unreleased
 
+### Added
+
+- **`/update spark`** — pull the newest Spark from GitHub into the folder you
+  already have. `python3 spark.py install` writes it, along with `update spark`
+  and the long form `python3 spark.py update`.
+
+  **Why there are two names for it.** A shell reads a leading `/` as *a file at
+  the very root of the filesystem*, so `/update` has to literally be that file:
+  it cannot be an alias, because bash refuses `/` in an alias name, and it
+  cannot be a shell function. Inside the PRoot distro the root belongs to the
+  distro and is writable, so `/update` is written there and works exactly as
+  asked. In Termux proper the root is Android's own and read-only to apps, so
+  `/update` cannot exist and `update spark` is the one to use. Install writes
+  whichever it can and says which.
+
+  **Your games are put aside and put back.** `games/*.json` are tracked files,
+  so a phone anybody has built on has local changes and a plain `git pull` would
+  refuse or trample them. They are stashed before the pull and restored after,
+  and if restoring ever collides it says so and says where they are, rather than
+  leaving a half-merged file to be discovered later.
+
+  **It refuses rather than guessing**: no `origin`, not a clone, GitHub
+  unreachable, or commits here that GitHub does not have — each stops, changes
+  nothing, and says which it was. `--check` reports what an update would bring
+  and stops.
+
+  Afterwards it rewrites `tiles.json` and `games/index.json`, which are
+  generated and would otherwise show yesterday's palette in the offline browser
+  copy.
+
+  **Nothing checks for updates by itself, and nothing will.** A game builder
+  that quietly rewrites itself while you are using it is worse than an
+  out-of-date one. And because `mytiles/approved.json` is untracked, an update
+  can never switch a Python tile on: a tile file that arrives or changes in the
+  pull lands inert, exactly as it would arriving any other way.
+
+  `tests/check_update.py` — 25 checks — builds a fake GitHub as a bare repo and
+  updates throwaway clones from it, including the one that matters: two edited
+  games, updated, both edits demanded back.
+
 ### Changed
 
 - **Every screen is now the six-button formation, not just the first one.** The

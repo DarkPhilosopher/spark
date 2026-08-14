@@ -702,7 +702,11 @@ anywhere, as plain `spark ...`, once you have run the install command.
 
 | Command | Does |
 |---|---|
-| `python3 spark.py install` | write the `spark` command into Termux's bin folder |
+| `python3 spark.py install` | write the `spark` and `update` commands, and `/update` where it can |
+| `/update spark` | pull the newest Spark from GitHub (PRoot distro) |
+| `update spark` | the same, and works in Termux proper too |
+| `python3 spark.py update` | the same, with no install needed |
+| `python3 spark.py update --check` | say what an update would bring, then stop |
 | `python3 spark.py tutorial` | ten guided lessons, offline, building a real game |
 | `python3 spark.py` | open the terminal menus |
 | `python3 spark.py games/chase.json` | open the menus with that game loaded |
@@ -730,6 +734,7 @@ anywhere, as plain `spark ...`, once you have run the install command.
 | `python3 tests/check_undo.py` | check the undo stack both brain editors keep |
 | `python3 tests/check_tiles_of_mine.py` | check your own named tiles and their edges |
 | `python3 tests/check_mytiles.py` | check the gate in front of Python tiles |
+| `python3 tests/check_update.py` | check updating, in throwaway clones |
 | `python3 tests/check_engines.py` | check both engines still play games identically |
 | `node tests/store.test.js` | check the editor's save and load logic |
 | `node tests/deck.test.js` | check the six buttons and the box you type in |

@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Spark -- build a game by snapping tiles together. No typing code.
 
-    python3 spark.py install               make `spark` work as a command
+    python3 spark.py install               make `spark` and `/update` commands
+    python3 spark.py update                pull the newest Spark from GitHub
+    python3 spark.py update --check        say what an update would bring, and stop
     python3 spark.py tutorial              learn it by building a game, offline
     python3 spark.py                       open the menu
     python3 spark.py edit [port]           open the drag-and-drop editor (8765)
@@ -75,6 +77,14 @@ def main():
             print("  %s %s %s  (%s)" % (game, arrow, where, what))
         if not results:
             print("nothing to " + args[0])
+        return
+    if args and args[0] == "update":
+        from engine import updater
+        try:
+            for line in updater.update(dry_run="--check" in args):
+                print("  " + line)
+        except updater.UpdateError as err:
+            sys.exit("  " + str(err))
         return
     if args and args[0] == "install":
         from engine import launcher
