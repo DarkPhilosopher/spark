@@ -22,7 +22,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from . import brain, live, status, tiles
+from . import brain, live, mytiles, status, tiles
 from .world import COLORS
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -32,6 +32,13 @@ WORLD3D = ROOT / "world3d.html"
 MAY_EDIT = ("owner", "edit")
 MAY_PLAY = ("owner", "edit", "play")
 MAY_LOOK = ("owner", "edit", "play", "watch")
+
+# Writing a Python tile means running Python on this phone, so it is the only
+# thing an `edit` code does NOT get. An editor guest may change games all day;
+# handing them a file that this device then executes would walk straight past
+# every other fence, including the one that stops a guest opening apps. Owner
+# only, and the owner is whoever is at the phone or holds the printed key.
+MAY_WRITE_CODE = ("owner",)
 
 # Who counts as the owner. When Spark is only listening to this phone, being on
 # this phone is proof enough. The moment it is shared -- and especially behind a
@@ -165,6 +172,16 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/status":
             return self.send_json(status.probe())
 
+        # Your own Python tiles. Reading them is owner-only too: they are files
+        # off this phone's disk, and a guest has no business seeing them.
+        if path == "/api/mytiles":
+            _, ok = self.allow(MAY_WRITE_CODE)
+            if not ok:
+                return None
+            return self.send_json({"files": mytiles.listing(),
+                                   "example": mytiles.EXAMPLE,
+                                   "note": mytiles.MINE_NOTE})
+
         if path == "/api/live":
             player, ok = self.allow(MAY_LOOK)
             return self.send_json(live.SESSION.snapshot(player)) if ok else None
@@ -261,11 +278,49 @@ class Handler(BaseHTTPRequestHandler):
             export_static()                     # keep the offline listing fresh
             return self.send_json({"saved": str(saved), "name": safe})
 
+        # -- your own Python tiles: owner only, every route ------------------
+        if path in ("/api/mytiles", "/api/mytiles/approve"):
+            _, ok = self.allow(MAY_WRITE_CODE)
+            if not ok:
+                return None
+            name = mytiles.safe_name(sent.get("name", ""))
+            if not name:
+                return self.send_json(
+                    {"error": "names may hold letters, digits, spaces, "
+                              "dashes and underscores only"}, 400)
+
+            if path == "/api/mytiles/approve":
+                on = bool(sent.get("on", True))
+                if not mytiles.approve(name, on):
+                    return self.send_json({"error": "no such file"}, 404)
+            else:
+                text = sent.get("text", "")
+                if not isinstance(text, str):
+                    return self.send_json({"error": "no text"}, 400)
+                if len(text) > 200000:
+                    return self.send_json({"error": "that is too long"}, 400)
+                # Saving is the act of approving: you are the owner and you
+                # just wrote it. See the module docstring in mytiles.py.
+                mytiles.save(name, text)
+
+            mytiles.load(name)
+            return self.send_json({"name": name, "files": mytiles.listing()})
+
         self.send_error(404)
 
     def do_DELETE(self):
         url = urlparse(self.path)
         status.note_browser()
+
+        if url.path == "/api/mytiles":
+            _, ok = self.allow(MAY_WRITE_CODE)
+            if not ok:
+                return None
+            name = (parse_qs(url.query).get("name") or [""])[0]
+            if not mytiles.delete(name):
+                return self.send_json({"error": "no such file"}, 404)
+            return self.send_json({"deleted": name, "files": mytiles.listing()})
+
         if url.path != "/api/game":
             return self.send_error(404)
         _, ok = self.allow(MAY_EDIT)

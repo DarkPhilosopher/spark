@@ -261,6 +261,61 @@ main menu in the terminal. Rows still pointing at a deleted tile are left alone
 — the engine treats a name nobody has defined as simply not firing, and the chip
 says `(no such tile)` — which is kinder than deleting those rows too.
 
+### Writing a tile in Python
+
+There is a plain-text editor in the browser — **your own tiles, written in
+Python** — that writes files into `mytiles/`. A tile there is an ordinary Spark
+tile: it appears on the menus and is used like any other.
+
+    @action("pace", "pace {far} squares {way}",
+            Param("far", "How many squares?", "int", [], 1),
+            Param("way", "Which way?", "choice", ["across", "down"], "across"))
+    def pace(obj, world, a, it):
+        ...
+
+`mytiles/example.py` ships with Spark, switched off, with the whole shape
+explained inside. Read it first.
+
+**This is the one part of Spark that runs code**, rather than reading a
+description of what to do. Python can do whatever Python can do — read your
+files, reach the network, delete things. So there are two rules, and they are
+enforced rather than remembered:
+
+**1. Only you can write one.** The browser routes for these answer the **owner**
+only: whoever is at the phone, or holds the key printed in the terminal.
+Somebody holding an `edit` code may rewrite every game you own and cannot put a
+single line of Python on your disk. That is deliberate — an `edit` guest cannot
+even make your phone open a link (see the fences on `open`), and this would have
+walked past all of it.
+
+**2. A file does nothing until this device says so.** Approval is recorded in
+`mytiles/approved.json`, against the exact text approved — and that file is
+**never committed**. So:
+
+| Where the file came from | What happens |
+|---|---|
+| you wrote it in the browser | approved as it is saved — writing it *is* approving it |
+| pulled from GitHub, sent by another player, copied off an SD card | it sits there **inert** until you have read it and pressed *switch on* |
+| approved once, then changed by anything but you | stops loading, and says *changed since you approved it* |
+
+None of this is a sandbox — there is no such thing for Python, and pretending
+otherwise would be worse than useless. It is a gate, and the gate is your
+consent.
+
+**One real limit.** These run in Termux, in the Python engine. The 3D view
+carries [a second engine written in JavaScript](#two-engines-kept-honest) for
+when nothing is reachable, and it cannot run Python. A game using a tile from
+`mytiles/` plays fine through Termux and through the server, but those rows will
+not fire in the browser's own offline engine.
+
+If you want a tile of your own that works **everywhere** — offline in the
+browser, on GitHub Pages, on another player's phone — fold one out of existing
+tiles instead. That is [the section above](#making-a-tile-of-your-own), and it
+needs no code and no permission.
+
+A tile that will not compile is reported in the editor and skipped; it can never
+stop Spark starting, because you would then have no way back in to fix it.
+
 ### Undoing
 
 Both editors keep an undo of the last **60** changes to the brain you are
@@ -661,6 +716,7 @@ Once `python3 spark.py install` has been run, every one of these works as plain
 | `python3 tests/check_places.py` | check placeholders: the three faces and the sums |
 | `python3 tests/check_undo.py` | check the undo stack behind both brain editors |
 | `python3 tests/check_tiles_of_mine.py` | check your own named tiles, and the ways they can be malformed |
+| `python3 tests/check_mytiles.py` | check the gate in front of Python tiles, and who may write one |
 | `python3 tests/check_multiplayer.py` | check two players share one world |
 | `python3 tests/check_engines.py` | check the Python and JavaScript engines still agree |
 
@@ -677,7 +733,11 @@ Once `python3 spark.py install` has been run, every one of these works as plain
     tiles.json           the tile list, written out for when no server is running
     games/*.json         your games, one file each
     games/index.json     the list of games, for when no server is running
+    mytiles/*.py         tiles you wrote yourself, in Python
+    mytiles/example.py   one shipped switched off, explaining how to write one
+    mytiles/approved.json  which of them THIS device runs (never committed)
     engine/tiles.py      the tile library      <- add new pieces here
+    engine/mytiles.py    loads mytiles/, and the gate that decides what runs
     engine/world.py      the grid, the characters, and the rule engine
     engine/brain.py      reading and writing game files
     engine/builder.py    the terminal menus
@@ -699,6 +759,7 @@ Once `python3 spark.py install` has been run, every one of these works as plain
     tests/check_places.py       checks the placeholder tiles, their sums and their edges
     tests/check_undo.py         checks the undo stack both brain editors keep
     tests/check_tiles_of_mine.py  checks named tiles, nesting, and self-reference
+    tests/check_mytiles.py      checks the approval gate, and that a guest cannot write code
     tests/check_engines.py      plays every game twice, once per engine, and compares
     tests/engine_trace.js       runs the JavaScript engine from a terminal, for that test
 

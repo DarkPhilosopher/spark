@@ -1,3 +1,9 @@
 __pycache__/
 *.pyc
 .spark-state.json
+
+# Which Python tiles THIS device has agreed to run. Never shared: that is the
+# whole mechanism. A tile file travels freely, but the approval does not travel
+# with it, so anything arriving from GitHub or another player lands inert until
+# it is switched on here. See engine/mytiles.py.
+mytiles/approved.json

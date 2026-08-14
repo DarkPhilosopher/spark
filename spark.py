@@ -30,6 +30,14 @@ from engine import brain, builder, runner  # noqa: E402
 
 def main():
     args = sys.argv[1:]
+
+    # Tiles you wrote yourself join the menus before anything else looks at
+    # them. Only files this device has approved are run -- see engine/mytiles.py
+    # -- and one that will not compile is reported rather than fatal, because a
+    # tile with a typo in it must not be able to lock you out of the editor you
+    # would fix it in.
+    from engine import mytiles
+    mytiles.load()
     if args and args[0] in ("edit", "host"):
         from engine import server
         port = int(args[1]) if len(args) > 1 and args[1].isdigit() else 8765

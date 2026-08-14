@@ -14,6 +14,7 @@ turning on the browser interface and GitHub.
 - [Controls: the browser editor](#controls-the-browser-editor)
 - [Controls: the 3D view](#controls-the-3d-view)
 - [Placeholders: the exact rules](#placeholders-the-exact-rules)
+- [Tiles you write in Python: the exact rules](#tiles-you-write-in-python-the-exact-rules)
 - [Every command](#every-command)
 - [Connecting the browser interface](#connecting-the-browser-interface)
 - [Connecting another person: live play](#connecting-another-person-live-play)
@@ -501,6 +502,106 @@ so neither can feed *move toward it*.
 
 ---
 
+## Tiles you write in Python: the exact rules
+
+The README explains what these are and why the gate exists. This is the precise
+reference.
+
+### Where they live
+
+| Path | What it is |
+|---|---|
+| `mytiles/<name>.py` | one file, holding one or more tiles |
+| `mytiles/approved.json` | which files **this device** runs. **Never committed** — it is in `.gitignore` |
+| `mytiles/example.py` | shipped with Spark, switched **off**, explaining how to write one |
+
+Names may hold letters, digits, spaces, dashes and underscores, up to 60
+characters. No dots, so no `..` and no pretending to be another kind of file;
+the `.py` is added for you. A name outside that is refused, in the editor and
+over HTTP alike.
+
+### Who may write one
+
+| Role | Read them | Write / switch on / delete | Edit games |
+|---|---|---|---|
+| **owner** — at the phone, or holding the printed key | yes | yes | yes |
+| **edit** guest | **no** | **no** | yes |
+| **play** / **watch** guest | no | no | no |
+
+An `edit` code is trusted with your games and not with your phone. Writing
+Python means running Python here, which would step past every other fence in
+Spark — including the one that stops a guest making your phone open a link.
+
+### When a file runs
+
+A file is run only when `approved.json` holds a fingerprint for it that matches
+the file's **current** text, exactly.
+
+| Situation | Loads? | The editor says |
+|---|---|---|
+| you saved it in the browser | yes | *switched on* |
+| it arrived from GitHub, another player, or the SD card | **no** | *not switched on* |
+| you read it and pressed *switch on* | yes | *switched on* |
+| it changed after you approved it | **no** | *changed since you approved it* |
+| you pressed *switch off* | no | *not switched on* |
+
+Saving from the browser approves it in the same movement: you are the owner and
+writing it is the act of consenting to it.
+
+### When a file is broken
+
+| What happens | Result |
+|---|---|
+| it will not compile | skipped; the error is shown in the editor; every other file still loads |
+| it throws while loading | skipped; **anything it managed to register first is taken back off**, so a half-run file leaves nothing behind |
+| it is saved again | its old tiles come off the menus before the new ones go on |
+| it is deleted | its tiles come off, and its approval is forgotten |
+
+A broken tile can never stop Spark starting. If it could, you would have no way
+back into the editor to fix it.
+
+### What a tile file gets
+
+Already in scope, with no imports:
+
+| Name | What it is |
+|---|---|
+| `sensor(id, label, *params)` | the decorator for a WHEN tile |
+| `action(id, label, *params)` | the decorator for a DO tile |
+| `Param(name, prompt, kind, choices, default)` | one question the editor asks. `kind` is `text`, `int`, `choice` or `kind` |
+| `tiles` | the tile module itself, for its helpers |
+
+A sensor is called `(obj, world, a)` and returns true or false — or a character,
+which becomes the row's `it`. An action is called `(obj, world, a, it)`.
+
+| Argument | What it is |
+|---|---|
+| `obj` | the character running the row — `.x`, `.y`, `.health`, `.facing`, `.age` |
+| `world` | everything else — `.score`, `.tick`, `.rng`, `.things`, `.try_move(...)` |
+| `a` | this tile's own settings, keyed by your `Param` names |
+| `it` | whoever the WHEN half found, or `None` |
+
+Anything you hang on `obj` yourself is **per character**, where a placeholder is
+shared by the whole world — that is how `example.py` gives each pacing character
+its own direction.
+
+### The one real limit
+
+These run in the Python engine, in Termux. `world3d.html` carries a second
+engine in JavaScript for when nothing is reachable, and it cannot run Python.
+
+| Where the game is played | Do your Python tiles fire? |
+|---|---|
+| `spark.py play`, and the terminal menus | yes |
+| the browser, with the server running (`LIVE`) | yes — the server is running the world |
+| the 3D view with no server (`RUNNING HERE`) | **no** |
+| GitHub Pages, with no Termux anywhere | **no** |
+
+For a tile of your own that works everywhere, fold one out of existing tiles
+instead — that needs no code, no approval, and travels with the game.
+
+---
+
 ## Every command
 
 Run these from inside the spark folder (`cd ~/spark` in Termux) — or from
@@ -535,6 +636,7 @@ anywhere, as plain `spark ...`, once you have run the install command.
 | `python3 tests/check_places.py` | check the placeholder tiles and their sums |
 | `python3 tests/check_undo.py` | check the undo stack both brain editors keep |
 | `python3 tests/check_tiles_of_mine.py` | check your own named tiles and their edges |
+| `python3 tests/check_mytiles.py` | check the gate in front of Python tiles |
 | `python3 tests/check_engines.py` | check both engines still play games identically |
 | `node tests/store.test.js` | check the editor's save and load logic |
 

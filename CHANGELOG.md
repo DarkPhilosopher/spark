@@ -16,6 +16,54 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ### Added
 
+- **Write a tile in Python, from the browser.** A plain-text editor —
+  *your own tiles, written in Python* — that writes files into `mytiles/`. What
+  you write is an ordinary Spark tile: it joins the menus and is used like any
+  other. `mytiles/example.py` ships switched off, with the whole shape explained
+  inside it.
+
+  This is the only part of Spark that runs code rather than reading a
+  description, so it has a door on it, and the door is enforced rather than
+  remembered:
+
+  **Only the owner may write one.** Those routes answer the owner alone —
+  whoever is at the phone or holds the key printed in the terminal. Somebody
+  holding an `edit` code may rewrite every game you own and cannot put one line
+  of Python on your disk. An `edit` guest cannot even make your phone open a
+  link; letting them write code would have walked past that and every other
+  fence at once.
+
+  **A file does nothing until this device says so.** Approval is recorded in
+  `mytiles/approved.json` against the exact text approved, and that file is in
+  `.gitignore` — it never travels. So a tile you write in the browser is
+  approved as it is saved, and a tile that arrives any other way — pulled from
+  GitHub, handed over by another player, copied off an SD card — sits inert
+  until you have read it and pressed *switch on*. A file that changes after
+  approval stops loading and says so, which also covers a pull quietly changing
+  one you had already agreed to.
+
+  It is not a sandbox. There is no such thing for Python and pretending
+  otherwise would be worse than useless. It is a gate, and the gate is consent.
+
+  *Why it is built this way:* the ask was to write a tile in the browser and
+  send it to the folder, to GitHub, or to other players in a shared world. All
+  three work — but "other players can grab it" now means they receive the text,
+  not that their phone runs it. Handing executable code to somebody else's
+  device and having it run unasked is the one part I would not build.
+
+  **One real limit, worth knowing before you rely on it:** these run in the
+  Python engine, in Termux. `world3d.html` carries a second engine in JavaScript
+  for when nothing is reachable, and it cannot run Python — so a game using one
+  plays through Termux and through the server, but those rows do not fire in the
+  browser's own offline engine, nor on GitHub Pages. For a tile of your own that
+  works everywhere, fold one out of existing tiles instead.
+
+  A file that will not compile is reported in the editor and skipped, and one
+  that throws part-way has whatever it managed to register taken back off — a
+  broken tile can never stop Spark starting, or you would have no way back in to
+  fix it. `tests/check_mytiles.py` — 47 checks — covers the gate, the
+  fingerprint, path escapes, broken files, and every route a guest is refused.
+
 - **Tiles of your own: fold a whole row up under a name.** The **⊞** button on a
   row in the browser, or *fold a row into one tile of your own* on the terminal
   brain menu. The new tile joins the palette and can be used anywhere, as often

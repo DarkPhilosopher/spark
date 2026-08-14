@@ -80,6 +80,21 @@
   #tiles .split{flex:0 0 100%;font-size:11px;color:var(--dim);
                 padding:6px 2px 0;letter-spacing:.04em;text-transform:uppercase}
   #tiles .toggle{flex:0 0 100%;margin:2px 0 4px}
+  /* the Python editor */
+  #code textarea{width:100%;min-height:220px;font-family:ui-monospace,monospace;
+     font-size:12px;line-height:1.45;background:#12151a;color:var(--ink);
+     border:1px solid var(--line);border-radius:8px;padding:8px;
+     white-space:pre;overflow-wrap:normal;overflow-x:auto}
+  #code .file{display:flex;gap:6px;align-items:center;margin-bottom:6px;
+     flex-wrap:wrap}
+  #code .file button{flex:0 0 auto}
+  #code .mark{font-size:11px;padding:2px 7px;border-radius:99px;
+     border:1px solid var(--line)}
+  #code .mark.on{color:var(--good);border-color:var(--good)}
+  #code .mark.off{color:var(--bad);border-color:var(--bad)}
+  #code pre.err{white-space:pre-wrap;font-size:11px;color:var(--bad);
+     background:#1b1315;border:1px solid var(--bad);border-radius:8px;
+     padding:8px;margin:6px 0;overflow-x:auto}
   .chip.ghost{position:fixed;z-index:99;pointer-events:none;opacity:.9;
               box-shadow:0 6px 18px #0009}
   .chip.lifted{opacity:.3}
@@ -168,6 +183,11 @@
 <details>
   <summary>world settings</summary>
   <div class="panel" id="world"></div>
+</details>
+
+<details id="codepanel" hidden>
+  <summary>your own tiles, written in Python</summary>
+  <div class="panel" id="code"></div>
 </details>
 
 <h2>brain <span id="whose"></span></h2>
@@ -926,6 +946,211 @@ function openGitHubSettings() {
   $("#dlg").showModal();
 }
 
+// ------------------------------------------- your own tiles, in Python
+//
+// The one place in Spark where you write code rather than arrange tiles, and
+// therefore the one place with a door on it. The server only answers these
+// routes to the owner -- somebody holding an `edit` code gets 403 -- so the
+// panel is simply hidden when the answer is no. Hiding it is tidiness; the
+// server is the actual protection, as everywhere else here.
+//
+// With no server (GitHub Pages, or a folder opened directly) there is no Python
+// at all, so nothing written here can run in this tab. What the panel does then
+// is keep your text in this browser and, if you have set up a token, commit it
+// to GitHub -- so that the Termux copy can pull it down and run it there.
+
+const LS_CODE = "spark:mytiles";
+let codeFiles = [];       // [{name, text, approved, changed, error, tiles}]
+let codeOpen = null;      // which file is in the box
+
+function localCode() {
+  try { return JSON.parse(localStorage.getItem(LS_CODE) || "{}"); }
+  catch (e) { return {}; }
+}
+function localCodeSave(map) {
+  localStorage.setItem(LS_CODE, JSON.stringify(map));
+}
+
+async function codeApi(method, path, body) {
+  const res = await fetch(path, {
+    method,
+    headers: {"Content-Type": "application/json", ...authHeaders()},
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (res.status === 403) return null;             // not the owner
+  return await res.json().catch(() => ({}));
+}
+
+async function loadCodePanel() {
+  if (store.mode === "server") {
+    const got = await codeApi("GET", "api/mytiles");
+    if (got === null) { $("#codepanel").hidden = true; return; }
+    codeFiles = got.files || [];
+    codeExample = got.example || codeExample;
+  } else {
+    const map = localCode();
+    codeFiles = Object.keys(map).sort().map(name => ({
+      name, text: map[name], approved: false, changed: false,
+      error: "", tiles: [], local: true,
+    }));
+  }
+  $("#codepanel").hidden = false;
+  renderCode();
+}
+
+let codeExample = "";
+
+function renderCode() {
+  const box = $("#code"); box.textContent = "";
+
+  box.append(el("div", "note", store.mode === "server"
+    ? "These run in Termux, on this phone. They cannot run in the 3D view's " +
+      "own engine, which is JavaScript — a game using one will play here " +
+      "through the server, but not offline in the browser."
+    : "There is no Python in a browser, so nothing here can run in this tab. " +
+      "Saved in this browser, and committed to GitHub if you set up a token, " +
+      "so that the copy in Termux can pull it down and run it there."));
+
+  const picker = el("div", "file");
+  for (const f of codeFiles) {
+    const b = el("button", f.name === codeOpen ? "" : null, f.name);
+    if (f.name === codeOpen) b.style.borderColor = "var(--accent)";
+    b.onclick = () => { codeOpen = f.name; renderCode(); };
+    picker.append(b);
+  }
+  const add = el("button", null, "+ new tile");
+  add.onclick = () => {
+    const name = (prompt("name this file (letters, digits, spaces)", "my tile")
+                  || "").trim();
+    if (!name) return;
+    if (codeFiles.some(f => f.name === name)) { codeOpen = name; renderCode();
+                                                return say("that one exists"); }
+    codeFiles.push({name, text: codeExample, approved: false, changed: false,
+                    error: "", tiles: [], local: store.mode !== "server"});
+    codeOpen = name;
+    renderCode();
+  };
+  picker.append(add);
+  box.append(picker);
+
+  const file = codeFiles.find(f => f.name === codeOpen);
+  if (!file) {
+    box.append(el("div", "empty", codeFiles.length
+      ? "pick one above, or make a new one"
+      : "no tiles of your own yet — tap “+ new tile”"));
+    return;
+  }
+
+  if (store.mode === "server") {
+    const marks = el("div", "file");
+    marks.append(el("span", "mark " + (file.approved ? "on" : "off"),
+                    file.approved ? "switched on" : "not switched on"));
+    if (file.changed)
+      marks.append(el("span", "mark off",
+                      "changed since you approved it — read it before switching "
+                      + "it back on"));
+    if (file.tiles && file.tiles.length)
+      marks.append(el("span", "mark", "gives: " + file.tiles.join(", ")));
+    box.append(marks);
+  }
+
+  if (file.error) {
+    box.append(el("div", "note", "this one did not load:"));
+    box.append(el("pre", "err", file.error));
+  }
+
+  const area = el("textarea");
+  area.value = file.text || "";
+  area.spellcheck = false;
+  area.oninput = () => { file.text = area.value; };
+  box.append(area);
+
+  const bar = el("div", "file");
+  const save = el("button", null, "save" + (store.mode === "server"
+                                            ? " and switch on" : ""));
+  save.onclick = () => saveCode(file);
+  const del = el("button", "danger", "delete");
+  del.onclick = () => deleteCode(file);
+  bar.append(save, del);
+
+  if (store.mode === "server" && file.approved) {
+    const off = el("button", null, "switch off");
+    off.onclick = async () => {
+      const got = await codeApi("POST", "api/mytiles/approve",
+                                {name: file.name, on: false});
+      if (got === null) return say("only the owner may do that");
+      codeFiles = got.files || codeFiles;
+      renderCode(); say("switched off — its tiles are off the menus");
+      catalog = await store.init(); renderPalette();
+    };
+    bar.append(off);
+  }
+  if (store.mode === "server" && !file.approved && file.name) {
+    const on = el("button", null, "switch on");
+    on.title = "read it first: switching it on lets this phone run it";
+    on.onclick = async () => {
+      if (!confirm("Switching this on lets Spark run it on this phone.\n\n" +
+                   "Only do that if you have read it and know what it does.\n\n" +
+                   "Switch on " + file.name + "?")) return;
+      const got = await codeApi("POST", "api/mytiles/approve",
+                                {name: file.name, on: true});
+      if (got === null) return say("only the owner may do that");
+      codeFiles = got.files || codeFiles;
+      renderCode(); say("switched on");
+      catalog = await store.init(); renderPalette();
+    };
+    bar.append(on);
+  }
+  if (store.mode !== "server" && ghConfig()) {
+    const push = el("button", null, "commit to GitHub");
+    push.onclick = async () => {
+      try {
+        await ghPut("mytiles/" + file.name + ".py", file.text || "",
+                    "spark: tile " + file.name, ghConfig());
+        say("committed — pull it in Termux to use it");
+      } catch (e) { say("GitHub: " + e.message); }
+    };
+    bar.append(push);
+  }
+  box.append(bar);
+}
+
+async function saveCode(file) {
+  if (store.mode !== "server") {
+    const map = localCode();
+    map[file.name] = file.text || "";
+    localCodeSave(map);
+    return say("kept in this browser");
+  }
+  const got = await codeApi("POST", "api/mytiles",
+                            {name: file.name, text: file.text || ""});
+  if (got === null) return say("only the owner may write these");
+  if (got.error) return say(got.error);
+  codeFiles = got.files || codeFiles;
+  const now = codeFiles.find(f => f.name === file.name);
+  renderCode();
+  catalog = await store.init();          // its tiles may have joined the menus
+  renderPalette();
+  say(now && now.error ? "saved, but it did not load — see the message above"
+                       : "saved and switched on");
+}
+
+async function deleteCode(file) {
+  if (!confirm("delete " + file.name + "?")) return;
+  if (store.mode !== "server") {
+    const map = localCode(); delete map[file.name]; localCodeSave(map);
+    codeFiles = codeFiles.filter(f => f.name !== file.name);
+    codeOpen = null; renderCode(); return say("deleted from this browser");
+  }
+  const got = await codeApi("DELETE",
+    "api/mytiles?name=" + encodeURIComponent(file.name));
+  if (got === null) return say("only the owner may do that");
+  codeFiles = got.files || [];
+  codeOpen = null; renderCode();
+  catalog = await store.init(); renderPalette();
+  say("deleted");
+}
+
 // ------------------------------------------------------------ shared world
 //
 // The host runs the world; everyone else sends keys and draws what comes back.
@@ -1294,6 +1519,9 @@ for (const tab of document.querySelectorAll("#tabs button"))
   else { project = blankProject("mygame"); renderAll(); }
   $("#gear").hidden = (store.mode === "server");
   $("#people-btn").hidden = (store.mode !== "server");
+  // Owner-only, and the server decides: a guest's request comes back 403 and
+  // loadCodePanel leaves the panel hidden.
+  await loadCodePanel();
   say(store.mode === "server" ? "saving to games/ on this phone"
                               : "saving in this browser");
 })();
