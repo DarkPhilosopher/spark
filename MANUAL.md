@@ -334,12 +334,56 @@ things depending on which engine is running:
 
 ### The operations
 
-| Word | Result |
+Nine, all taking two boxes and giving one whole number. There is one operation
+per tile and no brackets: to build something longer, write several tiles into
+the one row, each writing a placeholder the next one reads.
+
+| Word | Result | `7`, `5` | `-7`, `5` | `7`, `0` |
+|---|---|---|---|---|
+| plus | first + second | `12` | `-2` | `7` |
+| minus | first − second | `2` | `-12` | `7` |
+| times | first × second | `35` | `-35` | `0` |
+| divided by | first ÷ second, fraction dropped **toward zero** | `1` | `-1` | `0` |
+| remainder | what is left over, taking the sign of the **first** box | `2` | `-2` | `0` |
+| to the power of | first multiplied by itself `second` times | `16807` | `-16807` | `1` |
+| but no more than | the smaller of the two | `5` | `-7` | `0` |
+| but no less than | the larger of the two | `7` | `5` | `7` |
+| how far from | the size of the gap, never negative | `2` | `12` | `7` |
+
+An unrecognised word adds, so a game file written by a newer Spark still runs
+here rather than refusing to.
+
+**Dividing by zero, and the remainder of zero, are both `0`.** Not an error and
+not a stopped game: a row sitting on `always` must not be able to break the
+world, so the answer is the least surprising number and play continues.
+
+**The two sign traps.** Python and JavaScript disagree about both of these, so
+Spark defines them itself and neither language's own operator is used:
+
+| | Spark | Python alone | JavaScript alone |
+|---|---|---|---|
+| `-7 divided by 5` | `-1` | `-2` | `-1` |
+| `7 divided by -5` | `-1` | `-2` | `-1` |
+| `-7 remainder 5` | `-2` | `3` | `-2` |
+| `7 remainder -5` | `2` | `-3` | `2` |
+
+Division cuts **toward zero** and remainder takes the sign of the **left** box.
+The two are defined off one another, so they always reconcile:
+
+    first  =  (first divided by second) × second  +  (first remainder second)
+
+**to the power of**, exactly:
+
+| Case | Result |
 |---|---|
-| plus | first + second |
-| minus | first − second |
-| times | first × second |
-| divided by | first ÷ second, fraction dropped toward zero. **Second box 0 gives 0** |
+| exponent below 0 | `0` — it would be a fraction, and there are none here |
+| exponent 0 | `1`, including `0 to the power of 0` |
+| result past the fence | the fence, **with the correct sign** — `-10 to the power of 999` is −1,000,000,000 and `-10 to the power of 1000` is +1,000,000,000 |
+
+It is worked out by multiplying step by step and clamping at each step, never
+by asking either language for a power — `10 to the power of 999` would build a
+thousand-digit number in Python and an infinity in JavaScript, and both engines
+have to arrive at the same fenced answer instead.
 
 ### The fence
 

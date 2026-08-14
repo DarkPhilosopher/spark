@@ -273,16 +273,42 @@ function number(text, obj, world, it) {
   return 0;
 }
 
+function divide(left, right) {
+  if (!right) return 0;
+  const whole = Math.floor(Math.abs(left) / Math.abs(right));
+  return (left < 0) !== (right < 0) ? -whole : whole;
+}
+
+// Longhand, and not JavaScript's own %, for the reason spelt out in tiles.py:
+// the two languages disagree about the sign. Left box wins, in both engines.
+function remainder(left, right) {
+  if (!right) return 0;
+  const over = Math.abs(left) % Math.abs(right);
+  return left < 0 ? -over : over;
+}
+
+function power(base, exp) {
+  if (exp < 0) return 0;
+  if (exp === 0) return 1;
+  if (base === 0 || base === 1) return base;
+  if (base === -1) return exp % 2 ? -1 : 1;
+  const steps = exp <= 64 ? exp : 64 + (exp % 2);
+  let out = 1;
+  for (let i = 0; i < steps; i++) out = clamp(out * base);
+  return out;
+}
+
 function total(a, op, b, obj, world, it) {
   const left = number(a, obj, world, it);
   const right = number(b, obj, world, it);
   if (op === "minus") return clamp(left - right);
   if (op === "times") return clamp(left * right);
-  if (op === "divided by") {
-    if (!right) return 0;
-    const whole = Math.floor(Math.abs(left) / Math.abs(right));
-    return clamp((left < 0) !== (right < 0) ? -whole : whole);
-  }
+  if (op === "divided by") return clamp(divide(left, right));
+  if (op === "remainder") return clamp(remainder(left, right));
+  if (op === "to the power of") return clamp(power(left, right));
+  if (op === "but no more than") return clamp(Math.min(left, right));
+  if (op === "but no less than") return clamp(Math.max(left, right));
+  if (op === "how far from") return clamp(Math.abs(left - right));
   return clamp(left + right);
 }
 

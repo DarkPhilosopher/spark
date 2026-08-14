@@ -16,6 +16,45 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ### Added
 
+- **Nine operations in a sum, up from four.** The `=` tiles now offer
+  `remainder`, `to the power of`, `but no more than`, `but no less than` and
+  `how far from`, alongside the original `plus`, `minus`, `times` and
+  `divided by`. No new tiles — the same two `=` tiles, a longer list on the
+  menu — so nothing has to be rebuilt and old games keep working, `plus` being
+  the default as before.
+
+  *Why:* the first four covered arithmetic but not the four things games
+  actually keep needing. `remainder` is how anything goes round in a circle —
+  `tick remainder 4` counts 0, 1, 2, 3, 0, 1, 2, 3 for ever, which is a
+  four-frame animation or a four-step patrol. `but no more than` and `but no
+  less than` are a ceiling and a floor, so two tiles now fence a value into a
+  range instead of several rows faking it. `how far from` is distance along an
+  axis and never comes out negative, which also makes it the only way to get
+  absolute value.
+
+  **Two sign traps are pinned down rather than left to the languages.** Python
+  and JavaScript disagree about both, so Spark defines its own and neither
+  language's operator is used:
+
+  | | Spark | Python alone | JavaScript alone |
+  |---|---|---|---|
+  | `-7 divided by 5` | `-1` | `-2` | `-1` |
+  | `-7 remainder 5` | `-2` | `3` | `-2` |
+
+  Division cuts toward zero, remainder takes the sign of the left box, and the
+  two are defined off each other so they always reconcile back to the original
+  number. Dividing by zero, and the remainder of zero, are both **0** — a row
+  sitting on `always` must not be able to break the world.
+
+  `to the power of` has no negative exponents (that would be a fraction) and is
+  worked out by multiplying step by step, clamping as it goes, so `10 to the
+  power of 999` stops at the fence with the right sign instead of building a
+  thousand-digit number in one engine and an infinity in the other.
+
+  `tests/check_places.py` grows to 78 checks, and `games/placeholders.json` now
+  uses the new operations so `check_engines.py` proves both engines agree about
+  them too.
+
 - **Placeholders: an arbitrary named slot you can regard three ways at once —
   as a name, as a value, or as a vector.** Eight new tiles, six DO and two WHEN.
   Invent any name and the slot appears underneath it; nothing has to be declared

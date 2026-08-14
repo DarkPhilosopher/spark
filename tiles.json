@@ -474,7 +474,12 @@
             "plus",
             "minus",
             "times",
-            "divided by"
+            "divided by",
+            "remainder",
+            "to the power of",
+            "but no more than",
+            "but no less than",
+            "how far from"
           ],
           "default": "plus"
         },
@@ -524,7 +529,12 @@
             "plus",
             "minus",
             "times",
-            "divided by"
+            "divided by",
+            "remainder",
+            "to the power of",
+            "but no more than",
+            "but no less than",
+            "how far from"
           ],
           "default": "plus"
         },

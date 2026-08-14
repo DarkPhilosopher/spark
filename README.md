@@ -263,14 +263,50 @@ makes it a *placeholder* — it stands in for something before there is anything
 there. Capitals and spare spaces are ignored, so `Home` and `home` are the one
 slot.
 
-**The `=` half is a sum.** Two boxes with a word between them:
+**The `=` half is a sum.** Two boxes with one of nine words between them:
 
-| Word | What it does |
-|---|---|
-| **plus** | add the two boxes |
-| **minus** | take the second from the first |
-| **times** | multiply them |
-| **divided by** | divide, dropping any fraction. Dividing by 0 gives 0 |
+| Word | What it does | Reads as |
+|---|---|---|
+| **plus** | add the two boxes | `value gold = gold plus 5` |
+| **minus** | take the second from the first | `value gap = it x minus my x` |
+| **times** | multiply them | `value area = side times side` |
+| **divided by** | divide, dropping any fraction. Dividing by 0 gives 0 | `value half = gold divided by 2` |
+| **remainder** | what is left over after dividing — the `%` you were thinking of | `value spin = tick remainder 4` |
+| **to the power of** | the first multiplied by itself that many times | `value big = 2 to the power of 8` |
+| **but no more than** | the smaller of the two — a ceiling | `value speed = speed but no more than 5` |
+| **but no less than** | the larger of the two — a floor | `value health = health but no less than 0` |
+| **how far from** | the gap between them, never negative | `value away = my x how far from it x` |
+
+The last four are the ones worth knowing about, because they are the ones you
+would otherwise need several rows to fake:
+
+- **remainder** is how you make anything go round in a circle. `tick remainder
+  4` counts 0, 1, 2, 3, 0, 1, 2, 3… for ever, which is a four-frame animation,
+  a four-step patrol, or every-fourth-turn behaviour.
+- **but no more than** / **but no less than** are a ceiling and a floor. Chain
+  them and a value is fenced into a range in two tiles:
+
+      DO value speed = speed but no more than 5
+         value speed = speed but no less than 1
+
+- **how far from** is distance along one axis, and it never comes out negative.
+  Against `0` it is plain absolute value, which nothing else here gives you.
+
+**Signs, pinned down.** Two of these have a trap in them, and Spark picks one
+answer for both engines rather than letting each language decide:
+
+| | Spark says | Python alone would say | JavaScript alone would say |
+|---|---|---|---|
+| `-7 divided by 5` | `-1` — cut toward zero | −2 | −1 |
+| `-7 remainder 5` | `-2` — the sign of the **left** box | 3 | −2 |
+
+They are defined off each other, so `divided by` and `remainder` always fit
+back together: −1 × 5 + −2 = −7.
+
+**to the power of** has no negative exponents — that would be a fraction, and
+there are none here — so `2 to the power of -1` is 0. Anything to the power of
+0 is 1, including 0 itself. A power that runs off the end stops at the fence
+with the right sign rather than building a thousand-digit number.
 
 **What you can put in a box.** Read in this order, first match wins:
 

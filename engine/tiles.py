@@ -150,7 +150,12 @@ def remembered(world, text):
 FACES = ["value", "x", "y", "z"]        # which face a tile regards
 AXES = ["x", "y", "z"]
 TESTS = ["at least", "at most", "exactly"]
-OPS = ["plus", "minus", "times", "divided by"]
+
+# The nine operations a sum may use, commonest first because this is also the
+# order they appear on the menu. Every one takes two boxes and gives one whole
+# number, which is what keeps a sum readable left to right with no brackets.
+OPS = ["plus", "minus", "times", "divided by", "remainder", "to the power of",
+       "but no more than", "but no less than", "how far from"]
 
 # Every number in a placeholder is a whole number inside this fence. Both the
 # fence and the whole-number rule are here for the same reason: world3d.html
@@ -250,8 +255,69 @@ def number(text, obj, world, it):
     return 0
 
 
+def divide(left, right):
+    """Whole-number division, cut toward zero. Dividing by nothing is 0.
+
+    Cut toward zero rather than downward because that is the only rounding the
+    two engines can both do without thinking about it: -7 / 5 is -1 here, not
+    -2. The matching `remainder` below is defined off this one, so the pair
+    always fits back together as  left = divide * right + remainder.
+    """
+    if not right:
+        return 0
+    whole = abs(left) // abs(right)
+    return -whole if (left < 0) != (right < 0) else whole
+
+
+def remainder(left, right):
+    """What is left over. Takes the sign of the LEFT box, and 0 leaves 0.
+
+    Spelt out longhand on purpose: Python's own `%` takes the sign of the
+    right-hand box and JavaScript's takes the sign of the left, so -7 remainder
+    5 would be 3 in one engine and -2 in the other if either language were
+    trusted to answer. It is -2 in both, here.
+    """
+    if not right:
+        return 0
+    over = abs(left) % abs(right)
+    return -over if left < 0 else over
+
+
+def power(base, exp):
+    """`base` multiplied by itself `exp` times, clamped at every step.
+
+    A negative exponent would be a fraction, and there are no fractions here,
+    so it is 0. Anything to the power of 0 is 1, including 0 itself.
+
+    Multiplying step by step rather than asking either language for a power is
+    what keeps this safe and identical: `10 to the power of 999` would build a
+    thousand-digit number in Python and an infinity in JavaScript, and both
+    engines have to end up at the fence instead. Once the size is past the
+    fence only the SIGN can still change, so the loop stops early -- but at a
+    length with the same odd-or-evenness as `exp`, because that is what decides
+    the sign when the base is negative.
+    """
+    if exp < 0:
+        return 0
+    if exp == 0:
+        return 1
+    if base in (0, 1):
+        return base
+    if base == -1:
+        return -1 if exp % 2 else 1
+    steps = exp if exp <= 64 else 64 + (exp % 2)
+    out = 1
+    for _ in range(steps):
+        out = clamp(out * base)
+    return out
+
+
 def total(a, op, b, obj, world, it):
-    """The sum in the right-hand half of a `=` tile: one box, a word, one box."""
+    """The sum in the right-hand half of a `=` tile: one box, a word, one box.
+
+    Nine operations, all of them taking two boxes and giving one whole number.
+    Anything unrecognised adds, so a game file from a newer Spark still runs.
+    """
     left = number(a, obj, world, it)
     right = number(b, obj, world, it)
     if op == "minus":
@@ -259,10 +325,17 @@ def total(a, op, b, obj, world, it):
     if op == "times":
         return clamp(left * right)
     if op == "divided by":
-        if not right:
-            return 0                    # nothing sensible to return, so zero
-        whole = abs(left) // abs(right)
-        return clamp(-whole if (left < 0) != (right < 0) else whole)
+        return clamp(divide(left, right))
+    if op == "remainder":
+        return clamp(remainder(left, right))
+    if op == "to the power of":
+        return clamp(power(left, right))
+    if op == "but no more than":
+        return clamp(min(left, right))
+    if op == "but no less than":
+        return clamp(max(left, right))
+    if op == "how far from":
+        return clamp(abs(left - right))
     return clamp(left + right)
 
 

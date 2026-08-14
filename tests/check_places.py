@@ -135,6 +135,36 @@ cases = [
     ("plus", "-2.9", "0", -2),
     ("plus", "", "3", 3),                 # an empty box is nothing
     ("plus", "banana", "3", 3),           # so is a word that means nothing
+
+    # remainder takes the sign of the LEFT box. Python's own % would say 3 for
+    # the second of these and JavaScript's would say -2; Spark says -2 in both.
+    ("remainder", "7", "5", 2),
+    ("remainder", "-7", "5", -2),
+    ("remainder", "7", "-5", 2),
+    ("remainder", "-7", "-5", -2),
+    ("remainder", "7", "0", 0),
+    ("remainder", "10", "5", 0),
+
+    ("to the power of", "2", "8", 256),
+    ("to the power of", "-2", "3", -8),
+    ("to the power of", "-2", "4", 16),
+    ("to the power of", "5", "0", 1),
+    ("to the power of", "0", "0", 1),
+    ("to the power of", "0", "3", 0),
+    ("to the power of", "2", "-1", 0),    # a fraction, and there are none here
+    ("to the power of", "1", "999999", 1),
+
+    ("but no more than", "9", "5", 5),
+    ("but no more than", "3", "5", 3),
+    ("but no more than", "-9", "5", -9),
+    ("but no less than", "3", "5", 5),
+    ("but no less than", "9", "5", 9),
+    ("but no less than", "-9", "-5", -5),
+
+    ("how far from", "9", "5", 4),
+    ("how far from", "5", "9", 4),
+    ("how far from", "-3", "3", 6),
+    ("how far from", "-3", "0", 3),       # against 0, this is absolute value
 ]
 for op, a, b, want in cases:
     world = run([value("thing", a, op, b)])
@@ -150,6 +180,22 @@ check("a sum that runs off the end is held there too",
 world = run([value("thing", "0", "minus", "999999999999")])
 check("and the same at the bottom end",
       slot(world, "thing").get("value") == -tiles.LIMIT, world.places)
+
+world = run([value("thing", "10", "to the power of", "999")])
+check("a power far past the fence stops at the fence, not at a huge number",
+      slot(world, "thing").get("value") == tiles.LIMIT, world.places)
+world = run([value("thing", "-10", "to the power of", "999")])
+check("...keeping the sign an odd power gives it",
+      slot(world, "thing").get("value") == -tiles.LIMIT, world.places)
+world = run([value("thing", "-10", "to the power of", "1000")])
+check("...and the sign an even power gives it",
+      slot(world, "thing").get("value") == tiles.LIMIT, world.places)
+
+world = run([value("thing", "-7", "divided by", "5"),
+             value("check", "thing", "times", "5")])
+check("divide and remainder still fit back together",
+      slot(world, "check")["value"] + tiles.remainder(-7, 5) == -7,
+      (slot(world, "check"), tiles.remainder(-7, 5)))
 
 world = run([value("thing", "0x10", "plus", "0")])
 check("hexadecimal is not a number here (JavaScript would say 16)",

@@ -86,6 +86,19 @@
           "when": [{"tile": "place_has",
                     "args": {"who": "eaten", "face": "value", "test": "at least", "amount": 5}}],
           "do": [{"tile": "win", "args": {}}]
+        },
+        {
+          "when": [{"tile": "always", "args": {}}],
+          "do": [{"tile": "place_value",
+                  "args": {"who": "spin", "a": "tick", "op": "remainder", "b": "4"}},
+                 {"tile": "place_value",
+                  "args": {"who": "grow", "a": "spin", "op": "to the power of", "b": "3"}},
+                 {"tile": "place_value",
+                  "args": {"who": "grow", "a": "grow", "op": "but no more than", "b": "9"}},
+                 {"tile": "place_value",
+                  "args": {"who": "grow", "a": "grow", "op": "but no less than", "b": "-9"}},
+                 {"tile": "place_value",
+                  "args": {"who": "away", "a": "my x", "op": "how far from", "b": "my y"}}]
         }
       ]
     },
@@ -121,6 +134,16 @@
                     "args": {"who": "drift", "face": "x", "test": "at least", "amount": 3}}],
           "do": [{"tile": "place_vector",
                   "args": {"who": "drift", "axis": "x", "a": "0", "op": "minus", "b": "1"}}]
+        },
+        {
+          "when": [{"tile": "timer", "args": {"every": 5}}],
+          "do": [{"tile": "place_vector",
+                  "args": {"who": "drift", "axis": "y",
+                           "a": "my age", "op": "remainder", "b": "3"}},
+                 {"tile": "place_vector",
+                  "args": {"who": "drift", "axis": "y",
+                           "a": "drift y", "op": "but no more than", "b": "1"}},
+                 {"tile": "place_move", "args": {"who": "drift"}}]
         }
       ]
     }
