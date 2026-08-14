@@ -14,6 +14,54 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ## Unreleased
 
+### Added
+
+- **Undo, in both brain editors.** A button beside *+ add a row* in the browser,
+  and *undo the last change* on the brain and row menus in the terminal. Both
+  show how many steps are left, and both remember the last **60** changes.
+
+  It covers everything the brain editor does — adding and removing rows, moving
+  them, adding and removing tiles, changing a tile's settings, dragging a tile
+  between rows — plus deleting a character, since that throws whole brains away.
+  It does not cover a character's colour, glyph or health, which are one retype
+  to put back, nor world settings.
+
+  *How it works, and why:* the whole game is copied as text once per change.
+  Games are a few kilobytes, so sixty copies cost less than one photograph, and
+  keeping the entire thing means nothing can ever be half-undone and no screen
+  has to know which fields it owns. Opening a different game empties the history
+  so undo can never quietly swap one game for another.
+
+  Two wrinkles worth writing down. Opening a tile's settings and closing them
+  again costs no step — the mark is dropped if nothing actually moved, and the
+  browser hooks the dialog's own close event so Escape and tapping the backdrop
+  count too. And in the terminal, undo refills the project dictionary in place
+  rather than rebinding it, because every menu screen is holding that same
+  dictionary; the screens then unwind to the character list, which re-reads
+  everything, because the characters and rows *inside* it are new objects.
+  `tests/check_undo.py` — 19 checks — pins both of those down.
+
+- **Every tile is offered in both halves.** The browser palette shows the half
+  you are on, then every other tile as well, dashed and dimmed under a heading;
+  the terminal menus list the strays too, marked with what they will do. A
+  button at the top of the palette goes back to only the tiles that fit.
+
+  *Why:* which tile belongs where is the engine's rule, and there is no reason
+  to hide the rest from the person building the game — you can decide what to
+  use. What the engine actually does with a stray is now stated rather than
+  left to be discovered: a **DO** tile in the **WHEN** half makes the row never
+  fire at all, and a **WHEN** tile in the **DO** half is quietly skipped. Placed
+  strays stay marked, so a row that never fires shows why on its face.
+
+### Fixed
+
+- **The local server now answers `/tiles.json`.** It served the tile catalogue
+  at `api/tiles` but 404'd on the filename that GitHub Pages, and a plain
+  folder, both use — so anything written against the URL that works everywhere
+  else broke the moment the server was running. It is answered from the live
+  registries rather than the file on disk, so it can never be a stale copy from
+  before the last `spark.py export`.
+
 ### Changed
 
 - **Placeholders hold decimals now, not just whole numbers.** `7 divided by 2`

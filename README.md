@@ -202,6 +202,43 @@ who arrived before you started a game — they are connected and waiting.
 `<kind>` is the name of one of your characters, or **anything**, which matches
 all of them.
 
+### Every tile is offered in both halves
+
+The palette shows the half you are on first, then **every other tile as well**,
+dashed and dimmed under a heading. The terminal menus do the same, marking the
+strays. Nothing is withheld from you — which tile belongs where is the engine's
+rule, and you may want to place one anyway to see what happens.
+
+What happens is worth knowing before you do:
+
+| Where | What the engine does |
+|---|---|
+| a **DO** tile in the **WHEN** half | the row **never fires at all** — the engine looks for it among the sensors, does not find it, and abandons the row |
+| a **WHEN** tile in the **DO** half | it is quietly skipped; the rest of the row still runs |
+
+Placed strays stay marked, so a row that never fires shows why on its face. Tap
+the button at the top of the palette to go back to only the tiles that fit.
+
+### Undoing
+
+Both editors keep an undo of the last **60** changes to the brain you are
+editing:
+
+- **In the browser** — the `undo` button beside *+ add a row*. It counts what is
+  left, and greys out when there is nothing.
+- **In the terminal** — *undo the last change* on the brain menu and on the
+  row-editing menu, with the same count in brackets.
+
+It covers everything the brain editor does — adding and removing rows, moving
+them, adding and removing tiles, changing a tile's settings, dragging a tile
+between rows — and deleting a character, since that throws brains away. It does
+**not** cover a character's colour, glyph or health, which are one retype to put
+back, nor world settings.
+
+The two stacks are separate on purpose: each undoes what you did in front of it.
+Opening a different game empties the history, so undo can never quietly swap one
+game for another.
+
 ### Remembering something, and opening another app
 
 Two tiles that have nothing to do with the grid. **remember** ties a short name
@@ -580,6 +617,7 @@ Once `python3 spark.py install` has been run, every one of these works as plain
 | `python3 tests/check_permissions.py` | check guests cannot exceed their code |
 | `python3 tests/check_open.py` | check the remember/open tiles and their fences |
 | `python3 tests/check_places.py` | check placeholders: the three faces and the sums |
+| `python3 tests/check_undo.py` | check the undo stack behind both brain editors |
 | `python3 tests/check_multiplayer.py` | check two players share one world |
 | `python3 tests/check_engines.py` | check the Python and JavaScript engines still agree |
 
@@ -616,6 +654,7 @@ Once `python3 spark.py install` has been run, every one of these works as plain
     tests/check_multiplayer.py  two players in one world, over real HTTP
     tests/check_open.py  checks remember/open, and that a guest cannot launch apps
     tests/check_places.py       checks the placeholder tiles, their sums and their edges
+    tests/check_undo.py         checks the undo stack both brain editors keep
     tests/check_engines.py      plays every game twice, once per engine, and compares
     tests/engine_trace.js       runs the JavaScript engine from a terminal, for that test
 

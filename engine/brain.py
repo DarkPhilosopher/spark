@@ -47,10 +47,21 @@ def list_games():
 
 
 def describe_tile(registry, tile_use):
+    """One tile in English. Marks a tile sitting in the half it does not fit.
+
+    Both editors let you place any tile in either half, so this has to be able
+    to name a DO tile found among the WHEN tiles. It reads it out of the other
+    registry and flags it, rather than printing `???` at somebody who put it
+    there deliberately.
+    """
     tile = registry.get(tile_use["tile"])
+    if tile is not None:
+        return tile.describe(tile_use.get("args", {}))
+    other = tiles.ACTIONS if registry is tiles.SENSORS else tiles.SENSORS
+    tile = other.get(tile_use["tile"])
     if tile is None:
         return "??? (%s)" % tile_use["tile"]
-    return tile.describe(tile_use.get("args", {}))
+    return "%s  <- does not fire here" % tile.describe(tile_use.get("args", {}))
 
 
 def describe_row(row):

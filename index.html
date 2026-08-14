@@ -72,6 +72,12 @@
         border:1px solid transparent;touch-action:none;max-width:100%}
   .chip.when{background:#24384d;border-color:var(--when)}
   .chip.do{background:#42341f;border-color:var(--do)}
+  /* A tile from the other half, offered here because you asked to see
+     everything. Dashed and dimmed so it is obvious which half it belongs to. */
+  .chip.foreign{opacity:.6;border-style:dashed}
+  #tiles .split{flex:0 0 100%;font-size:11px;color:var(--dim);
+                padding:6px 2px 0;letter-spacing:.04em;text-transform:uppercase}
+  #tiles .toggle{flex:0 0 100%;margin:2px 0 4px}
   .chip.ghost{position:fixed;z-index:99;pointer-events:none;opacity:.9;
               box-shadow:0 6px 18px #0009}
   .chip.lifted{opacity:.3}
@@ -164,7 +170,10 @@
 
 <h2>brain <span id="whose"></span></h2>
 <div id="rows"></div>
-<div style="padding:0 8px 20px"><button id="addrow" style="width:100%">+ add a row</button></div>
+<div id="rowbar" style="padding:0 8px 20px;display:flex;gap:6px">
+  <button id="addrow" style="flex:3">+ add a row</button>
+  <button id="undo" style="flex:2" disabled>undo</button>
+</div>
 
 <div id="trash">drop here to delete</div>
 
@@ -189,8 +198,70 @@ const el = (tag, cls, text) => { const n = document.createElement(tag);
 const chars = () => project.characters;
 const cur = () => chars()[charIdx] || null;
 const kinds = () => chars().map(c => c.kind).concat("anything");
-const tileDef = (s, id) => (s === "when" ? catalog.sensors : catalog.actions)
-                             .find(t => t.id === id);
+// A tile may be placed in either half -- see renderPalette -- so a definition
+// is looked for in the half it sits in first, and then in the other one. Without
+// the fallback a tile dropped into the wrong half would draw as a bare id.
+const tileDef = (s, id) => {
+  const here = s === "when" ? catalog.sensors : catalog.actions;
+  const there = s === "when" ? catalog.actions : catalog.sensors;
+  return here.find(t => t.id === id) || there.find(t => t.id === id);
+};
+
+// Does this tile actually do anything in the half it has been put in? A DO tile
+// in the WHEN half stops the row dead (the engine cannot find it among the
+// sensors, so the row never fires); a WHEN tile in the DO half is skipped. Both
+// are allowed -- you asked to see every tile everywhere -- but they are marked.
+const fitsHalf = (s, id) =>
+  (s === "when" ? catalog.sensors : catalog.actions).some(t => t.id === id);
+
+let showEverything = true;   // every tile in both halves, as asked for
+
+// ------------------------------------------------------------------- undo
+//
+// The whole game, copied as text, once per change. Games are small -- a big one
+// is a few kilobytes -- so sixty copies cost less than one photograph, and
+// keeping the entire thing sidesteps the bookkeeping that per-field undo needs:
+// nothing can be half-undone, and nothing has to know which fields exist.
+//
+// The terminal menus keep their own identical stack. The two are deliberately
+// not shared: each is undoing what you did in front of it.
+
+const UNDO_DEPTH = 60;
+let past = [];
+
+function remember() {
+  if (!project) return;
+  past.push(JSON.stringify(project));
+  if (past.length > UNDO_DEPTH) past.shift();
+  paintUndo();
+}
+
+/* Throw away the last mark if nothing actually changed after it -- opening a
+   tile's settings and closing them again should not cost an undo step. */
+function forgetIfSame() {
+  if (past.length && past[past.length - 1] === JSON.stringify(project)) past.pop();
+  paintUndo();
+}
+
+function undo() {
+  if (!past.length) return say("nothing to undo");
+  project = JSON.parse(past.pop());
+  // The cast or the rows may have shrunk under whatever was selected.
+  charIdx = Math.min(charIdx, Math.max(0, chars().length - 1));
+  const c = cur();
+  rowIdx = c ? Math.min(rowIdx, Math.max(0, c.brain.length - 1)) : 0;
+  renderAll();
+  paintUndo();
+  say("undone — " + past.length + " step" + (past.length === 1 ? "" : "s") +
+      " left");
+}
+
+function paintUndo() {
+  const button = $("#undo");
+  if (!button) return;
+  button.disabled = !past.length;
+  button.textContent = past.length ? "undo (" + past.length + ")" : "undo";
+}
 
 // the same four flags the terminal prints above its prompts
 let serverFlags = null;   // last answer from /api/status, when there is a server
@@ -356,6 +427,13 @@ function renderWorld() {
 
 function chipFor(s, use, r, i) {
   const chip = el("div", "chip " + s, describe(s, use));
+  // A tile sitting in the half it does not belong to stays marked once placed,
+  // so a row that never fires shows why on its face rather than in the manual.
+  if (!fitsHalf(s, use.tile)) {
+    chip.classList.add("foreign");
+    chip.title = s === "when" ? "a DO tile here stops the row firing at all"
+                              : "a WHEN tile here is skipped";
+  }
   chip.dataset.row = r; chip.dataset.side = s; chip.dataset.i = i;
   chip.addEventListener("pointerdown", e => startDrag(e, chip));
   return chip;
@@ -387,10 +465,10 @@ function renderRows() {
     const btns = el("div", "rowbtns");
     const up = el("button", null, "↑");
     up.onclick = ev => { ev.stopPropagation();
-      if (r > 0) { const b = c.brain; [b[r-1], b[r]] = [b[r], b[r-1]];
+      if (r > 0) { remember(); const b = c.brain; [b[r-1], b[r]] = [b[r], b[r-1]];
                    rowIdx = r - 1; renderRows(); } };
     const del = el("button", null, "✕");
-    del.onclick = ev => { ev.stopPropagation(); c.brain.splice(r, 1);
+    del.onclick = ev => { ev.stopPropagation(); remember(); c.brain.splice(r, 1);
                           rowIdx = Math.max(0, rowIdx - 1); renderRows(); };
     btns.append(up, del);
     node.append(body, btns);
@@ -398,11 +476,42 @@ function renderRows() {
   });
 }
 
+/* Every tile, in whichever half you are looking at.
+ *
+ * The half's own tiles come first, then -- unless you turn it off -- the other
+ * half's, dashed and dimmed under a heading that says what they are. Nothing is
+ * hidden from you: the rule about which tile belongs where is the engine's, and
+ * you may want to place one anyway to see what happens. The marking is there so
+ * that "why does this row never fire" has a visible answer. */
 function renderPalette() {
   const box = $("#tiles"); box.textContent = "";
-  const defs = side === "when" ? catalog.sensors : catalog.actions;
-  for (const def of defs) {
+
+  const toggle = el("button", "toggle",
+                    showEverything ? "showing every tile — tap to show only "
+                                     + side.toUpperCase() + " tiles"
+                                   : "showing only " + side.toUpperCase()
+                                     + " tiles — tap to show every tile");
+  toggle.onclick = () => { showEverything = !showEverything; renderPalette(); };
+  box.append(toggle);
+
+  const mine = side === "when" ? catalog.sensors : catalog.actions;
+  for (const def of mine) {
     const chip = el("div", "chip " + side, def.label);
+    chip.onclick = () => addTile(def);
+    box.append(chip);
+  }
+  if (!showEverything) return;
+
+  const other = side === "when" ? "do" : "when";
+  const theirs = side === "when" ? catalog.actions : catalog.sensors;
+  box.append(el("div", "split",
+                other.toUpperCase() + " tiles — placed here they do not fire"));
+  for (const def of theirs) {
+    const chip = el("div", "chip " + side + " foreign", def.label);
+    chip.title = "a " + other.toUpperCase() + " tile. In the "
+               + side.toUpperCase() + " half "
+               + (side === "when" ? "it stops the row firing at all"
+                                  : "it is skipped");
     chip.onclick = () => addTile(def);
     box.append(chip);
   }
@@ -416,6 +525,7 @@ function renderAll() { renderWhere(); renderCast(); renderProps(); renderWorld()
 function addTile(def) {
   const c = cur();
   if (!c) return say("add a character first");
+  remember();
   if (!c.brain.length) c.brain.push({when:[], do:[]});
   rowIdx = Math.min(rowIdx, c.brain.length - 1);
   const args = {};
@@ -427,6 +537,10 @@ function addTile(def) {
 }
 
 function openParams(s, use, r, i) {
+  // One mark for the whole visit to this dialog, so changing three settings and
+  // closing is a single undo rather than three. Dropped again on the way out if
+  // nothing was actually touched -- see forgetIfSame.
+  remember();
   const def = tileDef(s, use.tile), form = $("#dlgform");
   form.textContent = "";
   form.append(el("h3", null, describe(s, use)));
@@ -511,6 +625,7 @@ function onDragEnd(e) {
   const zone = under && under.closest(".side");
   const bin  = under && under.closest("#trash");
   const brain = cur().brain;
+  remember();
   const [moved] = brain[d.from.r][d.from.s].splice(d.from.i, 1);
 
   if (!bin && zone && zone.dataset.side === d.from.s)
@@ -518,7 +633,12 @@ function onDragEnd(e) {
   else if (!bin)
     brain[d.from.r][d.from.s].splice(d.from.i, 0, moved);   // put it back
   renderRows();
+  forgetIfSame();          // a drag that put the tile back is not a change
 }
+
+// However the settings dialog is left -- done, remove, Escape, or tapping the
+// backdrop -- the mark openParams laid down is dropped again if nothing moved.
+$("#dlg").addEventListener("close", forgetIfSame);
 
 // chips answer a tap by opening their parameters
 document.addEventListener("click", e => {
@@ -748,7 +868,7 @@ function amEditor() { return me.role === "owner" || me.role === "edit"; }
 
 function showStage(on) {
   $("#stage").classList.toggle("on", on);
-  for (const id of ["#rows", "#props", "#palette", "#addrow", "#cast"])
+  for (const id of ["#rows", "#props", "#palette", "#rowbar", "#cast"])
     document.querySelectorAll(id).forEach(n => n.style.display = on ? "none" : "");
   document.querySelectorAll("details").forEach(n => n.style.display = on ? "none" : "");
   document.querySelectorAll("h2").forEach(n => n.style.display = on ? "none" : "");
@@ -974,6 +1094,9 @@ async function openGame(name) {
     c.brain ||= [];
     for (const row of c.brain) { row.when ||= []; row.do ||= []; }
   }
+  // A fresh game means a fresh history: undoing back into the previous game
+  // would quietly replace this one with that one.
+  past = []; paintUndo();
   charIdx = 0; rowIdx = 0; renderAll();
   say("opened " + name);
 }
@@ -1007,6 +1130,7 @@ $("#new").onclick = async () => {
   const name = prompt("name your game", "mygame");
   if (!name) return;
   project = blankProject(name.trim());
+  past = []; paintUndo();
   charIdx = 0; rowIdx = 0;
   await loadGames(project.name);
   renderAll();
@@ -1025,10 +1149,13 @@ $("#gear").onclick = openGitHubSettings;
 $("#addrow").onclick = () => {
   const c = cur();
   if (!c) return say("add a character first");
+  remember();
   c.brain.push({when:[], do:[]});
   rowIdx = c.brain.length - 1;
   renderRows();
 };
+
+$("#undo").onclick = undo;
 
 for (const tab of document.querySelectorAll("#tabs button"))
   tab.onclick = () => {

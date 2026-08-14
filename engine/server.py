@@ -154,6 +154,14 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_file(WORLD3D)
         if path == "/api/tiles":
             return self.send_json(catalog())
+        # The same catalogue under the name the static pages use. GitHub Pages
+        # and a bare folder both serve tiles.json as a file, and without this
+        # the one URL that works everywhere else 404s here -- so anything
+        # written against it broke the moment the server was running. Answered
+        # from the live registries rather than the file on disk, so it cannot be
+        # the stale copy of a tile added since the last `spark.py export`.
+        if path == "/tiles.json":
+            return self.send_json(catalog())
         if path == "/api/status":
             return self.send_json(status.probe())
 

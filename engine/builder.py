@@ -1,11 +1,63 @@
 """The no-code editor: every choice is a numbered menu, nothing is typed as code."""
 
+import json
 import sys
 
 from . import brain, runner, status, tiles
 from .world import COLORS
 
 CLEAR = "\033[H\033[2J"
+
+# ---------------------------------------------------------------------------
+# undo
+#
+# The whole game, copied as text, once per change. Games are small, so sixty
+# copies cost nothing, and keeping the entire thing means nothing can be
+# half-undone and no screen has to know which fields it owns.
+#
+# Restoring empties the dict and refills it rather than rebinding the name,
+# because every screen here is holding the same dict and a rebind would leave
+# them all editing the abandoned one.
+#
+# The browser keeps its own identical stack. They are deliberately separate:
+# each undoes what you did in front of it.
+# ---------------------------------------------------------------------------
+
+UNDO_DEPTH = 60
+_history = []
+
+
+def remember(project):
+    if project is None:
+        return
+    _history.append(json.dumps(project))
+    if len(_history) > UNDO_DEPTH:
+        _history.pop(0)
+
+
+def forget_if_same(project):
+    """Drop the last mark if nothing changed after it."""
+    if _history and _history[-1] == json.dumps(project):
+        _history.pop()
+
+
+def undo(project):
+    """Put the game back as it was before the last change. True if it moved."""
+    if not _history:
+        return False
+    project.clear()
+    project.update(json.loads(_history.pop()))
+    return True
+
+
+def undo_label():
+    return ("undo the last change (%d)" % len(_history) if _history
+            else "undo the last change (nothing yet)")
+
+
+def forget_history():
+    """A different game means a fresh history -- see openGame in index.html."""
+    _history.clear()
 
 
 # --------------------------------------------------------------------------
@@ -169,13 +221,28 @@ def fill_params(tile, project):
 
 
 def pick_tile(registry, project, what):
+    """Every tile, this half's first and the other half's after.
+
+    The browser palette offers both halves too. Nothing is hidden: which tile
+    belongs where is the engine's rule, and you may want to place one anyway to
+    see what it does. The ones that will not fire are marked rather than
+    withheld -- a DO tile among the WHEN tiles stops its row firing at all, and
+    a WHEN tile among the DO tiles is skipped.
+    """
+    other = tiles.ACTIONS if registry is tiles.SENSORS else tiles.SENSORS
+    other_name = "DO" if registry is tiles.SENSORS else "WHEN"
+    warning = ("stops the row firing" if registry is tiles.SENSORS
+               else "is skipped here")
+
     header("Pick a %s tile" % what)
-    ids = list(registry)
-    labels = [registry[i].label for i in ids]
+    ids = list(registry) + list(other)
+    labels = ([registry[i].label for i in registry] +
+              ["%s  <- %s tile, %s" % (other[i].label, other_name, warning)
+               for i in other])
     index = menu(labels)
     if index is None:
         return None
-    tile = registry[ids[index]]
+    tile = (registry if index < len(registry) else other)[ids[index]]
     return {"tile": tile.id, "args": fill_params(tile, project)}
 
 
@@ -188,16 +255,27 @@ def edit_row(project, row):
             "add a DO tile (an action)",
             "remove a WHEN tile",
             "remove a DO tile",
+            undo_label(),
         ], back_label="done")
         if choice is None:
             return row
+        if choice == 4:
+            # A row being edited may itself be undone out of existence, so the
+            # caller redraws from the project rather than from this row.
+            if undo(project):
+                return None
+            print("  nothing to undo")
+            ask("press enter")
+            continue
         if choice == 0:
             tile_use = pick_tile(tiles.SENSORS, project, "WHEN")
             if tile_use:
+                remember(project)
                 row["when"].append(tile_use)
         elif choice == 1:
             tile_use = pick_tile(tiles.ACTIONS, project, "DO")
             if tile_use:
+                remember(project)
                 row["do"].append(tile_use)
         elif choice in (2, 3):
             key = "when" if choice == 2 else "do"
@@ -207,12 +285,22 @@ def edit_row(project, row):
             header("Remove which tile?")
             index = menu([brain.describe_tile(registry, t) for t in row[key]])
             if index is not None:
+                remember(project)
                 row[key].pop(index)
 
 
+# What a screen returns when an undo has just replaced the project's contents.
+# Every screen below holds a reference into the project -- a character, its list
+# of rows -- and undo swaps those objects for the restored ones, so the old
+# references are dangling. Rather than trying to patch them up, the screens
+# unwind to characters_screen, which re-reads everything from the project each
+# time round its loop.
+UNDONE = "undone"
+
+
 def brain_screen(project, char):
-    rows = char["brain"]
     while True:
+        rows = char["brain"]
         header("Brain of '%s'  %s" % (char["kind"], char["glyph"]))
         if rows:
             for i, row in enumerate(rows, 1):
@@ -221,27 +309,43 @@ def brain_screen(project, char):
             print(" (empty -- this character just sits there)")
         print()
         choice = menu(["add a new row", "change a row", "delete a row",
-                       "move a row up"], back_label="done")
+                       "move a row up", undo_label()], back_label="done")
         if choice is None:
-            return
-        if choice == 0:
-            row = edit_row(project, {"when": [], "do": []})
-            if row["when"] or row["do"]:
-                rows.append(row)
+            return None
+        if choice == 4:
+            if undo(project):
+                return UNDONE
+            print("  nothing to undo")
+            ask("press enter")
+        elif choice == 0:
+            # The row joins the project before it is filled in, so that undo
+            # inside the row editor has something real to undo. If it is left
+            # empty it is taken away again, and forget_if_same then drops the
+            # mark, so adding a row and changing your mind costs no undo step.
+            remember(project)
+            rows.append({"when": [], "do": []})
+            if edit_row(project, rows[-1]) is None:
+                return UNDONE
+            if not (rows[-1]["when"] or rows[-1]["do"]):
+                rows.pop()
+                forget_if_same(project)
         elif choice == 1 and rows:
             header("Change which row?")
             index = menu([brain.describe_row(r) for r in rows])
             if index is not None:
-                edit_row(project, rows[index])
+                if edit_row(project, rows[index]) is None:
+                    return UNDONE
         elif choice == 2 and rows:
             header("Delete which row?")
             index = menu([brain.describe_row(r) for r in rows])
             if index is not None:
+                remember(project)
                 rows.pop(index)
         elif choice == 3 and len(rows) > 1:
             header("Move which row up?")
             index = menu([brain.describe_row(r) for r in rows])
             if index is not None and index > 0:
+                remember(project)
                 rows[index - 1], rows[index] = rows[index], rows[index - 1]
 
 
@@ -262,7 +366,8 @@ def character_screen(project, char):
         if choice is None:
             return True
         if choice == 0:
-            brain_screen(project, char)
+            if brain_screen(project, char) is UNDONE:
+                return UNDONE          # `char` is now a dangling reference
         elif choice == 1:
             char["glyph"] = (ask("One letter or symbol", char["glyph"]) or "?")[:1]
         elif choice == 2:
@@ -283,6 +388,10 @@ def character_screen(project, char):
                                     char["solid"])
         elif choice == 7:
             if ask_yes("Really delete '%s'" % char["kind"]):
+                # Deleting a character throws away every brain row it had, so
+                # this one is worth an undo mark even though the other settings
+                # on this screen are not -- see undo_label.
+                remember(project)
                 project["characters"].remove(char)
                 return True
 
@@ -309,6 +418,7 @@ def characters_screen(project):
                 print("  that name is taken")
                 continue
             glyph = (ask("One letter or symbol to draw it with", name[0]) or "?")[:1]
+            remember(project)
             char = brain.new_character(name, glyph)
             chars.append(char)
             character_screen(project, char)
@@ -317,6 +427,8 @@ def characters_screen(project):
             index = menu(["%s  %s" % (c["glyph"], c["kind"]) for c in chars])
             if index is not None:
                 character_screen(project, chars[index])
+        # Either way, the loop re-reads project["characters"] next time round,
+        # which is exactly what makes it safe to come back here after an undo.
 
 
 def world_screen(project):
@@ -511,5 +623,9 @@ def main_menu(project=None):
         elif label == "start a new game":
             name = ask("Name your game", "mygame").strip() or "mygame"
             project = brain.new_project(name)
+            forget_history()
         elif label == "open a game":
-            project = open_screen() or project
+            opened = open_screen()
+            if opened is not None:
+                project = opened
+                forget_history()   # undoing into the last game would swap it in

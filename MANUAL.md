@@ -533,6 +533,7 @@ anywhere, as plain `spark ...`, once you have run the install command.
 | `python3 tests/check_docs.py` | check the README still matches the code |
 | `python3 tests/check_sync.py` | check the GitHub push/pull logic, offline |
 | `python3 tests/check_places.py` | check the placeholder tiles and their sums |
+| `python3 tests/check_undo.py` | check the undo stack both brain editors keep |
 | `python3 tests/check_engines.py` | check both engines still play games identically |
 | `node tests/store.test.js` | check the editor's save and load logic |
 
