@@ -166,13 +166,32 @@ Six buttons and a box, filling the screen.
 | Button | Opens |
 |---|---|
 | play | the game — live through Termux, or the 3D view with no server |
-| edit | the top bar: open, save, new, rename, GitHub, sharing, and world settings |
-| characters | the cast strip and the character panel |
-| brain | the rows, the tile palette, undo, the ⊞ fold button and the bin |
-| tiles | your own tiles — the folded ones and the Python editor |
-| save | writes the game down. No page: it just saves and says where |
+| edit | open, new, rename, world, share, github |
+| characters | a button per character, then a button per setting |
+| brain | a button per row, then a button per tile in it |
+| tiles | your folded tiles, and the Python editor |
+| save | writes the game down. No screen: it saves and says where |
 
-**‹ back**, top left of any page, returns to the deck.
+**Every screen is the same formation.** There is no long page anywhere. What
+used to be a panel is now a screen of buttons:
+
+| Screen | Its buttons |
+|---|---|
+| edit | open · new · rename · world · share · github |
+| open | one per saved game |
+| world | width · height · speed · edges |
+| characters | one per character · + new |
+| one character | name · drawn as · colour · health · how many · role · solid · brain · delete |
+| brain | one per row · + row · undo |
+| one row | one per tile in it · + WHEN · + DO · ⊞ fold · delete row |
+| add a tile | your own tiles, then all thirty-five — **this is what the scrolling is for** |
+| your tiles | one per folded tile (tap to delete) · fold a row · python |
+
+`‹` beside the box goes back one screen; `/home` returns to the six.
+
+**The two things that are not buttons**, because they cannot be: a tile's
+settings, and the Python text editor. Both open over the deck with their own
+back button.
 
 ### The formation
 
@@ -200,6 +219,8 @@ and remembers which side you left it on. `/swap side chat left` and
 | `/pin "note"` | keeps a note. Quotes are optional: `/pin feed the bug` works |
 | `/pins` | lists them, numbered |
 | `/unpin 2` | removes number 2 |
+| `/back` | up one screen — the same as `‹` |
+| `/home` | back to the six |
 | `/swap side chat` | the box changes sides when sideways |
 | `/who` | who is connected |
 | `/clear` | empties the log |

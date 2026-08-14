@@ -16,6 +16,34 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ### Changed
 
+- **Every screen is now the six-button formation, not just the first one.** The
+  previous entry put a deck in front of the editor and left the editor behind it
+  as the same long scrolling page, which is not what was asked for. Now there is
+  no long page anywhere:
+
+  | Screen | Its buttons |
+  |---|---|
+  | edit | open · new · rename · world · share · github |
+  | characters | one per character · + new |
+  | one character | name · drawn as · colour · health · how many · role · solid · brain · delete |
+  | brain | one per row · + row · undo |
+  | one row | one per tile in it · + WHEN · + DO · ⊞ fold · delete row |
+  | add a tile | your own, then all thirty-five — what the scrolling was built for |
+  | your tiles | one per folded tile · fold a row · python |
+
+  A screen is a name and a list of buttons; opening one pushes it on a stack and
+  `‹` beside the box pops it, with `/back` and `/home` doing the same. Because
+  every screen is rebuilt from the game each time it is shown, no action has to
+  remember which buttons its change affected.
+
+  Two things stay as they were, because they genuinely are not buttons: a tile's
+  settings, and the Python text editor. Both open over the deck.
+
+  `tests/deck.test.js` now **builds every screen** against a stub page rather
+  than only reading the source — which is how it caught a screen referring to a
+  function that had been deleted: it parsed perfectly and would have failed only
+  when the button was pressed. 82 checks.
+
 - **The browser now opens on a deck: six buttons and a box to type in, filling
   the screen.** The buttons are **play, edit, characters, brain, tiles, save**,
   and each opens what used to be a section of one long page, with a **‹ back**

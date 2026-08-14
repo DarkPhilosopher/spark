@@ -126,6 +126,14 @@
   #keys button .sub{display:block;font-size:.62em;font-weight:400;
                     color:var(--dim);margin-top:3px}
 
+  #crumb{display:flex;gap:6px;align-items:center;flex:0 0 auto}
+  #crumb button{flex:0 0 auto;padding:6px 12px;font-size:16px;line-height:1}
+  #crumb button:disabled{opacity:.35}
+  #screen{color:var(--dim);font-size:12px;overflow:hidden;text-overflow:ellipsis;
+          white-space:nowrap}
+  #keys button.mine{background:#2c2440;border-color:#8c6fd0}
+  #keys button.foreign{opacity:.6;border-style:dashed}
+  #keys button.danger{border-color:var(--bad);color:#ff9a94}
   #log{flex:1;min-height:0;overflow-y:auto;background:var(--panel);
        border:1px solid var(--line);border-radius:12px;padding:8px;
        font-size:12px;line-height:1.4;display:flex;flex-direction:column;
@@ -248,6 +256,10 @@
 <div id="deck">
   <div id="keys"></div>
   <div id="talk">
+    <div id="crumb">
+      <button id="backkey" type="button" title="back">‹</button>
+      <span id="screen"></span>
+    </div>
     <div id="log"></div>
     <form id="saybar" autocomplete="off">
       <input id="saybox" placeholder="/help, or say something"
@@ -851,7 +863,12 @@ function onDragEnd(e) {
 
 // However the settings dialog is left -- done, remove, Escape, or tapping the
 // backdrop -- the mark openParams laid down is dropped again if nothing moved.
-$("#dlg").addEventListener("close", forgetIfSame);
+$("#dlg").addEventListener("close", () => {
+  forgetIfSame();
+  // A tile's settings are the one thing that is still a dialog, so the screen
+  // behind it has to be redrawn by hand once it closes.
+  if (stack.length) renderDeck();
+});
 
 // chips answer a tap by opening their parameters
 document.addEventListener("click", e => {
@@ -1054,55 +1071,337 @@ function openGitHubSettings() {
 
 const LS_SWAP = "spark:chatside", LS_PINS = "spark:pins";
 
-const DECK = [
-  {key: "play",       sub: "run the game",        go: () => deckPlay()},
-  {key: "edit",       sub: "open / save / new",   go: () => openPage("edit")},
-  {key: "characters", sub: "the cast",            go: () => openPage("characters")},
-  {key: "brain",      sub: "rows and tiles",      go: () => openPage("brain")},
-  {key: "tiles",      sub: "yours, and Python",   go: () => openPage("tiles")},
-  {key: "save",       sub: "write it down",       go: () => deckSave()},
-];
+/* Every screen is the same six-button formation.
+ *
+ * A screen is a list of buttons and a name. Opening one pushes it on a stack;
+ * `‹` beside the box pops it. There is no long scrolling page anywhere -- when
+ * a list is longer than six (the cast, the rows, the tile palette, all of
+ * them), the button area scrolls in the same formation rather than changing
+ * shape.
+ *
+ * Two things genuinely are not buttons and stay as they were: a tile's settings
+ * (the dialog), and the Python text editor. Both open over the deck. */
 
-// Which parts of the old page each button shows. Everything not listed for a
-// page is hidden while that page is open.
-const PAGES = {
-  edit:       {name: "edit", show: ["#top", "#world-details"]},
-  characters: {name: "characters", show: ["#cast-h", "#cast", "#props"]},
-  brain:      {name: "brain", show: ["#brain-h", "#rows", "#rowbar", "#palette",
-                                     "#trash"]},
-  tiles:      {name: "tiles", show: ["#codepanel", "#palette", "#tilesnote"]},
-};
+const stack = [];                 // screens, deepest first
+let pinned = [];                  // notes kept by /pin, in this browser
 
-let pinned = [];
-
-function renderKeys() {
-  const box = $("#keys"); box.textContent = "";
-  for (const item of DECK) {
-    const b = el("button", null, item.key);
-    b.append(el("span", "sub", item.sub));
-    b.onclick = item.go;
-    box.append(b);
-  }
+function deckPush(build) {
+  stack.push(build);
+  renderDeck();
 }
 
-// The four that change the game. A guest who joined to play or watch gets the
-// deck and the chat, but not these -- the server would refuse the saves anyway,
-// so saying it here is a kindness rather than a lock.
-const EDIT_PAGES = ["edit", "characters", "brain", "tiles"];
+function deckPop() {
+  if (stack.length <= 1) return;
+  stack.pop();
+  renderDeck();
+}
 
-function openPage(which) {
-  if (EDIT_PAGES.includes(which) && !amEditor())
-    return note("you joined as a guest — you can play and talk here, "
-                + "not change the game", "bad");
-  const page = PAGES[which];
-  if (!page) return;
+function deckHome() {
+  stack.length = 0;
+  stack.push(homeScreen);
+  renderDeck();
+}
+
+/* Rebuild the current screen from scratch. Every action ends by calling this,
+   so nothing has to remember which buttons its change affected. */
+function renderDeck() {
+  if (!stack.length) stack.push(homeScreen);
+  const screen = stack[stack.length - 1]();
+  const box = $("#keys");
+  box.textContent = "";
+  for (const item of screen.items || []) {
+    if (!item) continue;
+    const b = el("button", item.kind || null, item.key);
+    if (item.sub) b.append(el("span", "sub", item.sub));
+    b.onclick = async () => { await item.go(); };
+    box.append(b);
+  }
+  $("#screen").textContent = screen.name || "";
+  $("#backkey").disabled = stack.length <= 1;
+  box.scrollTop = 0;
+}
+
+const item = (key, sub, go, kind) => ({key, sub, go, kind});
+
+// -- the six you land on ----------------------------------------------------
+
+function homeScreen() {
+  // A guest who joined to play or watch gets play and the box; the four that
+  // change the game would be refused by the server anyway, so they say so here
+  // rather than opening on to nothing.
+  const guest = !amEditor();
+  const barred = what => () => note("you joined as a guest — you can play and "
+                                    + "talk here, not " + what, "bad");
+  return {name: project ? project.name : "spark", items: [
+    item("play", "run the game", deckPlay),
+    item("edit", guest ? "guests cannot" : "open / new / share",
+         guest ? barred("open or save games") : () => deckPush(editScreen),
+         guest ? "foreign" : null),
+    item("characters", guest ? "guests cannot" : castCount(),
+         guest ? barred("change the cast") : () => deckPush(castScreen),
+         guest ? "foreign" : null),
+    item("brain", guest ? "guests cannot" : brainCount(),
+         guest ? barred("change a brain") : () => deckPush(brainScreen),
+         guest ? "foreign" : null),
+    item("tiles", guest ? "guests cannot" : tilesCount(),
+         guest ? barred("make tiles") : () => deckPush(tilesScreen),
+         guest ? "foreign" : null),
+    item("save", guest ? "guests cannot" : "write it down",
+         guest ? barred("save") : deckSave, guest ? "foreign" : null),
+  ]};
+}
+
+const castCount = () => !project ? "" :
+  chars().length + (chars().length === 1 ? " character" : " characters");
+const brainCount = () => {
+  const c = cur();
+  return !c ? "nobody yet"
+            : c.kind + " — " + c.brain.length +
+              (c.brain.length === 1 ? " row" : " rows");
+};
+const tilesCount = () => {
+  const mine = project ? myTiles().length : 0;
+  return mine ? mine + " of your own" : "make your own";
+};
+
+// -- edit -------------------------------------------------------------------
+
+function editScreen() {
+  return {name: "edit", items: [
+    item("open", "a saved game", () => deckPush(gamesScreen)),
+    item("new", "start again", async () => {
+      const name = (prompt("name your game", "mygame") || "").trim();
+      if (!name) return;
+      project = blankProject(name);
+      past = []; paintUndo(); charIdx = 0; rowIdx = 0;
+      await loadGames(project.name);
+      renderAll(); deckHome();
+      note("new game “" + name + "” — press save to write it down");
+    }),
+    item("rename", project ? project.name : "", async () => {
+      const was = project.name;
+      const now = (prompt("new name for this game", was) || "").trim();
+      if (!now || now === was) return;
+      project.name = now;
+      const out = await store.saveGame(project);
+      if (out.error) { project.name = was; return note(out.error, "bad"); }
+      if (confirm("delete the old copy, “" + was + "”?"))
+        await store.deleteGame(was);
+      await loadGames(project.name);
+      renderDeck();
+      note("renamed to " + project.name);
+    }),
+    item("world", worldSummary(), () => deckPush(worldScreen)),
+    item("share", store.mode === "server" ? "invite people" : "needs the server",
+         () => {
+           if (store.mode !== "server")
+             return note("sharing needs `python3 spark.py host`", "bad");
+           openHostPanel();
+         }),
+    item("github", ghConfig() ? "connected" : "connect a token",
+         openGitHubSettings),
+  ]};
+}
+
+const worldSummary = () => project
+  ? project.world.width + "×" + project.world.height +
+    (project.world.wrap ? " wrap" : "")
+  : "";
+
+function worldScreen() {
+  const w = project.world;
+  const ask = (label, key, low, high) => item(label, String(w[key] ?? ""),
+    () => {
+      const got = parseInt(prompt(label, w[key]), 10);
+      if (!isNaN(got)) { w[key] = Math.max(low, Math.min(high, got)); renderDeck(); }
+    });
+  return {name: "world", items: [
+    ask("width", "width", 5, 70),
+    ask("height", "height", 5, 20),
+    ask("speed", "speed", 1, 30),
+    item("edges", w.wrap ? "wrap around" : "solid",
+         () => { w.wrap = !w.wrap; renderDeck(); }),
+  ]};
+}
+
+function gamesScreen() {
+  return {name: "open a game", items: (gameNames || []).map(n =>
+    item(n, n === (project && project.name) ? "open now" : "", async () => {
+      await openGame(n);
+      deckHome();
+    }))};
+}
+
+// -- characters -------------------------------------------------------------
+
+function castScreen() {
+  const items = chars().map((c, i) => item(c.glyph + "  " + c.kind,
+    c.brain.length + (c.brain.length === 1 ? " row" : " rows"),
+    () => { charIdx = i; rowIdx = 0; renderAll(); deckPush(oneCharScreen); }));
+  items.push(item("+ new", "add a character", () => {
+    const name = (prompt("name it (one word)", "thing" + chars().length) || "")
+      .trim();
+    if (!name) return;
+    if (chars().some(c => c.kind === name)) return note("that name is taken",
+                                                       "bad");
+    remember();
+    chars().push(newChar(name, name[0]));
+    charIdx = chars().length - 1; rowIdx = 0;
+    renderAll(); renderDeck();
+  }));
+  return {name: "characters", items};
+}
+
+function oneCharScreen() {
+  const c = cur();
+  if (!c) return {name: "characters", items: []};
+  const type = (label, key, cast) => item(label, String(c[key]), () => {
+    const got = prompt(label, c[key]);
+    if (got === null) return;
+    remember();
+    c[key] = cast(got);
+    renderAll(); renderDeck();
+  });
+  return {name: c.kind, items: [
+    type("name", "kind", v => v.trim() || c.kind),
+    type("drawn as", "glyph", v => (v || "?").slice(0, 1)),
+    item("colour", c.color, () => deckPush(() => ({
+      name: "colour", items: catalog.colors.map(col =>
+        item(col, col === c.color ? "now" : "", () => {
+          remember(); c.color = col; renderAll(); deckPop();
+        }))}))),
+    type("health", "health", v => Math.max(1, parseInt(v, 10) || 1)),
+    type("how many at start", "count", v => Math.max(0, parseInt(v, 10) || 0)),
+    item("role", c.role, () => {
+      remember(); c.role = c.role === "player" ? "prop" : "player";
+      renderAll(); renderDeck();
+    }),
+    item("solid", c.solid ? "blocks others" : "walk through", () => {
+      remember(); c.solid = !c.solid; renderAll(); renderDeck();
+    }),
+    item("brain", c.brain.length + " rows",
+         () => deckPush(brainScreen)),
+    item("delete", "remove " + c.kind, () => {
+      if (!confirm("delete " + c.kind + "?")) return;
+      remember();
+      chars().splice(charIdx, 1); charIdx = 0; rowIdx = 0;
+      renderAll(); deckPop();
+    }, "danger"),
+  ]};
+}
+
+// -- brain ------------------------------------------------------------------
+
+function brainScreen() {
+  const c = cur();
+  if (!c) return {name: "brain", items: [
+    item("no character yet", "make one first", () => deckPush(castScreen))]};
+  const items = c.brain.map((row, r) => item(
+    "row " + (r + 1),
+    (row.when.length || 0) + " when · " + (row.do.length || 0) + " do",
+    () => { rowIdx = r; renderRows(); deckPush(oneRowScreen); }));
+  items.push(item("+ row", "a new one", () => {
+    remember();
+    c.brain.push({when: [], do: []});
+    rowIdx = c.brain.length - 1;
+    renderRows(); renderDeck();
+  }));
+  items.push(item("undo", past.length ? past.length + " to go" : "nothing yet",
+                  () => { undo(); renderDeck(); }));
+  return {name: "brain of " + c.kind, items};
+}
+
+function oneRowScreen() {
+  const c = cur();
+  const row = c && c.brain[rowIdx];
+  if (!row) return brainScreen();
+  const chip = (half, use, i) => item(
+    describe(half, use), half.toUpperCase() + (fitsHalf(half, use.tile) ? ""
+                                               : " · does not fire here"),
+    () => openParams(half, use, rowIdx, i),
+    fitsHalf(half, use.tile) ? null : "foreign");
+  const items = [];
+  row.when.forEach((use, i) => items.push(chip("when", use, i)));
+  row.do.forEach((use, i) => items.push(chip("do", use, i)));
+  items.push(item("+ WHEN", "a sensor", () => pickTileScreen("when")));
+  items.push(item("+ DO", "an action", () => pickTileScreen("do")));
+  items.push(item("⊞ fold", "into one tile", () => {
+    foldRow(rowIdx); renderDeck();
+  }));
+  items.push(item("delete row", "", () => {
+    if (!confirm("delete row " + (rowIdx + 1) + "?")) return;
+    remember();
+    c.brain.splice(rowIdx, 1);
+    rowIdx = Math.max(0, rowIdx - 1);
+    renderRows(); deckPop();
+  }, "danger"));
+  return {name: "row " + (rowIdx + 1) + " of " + c.kind, items};
+}
+
+/* The palette, as buttons. Thirty-five of them, so this is the screen the
+   scrolling was built for. */
+function pickTileScreen(half) {
+  side = half;
+  deckPush(() => {
+    const items = [];
+    for (const own of myTiles())
+      items.push(item("⊞ " + own.name,
+                      (own[half] || []).length + " inside",
+                      () => { addTile({id: "combo", params: [],
+                                       args: {name: own.name}});
+                              deckPop(); }, "mine"));
+    const here = (half === "when" ? catalog.sensors : catalog.actions)
+      .filter(d => d.id !== "combo");
+    const there = (half === "when" ? catalog.actions : catalog.sensors)
+      .filter(d => d.id !== "combo");
+    for (const def of here)
+      items.push(item(def.label, "", () => { addTile(def); deckPop(); }));
+    if (showEverything)
+      for (const def of there)
+        items.push(item(def.label, "does not fire in this half",
+                        () => { addTile(def); deckPop(); }, "foreign"));
+    return {name: "add a " + half.toUpperCase() + " tile", items};
+  });
+}
+
+// -- tiles ------------------------------------------------------------------
+
+function tilesScreen() {
+  const items = myTiles().map(own => item("⊞ " + own.name,
+    (own.when || []).length + " when · " + (own.do || []).length + " do",
+    () => {
+      if (confirm("delete your tile " + own.name + "?")) {
+        unfold(own.name); renderDeck();
+      }
+    }, "mine"));
+  items.push(item("fold a row", "make one from a row",
+                  () => deckPush(brainScreen)));
+  items.push(item("python", codeSummary(), () => {
+    if ($("#codepanel").hidden)
+      return note("writing Python is for the owner, with the server running",
+                  "bad");
+    openOverlay("#codepanel", "python tiles");
+  }));
+  return {name: "your tiles", items};
+}
+
+const codeSummary = () => {
+  if ($("#codepanel") && $("#codepanel").hidden) return "owner only";
+  const on = codeFiles.filter(f => f.approved).length;
+  return codeFiles.length ? on + " on of " + codeFiles.length : "write one";
+};
+
+// -- the two things that are not buttons ------------------------------------
+
+function openOverlay(sel, name) {
   $("#deck").classList.add("off");
   $("#page").hidden = false;
-  $("#pagename").textContent = page.name;
-  for (const sel of PAGE_PARTS)
-    document.querySelectorAll(sel).forEach(n => {
-      n.style.display = page.show.includes(sel) ? "" : "none";
+  $("#pagename").textContent = name;
+  for (const part of PAGE_PARTS)
+    document.querySelectorAll(part).forEach(n => {
+      n.style.display = part === sel ? "" : "none";
     });
+  if (sel === "#codepanel") $("#codepanel").open = true;
   window.scrollTo(0, 0);
 }
 
@@ -1113,6 +1412,7 @@ const PAGE_PARTS = ["#top", "#world-details", "#cast-h", "#cast", "#props",
 function closePage() {
   $("#page").hidden = true;
   $("#deck").classList.remove("off");
+  renderDeck();
 }
 
 async function deckSave() {
@@ -1120,6 +1420,7 @@ async function deckSave() {
   const out = await store.saveGame(project);
   if (out.error) return note(out.error, "bad");
   await loadGames(project.name);
+  renderDeck();
   note("saved to " + out.where + (out.warn ? " — " + out.warn : ""));
 }
 
@@ -1176,8 +1477,9 @@ function swapSide(to) {
 
 const COMMANDS = {
   help() {
-    note("buttons: " + DECK.map(d => d.key).join(", "), "pin");
+    note("buttons: play, edit, characters, brain, tiles, save", "pin");
     note("/play /edit /characters /brain /tiles /save — same as the buttons");
+    note("/back — up one screen.  /home — back to the six");
     note('/pin "note" — keep a note.  /pins — list them.  /unpin 2 — remove one');
     note("/swap side chat — put the box on the other side when sideways");
     note("/who — who is connected.  /clear — empty this log");
@@ -1215,14 +1517,23 @@ const COMMANDS = {
     for (const p of people) note(p.name + " — " + p.role, "pin");
   },
 };
-for (const item of DECK) COMMANDS[item.key] = () => item.go();
+// The six, reachable by name as well as by button.
+COMMANDS.play = deckPlay;
+COMMANDS.save = deckSave;
+COMMANDS.edit = () => deckPush(editScreen);
+COMMANDS.characters = () => deckPush(castScreen);
+COMMANDS.brain = () => deckPush(brainScreen);
+COMMANDS.tiles = () => deckPush(tilesScreen);
+COMMANDS.back = deckPop;
+COMMANDS.home = deckHome;
 
 function startDeck() {
-  renderKeys();
   loadPins();
   if (localStorage.getItem(LS_SWAP) === "left")
     $("#deck").classList.add("swapped");
-  closePage();
+  $("#page").hidden = true;
+  $("#deck").classList.remove("off");
+  deckHome();
   note("six buttons above. type /help for what this box can do.");
   if (pinned.length)
     note(pinned.length + " note" + (pinned.length === 1 ? "" : "s") +
@@ -1721,8 +2032,11 @@ $("#people-btn").onclick = openHostPanel;
 
 // ---------------------------------------------------------------- wiring up
 
+let gameNames = [];
+
 async function loadGames(pick) {
   const names = await store.listGames();
+  gameNames = names || [];               // the deck's "open" screen reads this
   const sel = $("#games"); sel.textContent = "";
   for (const n of names) {
     const o = el("option", null, n); o.value = n;
@@ -1810,6 +2124,7 @@ $("#undo").onclick = undo;
 // -- the deck's own wiring --------------------------------------------------
 
 $("#back").onclick = closePage;
+$("#backkey").onclick = deckPop;
 $("#saybar").onsubmit = e => {
   e.preventDefault();
   const box = $("#saybox");

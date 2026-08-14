@@ -13,6 +13,14 @@ const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 const src = html.slice(html.indexOf("const LS_SWAP"),
                        html.indexOf("// ------------------------------------------- your own tiles, in Python"));
 
+// Every screen must be a list of buttons, so that the formation is the same
+// wherever you are -- that is the whole point of the redesign. These are read
+// straight out of the source rather than run, because building them needs the
+// rest of the page.
+const SCREENS = ["homeScreen", "editScreen", "worldScreen", "gamesScreen",
+                 "castScreen", "oneCharScreen", "brainScreen", "oneRowScreen",
+                 "tilesScreen"];
+
 let pass = 0, fail = 0;
 const ok = (name, cond, extra) => {
   if (cond) { pass++; console.log("  ok   " + name); }
@@ -75,7 +83,7 @@ function harness(opts = {}) {
     ${src}
     // things the deck leans on that live elsewhere in the page
     module.exports = {runSaid, COMMANDS, quoted, pinned: () => pinned,
-                      DECK, note, classes, log, store,
+                      note, classes, log, store,
                       swapped: () => classes.has("swapped")};
   `;
   const mod = {exports: {}};
@@ -102,15 +110,34 @@ function classesOf(set) { return set; }
 
 (async () => {
 
-console.log("what the box understands\n");
+console.log("every screen is buttons, not a page\n");
+{
+  for (const name of SCREENS)
+    ok(name + " exists", new RegExp("function " + name + "\\b").test(src));
+  // Each screen returns {name, items:[...]} -- if one ever returned markup
+  // instead, the formation would break on that screen only, which is exactly
+  // the thing the redesign was meant to end.
+  for (const name of SCREENS) {
+    const at = src.indexOf("function " + name);
+    const body = src.slice(at, src.indexOf("\nfunction ", at + 10));
+    ok(name + " returns items", /items\s*[:=]/.test(body), name);
+  }
+  ok("the six on the home screen are the ones asked for",
+     ["play", "edit", "characters", "brain", "tiles", "save"].every(k =>
+       new RegExp('item\\("' + k + '"').test(src)));
+  ok("there is a back that pops one screen", /function deckPop\b/.test(src));
+  ok("...and a way home", /function deckHome\b/.test(src));
+  ok("the tile palette is a screen too, so it scrolls in formation",
+     /function pickTileScreen\b/.test(src));
+}
+
+console.log("\nwhat the box understands");
 {
   const d = harness();
-  ok("the six buttons are the ones asked for",
-     d.DECK.map(x => x.key).join(",") === "play,edit,characters,brain,tiles,save",
-     d.DECK.map(x => x.key).join(","));
   for (const key of ["play", "edit", "characters", "brain", "tiles", "save"])
     ok("/" + key + " is a command too", typeof d.COMMANDS[key] === "function");
-  for (const key of ["help", "pin", "pins", "unpin", "swap", "clear", "who"])
+  for (const key of ["help", "pin", "pins", "unpin", "swap", "clear", "who",
+                     "back", "home"])
     ok("/" + key + " exists", typeof d.COMMANDS[key] === "function");
 }
 
@@ -180,6 +207,111 @@ console.log("\nwhat is a command and what is chat");
   const before = d.log.length;
   await d.runSaid("   ");
   ok("an empty line does nothing at all", d.log.length === before);
+}
+
+/* Actually build each screen, rather than only reading the source.
+ *
+ * This is the part that earns its keep: it is how the missing deckSave was
+ * found. A screen that references something that no longer exists parses
+ * perfectly and only falls over when somebody presses the button. */
+function screens() {
+  const project = {
+    name: "probe", world: {width: 30, height: 14, wrap: false, speed: 6},
+    tiles: [{name: "hunt", when: [{tile: "see", args: {}}],
+             do: [{tile: "move", args: {}}]}],
+    characters: [
+      {kind: "hero", glyph: "@", color: "cyan", health: 3, count: 1,
+       solid: false, role: "player",
+       brain: [{when: [{tile: "always", args: {}}],
+                do: [{tile: "move", args: {dir: "up"}}]}]},
+      {kind: "apple", glyph: "o", color: "green", health: 1, count: 2,
+       solid: false, role: "prop", brain: []},
+    ],
+  };
+  const catalog = {
+    colors: ["white", "red", "cyan"],
+    sensors: [{id: "always", label: "always", params: []},
+              {id: "combo", label: 'the tile called "{name}"', params: []}],
+    actions: [{id: "move", label: "move {dir}", params: []},
+              {id: "combo", label: 'the tile called "{name}"', params: []}],
+  };
+  const names = ["homeScreen", "editScreen", "worldScreen", "gamesScreen",
+                 "castScreen", "oneCharScreen", "brainScreen", "oneRowScreen",
+                 "tilesScreen"];
+  const body = `
+    ${src}
+    module.exports = {${names.join(", ")}, deckPush, deckPop, deckHome,
+                      renderDeck, stack};
+  `;
+  const nodes = {
+    "#keys": {textContent: "", scrollTop: 0, append() {}},
+    "#screen": {textContent: ""},
+    "#backkey": {disabled: false},
+    "#log": {children: [], append() {}, scrollTop: 0, scrollHeight: 0},
+    "#deck": {classList: {add() {}, remove() {}, toggle() {},
+                          contains: () => false}},
+    "#page": {hidden: true},
+    "#codepanel": {hidden: false, open: false},
+  };
+  const mod = {exports: {}};
+  const args = {
+    module: mod,
+    $: sel => nodes[sel] || {textContent: "", hidden: false, append() {},
+                             classList: {add() {}, remove() {}, toggle() {},
+                                         contains: () => false}},
+    el: (tag, cls, text) => ({tag, cls, text: text ?? "", append() {}}),
+    document: {createTextNode: t => ({text: t}), querySelectorAll: () => []},
+    localStorage: {getItem: () => null, setItem() {}, removeItem() {}},
+    window: {scrollTo() {}}, location: {href: ""},
+    project, catalog, store: {mode: "server", saveGame: async () => ({}),
+                              deleteGame: async () => {}},
+    chars: () => project.characters,
+    cur: () => project.characters[0],
+    myTiles: () => project.tiles,
+    past: [], codeFiles: [], showEverything: true,
+    charIdx: 0, rowIdx: 0, side: "when",
+    amEditor: () => true,
+    describe: (s, use) => use.tile,
+    fitsHalf: () => true,
+    ghConfig: () => null,
+    note() {}, say() {}, renderAll() {}, renderRows() {}, paintUndo() {},
+    remember() {}, undo() {}, addTile() {}, openParams() {}, foldRow() {},
+    unfold() {}, openHostPanel() {}, openGitHubSettings() {},
+    openGame: async () => {}, loadGames: async () => {},
+    blankProject: n => ({name: n, characters: [], tiles: [], world: {}}),
+    newChar: (k, g) => ({kind: k, glyph: g, brain: []}),
+    startLive() {}, authHeaders: () => ({}), fetch: async () => ({ok: true}),
+    btoa: s => Buffer.from(s, "binary").toString("base64"),
+    unescape: s => s, encodeURIComponent: s => s,
+    gameNames: ["probe", "chase"], liveSnap: null,
+    me: {role: "owner", name: "host"},
+  };
+  new Function(...Object.keys(args), body)(...Object.values(args));
+  return {api: mod.exports, names};
+}
+
+console.log("\nevery screen actually builds");
+{
+  const {api, names} = screens();
+  for (const name of names) {
+    let out = null, err = null;
+    try { out = api[name](); } catch (e) { err = e.message; }
+    ok(name + " builds without falling over", out && Array.isArray(out.items),
+       err || JSON.stringify(out));
+    if (out && out.items)
+      ok("...and every button on it does something",
+         out.items.filter(Boolean).every(i => typeof i.go === "function"),
+         name);
+  }
+  const {api: a2} = screens();
+  ok("home is the bottom of the stack, so back stops there",
+     (a2.deckHome(), a2.stack.length === 1), a2.stack.length);
+  a2.deckPush(a2.editScreen);
+  ok("opening a screen pushes it", a2.stack.length === 2);
+  a2.deckPop();
+  ok("back pops it", a2.stack.length === 1);
+  a2.deckPop();
+  ok("back at the bottom does nothing", a2.stack.length === 1);
 }
 
 console.log("\n" + pass + " passed, " + fail + " failed");

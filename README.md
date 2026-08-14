@@ -95,8 +95,14 @@ The browser opens on **six buttons and a box to type in**, filling the screen.
 | **tiles** | your own — folded ones and Python ones |
 | **save** | write the game down |
 
-Each opens a page with a **‹ back** button. Nothing was taken away; the buttons
-are a way in, not a smaller Spark.
+**Every screen is the same six-button formation** — not just this one. Opening
+*characters* gives you a button per character; opening one of those gives you a
+button per setting; *brain* gives a button per row, and a row gives a button per
+tile. The tile palette is buttons too, all thirty-five of them, which is what
+the scrolling is for. `‹` beside the box goes back up one.
+
+Only two things are not buttons, because they cannot be: a tile's settings, and
+the Python text editor. Both open over the deck.
 
 **How it sits on the screen.** Eight cells. Six are buttons, and the two left
 over are the box.
@@ -127,6 +133,7 @@ world:
 | `/pin "feed the bug first"` | keep a note. Quotes optional |
 | `/pins` | list them |
 | `/unpin 2` | remove one |
+| `/back` `/home` | up one screen; back to the six |
 | `/swap side chat` | put the box on the other side when the phone is sideways |
 | `/who` | who is connected |
 | `/clear` | empty the log |
@@ -811,7 +818,7 @@ Once `python3 spark.py install` has been run, every one of these works as plain
     engine/tunnel.py     finds and runs cloudflared or ngrok for public play
     engine/rng.py        seeded dice, so both engines can roll the same numbers
     tests/store.test.js  17 checks on the editor's save and load logic
-    tests/deck.test.js   37 checks on the six buttons and the box you type in
+    tests/deck.test.js   82 checks: every screen builds, and what the box understands
     tests/check_docs.py  fails if this README has drifted from the code
     tests/check_sync.py  checks the GitHub push/pull logic, without the network
     tests/check_permissions.py  checks a guest can only do what their code allows
