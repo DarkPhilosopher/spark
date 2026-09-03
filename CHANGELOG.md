@@ -54,6 +54,14 @@ Each entry says **what** changed and, where it is not obvious, **why**.
   the original settings first and overriding just the four that can
   actually change live.
 
+  **A second one, caught right after:** nothing ever removed a scattered
+  object once it existed, or forgot a chunk once it had scattered one —
+  a long exploring session would just keep adding more things to
+  simulate and render, forever. Fixed the same day: chunks (and whatever
+  they scattered) more than 60 cells behind the player are now forgotten
+  and removed; wandering back in re-scatters that ground fresh, same as
+  it had never loaded.
+
 - **Mesh Creator and Build mode.** The Mesh Creator (🧩) builds a custom
   shape out of several cube/sphere parts, each with its own offset, size,
   and colour, previewed live in a second WebGL view (the same `Renderer`
