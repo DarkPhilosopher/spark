@@ -334,16 +334,16 @@
            display:flex;gap:8px;padding:6px}
   #quickbar .bubble{font-size:16px}
 
-  /* Mesh Creator and Build/palette -- same near-fullscreen, inset-from-
-     every-edge shape as Properties, and the same game colours (this pair
-     is not the Backpack's deliberate exception). */
-  #mesh-modal,#palette-modal{position:fixed;inset:6vh 6vw;z-index:17;
-                             display:none;flex-direction:column;
+  /* Mesh Creator, Build/palette, and the Object Inspector -- same near-
+     fullscreen, inset-from-every-edge shape as Properties, and the same
+     game colours (this trio is not the Backpack's deliberate exception). */
+  #mesh-modal,#palette-modal,#inspect-modal{position:fixed;inset:6vh 6vw;
+                             z-index:17;display:none;flex-direction:column;
                              background:rgba(74,80,88,.96);
                              border:1px solid var(--line);border-radius:12px;
                              overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.35);
                              backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
-  #mesh-modal.on,#palette-modal.on{display:flex}
+  #mesh-modal.on,#palette-modal.on,#inspect-modal.on{display:flex}
   #mesh-titlebar{display:flex;align-items:center;gap:8px;padding:12px 14px;
                  font-weight:700;border-bottom:1px solid var(--line);flex:0 0 auto}
   #mesh-titlebar span{margin-right:auto}
@@ -580,6 +580,32 @@
   <div id="mesh-body">
     <div class="row"><button id="palette-mesh-creator">🧩 open the Mesh Creator</button></div>
     <div id="palette-list"></div>
+  </div>
+</div>
+
+<!-- Object Inspector: colour, resize, and relocate whatever you're
+     touching -- or, if you have a ghost pending, that instead, so a
+     newly-spawned object can be set up before it's even confirmed. Local
+     play only, same as Build mode: it writes straight into the live Thing
+     instance, which only exists for the copy of the game in this tab. -->
+<div id="inspect-modal">
+  <div id="mesh-titlebar">
+    <span id="inspect-title">🎯 Object</span>
+    <button id="inspect-close" title="close">✕</button>
+  </div>
+  <div id="mesh-body">
+    <div class="row">
+      <label style="flex:1">color <select id="inspect-color"></select></label>
+    </div>
+    <div class="row">
+      <label style="flex:2">size <input id="inspect-size" type="range" min="20" max="300" step="1" value="100"></label>
+      <input id="inspect-size-num" type="number" step="1" min="20" max="300" value="100">
+    </div>
+    <div class="row">
+      <label style="flex:1">x <input id="inspect-x" type="number" step="1"></label>
+      <label style="flex:1">y <input id="inspect-y" type="number" step="1"></label>
+      <label style="flex:1">z (altitude) <input id="inspect-z" type="number" step="1" min="0" max="8"></label>
+    </div>
   </div>
 </div>
 
@@ -2716,6 +2742,90 @@ function setupPalette() {
   };
 }
 
+/* ---------------------------------------------------------------------
+ * Object Inspector -- colour, resize, and relocate whatever you're
+ * touching, or your pending ghost if you have one (so a newly-spawned
+ * object can be set up before it's even confirmed). Local play only,
+ * same reasoning as Build mode: it writes straight into the live Thing
+ * instance, which only exists for the copy of the game in this tab.
+ * ------------------------------------------------------------------- */
+let inspectTarget = null;
+
+function findPlayer() {
+  return world && world.things.find(t => t.role === "player");
+}
+
+// A pending ghost first (the "as I'm spawning one" case), else whatever
+// is within one square -- the same reach the touch sensor itself uses.
+function findInspectTarget() {
+  const player = findPlayer();
+  if (!player) return null;
+  const ghost = world.things.find(t => t.alive && t.ghost && t.owner === player);
+  if (ghost) return ghost;
+  return world.things.find(t => t.alive && t !== player &&
+    Math.max(Math.abs(t.x - player.x), Math.abs(t.y - player.y)) <= 1) || null;
+}
+
+function openInspector() {
+  if (!world) { drawerToast("not available in LIVE mode"); return; }
+  const target = findInspectTarget();
+  if (!target) { drawerToast("touch something, or start placing one, first"); return; }
+  inspectTarget = target;
+  $("#inspect-title").textContent = "🎯 " + target.kind + (target.ghost ? " (still being placed)" : "");
+  $("#inspect-color").value = target.color || "white";
+  const size = target.size === undefined ? 100 : target.size;
+  $("#inspect-size").value = size;
+  $("#inspect-size-num").value = size;
+  $("#inspect-x").value = target.x;
+  $("#inspect-y").value = target.y;
+  $("#inspect-z").value = target.z || 0;
+  $("#inspect-modal").classList.add("on");
+}
+
+function applyInspectorSize(fromSlider) {
+  if (!inspectTarget || !inspectTarget.alive) return;
+  const raw = fromSlider ? $("#inspect-size").value : $("#inspect-size-num").value;
+  const v = Math.max(20, Math.min(300, parseFloat(raw) || 100));
+  $("#inspect-size").value = v;
+  $("#inspect-size-num").value = v;
+  inspectTarget.size = v;
+}
+
+function applyInspectorPosition() {
+  if (!inspectTarget || !inspectTarget.alive || !world) return;
+  let x = Math.round(parseFloat($("#inspect-x").value));
+  let y = Math.round(parseFloat($("#inspect-y").value));
+  if (!Number.isFinite(x)) x = inspectTarget.x;
+  if (!Number.isFinite(y)) y = inspectTarget.y;
+  if (!world.inBounds(x, y)) { drawerToast("that's outside the world"); return; }
+  inspectTarget.x = x;
+  inspectTarget.y = y;
+  const z = parseFloat($("#inspect-z").value);
+  inspectTarget.z = Number.isFinite(z) ? Math.max(0, Math.min(8, z)) : 0;
+}
+
+function setupInspector() {
+  const colorSelect = $("#inspect-color");
+  for (const name of Object.keys(COLOR_RGB)) {
+    const opt = document.createElement("option");
+    opt.value = name; opt.textContent = name;
+    colorSelect.appendChild(opt);
+  }
+  colorSelect.addEventListener("change", () => {
+    if (inspectTarget && inspectTarget.alive) inspectTarget.color = colorSelect.value;
+  });
+  $("#inspect-size").addEventListener("input", () => applyInspectorSize(true));
+  $("#inspect-size-num").addEventListener("input", () => applyInspectorSize(false));
+  for (const id of ["inspect-x", "inspect-y", "inspect-z"]) {
+    $("#" + id).addEventListener("input", applyInspectorPosition);
+    $("#" + id).addEventListener("change", applyInspectorPosition);
+  }
+  $("#inspect-close").onclick = () => {
+    $("#inspect-modal").classList.remove("on");
+    inspectTarget = null;
+  };
+}
+
 /* Quickbar -- a fixed row of plain bubble slots, always visible, no tab
  * to slide open first (that's what the drawer is for). Each slot is
  * still a real [data-editable] button, so it can be dragged/resized/
@@ -2914,11 +3024,15 @@ window.addEventListener("unhandledrejection",
     {icon: "🗑", label: "remove the object I'm touching", onTap: () => pressed.add("remove"), locked: true},
     {icon: "🎨", label: "build: pick what to place, or open the Mesh Creator",
      onTap: () => openPalette(), locked: true},
+    // whatever you're touching, or your pending ghost if you have one --
+    // colour, resize, and relocate it directly, live.
+    {icon: "🎯", label: "inspect: colour, resize, relocate", onTap: () => openInspector(), locked: true},
   ]});
   setupBackpack();
   setupProperties();
   setupMeshCreator();
   setupPalette();
+  setupInspector();
   setupCompass();
   makeQuickbar(7);
 
