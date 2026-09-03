@@ -18,6 +18,14 @@
        a pad the size of a dinner plate. */
     --pad:min(94vw, 50vh, 460px);
     --util:clamp(36px, 9vw, 48px); /* restart / centre / save / live: pressed rarely */
+    /* The translucent panel colours that kept getting retyped as the same
+       literal rgba() across pad/side/drawer/modals as each was added --
+       named once here instead. Not every rgba() in this file uses these:
+       only the ones that were genuinely the same value more than once. */
+    --glass-input: rgba(102,109,118,.5);   /* text/number inputs inside a modal */
+    --glass-btn: rgba(102,109,118,.6);     /* pad/side/tab/bubble backgrounds */
+    --overlay-text: rgba(74,80,88,.85);    /* HUD/say floating text backgrounds */
+    --modal-bg: rgba(74,80,88,.96);        /* Mesh Creator / Build / Inspector backgrounds */
   }
   *{box-sizing:border-box}
   html,body{height:100%}
@@ -74,7 +82,7 @@
   #side-tools{margin-top:6px}
   #side button,#side-tools button{font-size:12px;padding:8px 12px;border-radius:11px;
                min-height:var(--util);min-width:0;
-               background:rgba(102,109,118,.6);backdrop-filter:blur(6px);
+               background:var(--glass-btn);backdrop-filter:blur(6px);
                -webkit-backdrop-filter:blur(6px)}
 
   /* 160px, not the 104px this used to be -- the top bar grew a second
@@ -82,11 +90,11 @@
      the title, on the shortest phone this runs on, not just a tall one. */
   #hud{position:absolute;top:calc(160px + env(safe-area-inset-top));left:8px;z-index:4;
        font:12px/1.7 ui-monospace,monospace;color:var(--dim);
-       background:rgba(74,80,88,.85);border-radius:10px;padding:6px 10px}
+       background:var(--overlay-text);border-radius:10px;padding:6px 10px}
   #hud b{color:var(--ink)}
   #say{position:absolute;top:calc(160px + env(safe-area-inset-top));right:8px;z-index:4;
        max-width:52vw;text-align:right;color:var(--accent);font-size:13px;
-       background:rgba(74,80,88,.85);border-radius:10px;padding:6px 10px}
+       background:var(--overlay-text);border-radius:10px;padding:6px 10px}
   #say:empty{display:none}
 
   /* Floats over the bottom of the world instead of claiming a strip of the
@@ -148,7 +156,7 @@
   .drawer[data-edge="left"].open{transform:translate(0, 0)}
   .drawer .tab{width:var(--util);height:var(--util);flex:0 0 auto;
                display:flex;align-items:center;justify-content:center;
-               background:rgba(102,109,118,.6);border:1px solid var(--line);
+               background:var(--glass-btn);border:1px solid var(--line);
                color:var(--accent);font-size:20px;cursor:pointer;
                backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
                border-radius:0 14px 14px 0}
@@ -159,7 +167,7 @@
                    backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
   .bubble{width:var(--util);height:var(--util);border-radius:50%;flex:0 0 auto;
           display:flex;align-items:center;justify-content:center;
-          background:rgba(102,109,118,.6);border:1px solid var(--line);
+          background:var(--glass-btn);border:1px solid var(--line);
           color:var(--ink);font-size:18px;cursor:pointer;
           transition:transform .12s,background .12s}
   .bubble:active{transform:scale(.88)}
@@ -203,7 +211,7 @@
                      font-size:12px;color:var(--dim)}
   #edit-panel input[type=range]{flex:1}
   #edit-panel input[type=number]{flex:1;width:100%;min-width:0;font:inherit;
-                                 color:var(--ink);background:rgba(102,109,118,.5);
+                                 color:var(--ink);background:var(--glass-input);
                                  border:1px solid var(--line);border-radius:6px;
                                  padding:6px 8px;min-height:32px}
   #edit-panel .row{display:flex;flex-wrap:wrap;gap:8px}
@@ -236,7 +244,7 @@
   .edit-list-row{box-sizing:border-box;height:34px;flex:0 0 auto;
                  display:flex;align-items:center;
                  font-size:12px;padding:0 10px;border-radius:8px;
-                 background:rgba(102,109,118,.5);cursor:pointer;
+                 background:var(--glass-input);cursor:pointer;
                  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .edit-list-row.on{background:var(--accent);color:var(--bg);font-weight:700}
   /* named layout saves -- same row look, plus a delete glyph on the right */
@@ -297,7 +305,7 @@
      the world stays visible all the way round it -- in the game's own
      gray/light-blue theme, unlike the Backpack's deliberate exception. */
   #properties-modal{position:fixed;inset:6vh 6vw;z-index:17;display:none;
-                    flex-direction:column;background:rgba(74,80,88,.96);
+                    flex-direction:column;background:var(--modal-bg);
                     border:1px solid var(--line);border-radius:12px;
                     overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.35);
                     backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
@@ -317,7 +325,7 @@
   #properties-body .row{display:flex;flex-wrap:wrap;gap:8px;width:100%}
   #properties-body input[type=range]{flex:1}
   #properties-body input[type=number]{flex:0 0 64px;width:64px;font:inherit;
-      color:var(--ink);background:rgba(102,109,118,.5);border:1px solid var(--line);
+      color:var(--ink);background:var(--glass-input);border:1px solid var(--line);
       border-radius:6px;padding:6px 8px;min-height:32px}
 
   /* Compass -- a meter across the top, not a dial: ticks scroll sideways
@@ -363,7 +371,7 @@
      game colours (this trio is not the Backpack's deliberate exception). */
   #mesh-modal,#palette-modal,#inspect-modal{position:fixed;inset:6vh 6vw;
                              z-index:17;display:none;flex-direction:column;
-                             background:rgba(74,80,88,.96);
+                             background:var(--modal-bg);
                              border:1px solid var(--line);border-radius:12px;
                              overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.35);
                              backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
@@ -383,14 +391,14 @@
                    font-size:11px;color:var(--dim)}
   #mesh-body input[type=number],#mesh-body input[type=text],#mesh-body select{
       width:100%;min-width:0;flex:1;
-      font:inherit;color:var(--ink);background:rgba(102,109,118,.5);
+      font:inherit;color:var(--ink);background:var(--glass-input);
       border:1px solid var(--line);border-radius:6px;padding:6px 8px;
       min-height:32px}
   #mesh-body button{flex:1;font-size:12px;padding:6px 10px;min-height:36px}
   #mesh-part-list,#palette-list{display:flex;flex-direction:column;gap:4px;
       max-height:148px;min-height:0;overflow-y:auto;touch-action:pan-y}
   .mesh-part-row,.palette-item{font-size:12px;padding:8px 10px;
-      border-radius:8px;background:rgba(102,109,118,.5);cursor:pointer;
+      border-radius:8px;background:var(--glass-input);cursor:pointer;
       white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .mesh-part-row.on,.palette-item.on{background:var(--accent);
       color:var(--bg);font-weight:700}
@@ -673,7 +681,32 @@
   <button id="veil-b">try again</button>
 </div></div>
 
+
 <script>
+// Roughly in this order, top to bottom (search for the heading text to
+// jump straight there -- this file grew a UI subsystem at a time, so nothing
+// is alphabetical and nothing is grouped by file the way separate files
+// would be):
+//
+//   SPARK-ENGINE-START..END   the JS twin of engine/*.py (see check_engines.py)
+//   "The 3D view"             WebGL constants, colours, pushBox/Sphere/Cone
+//   "class Renderer"          the WebGL renderer itself (also reused for
+//                             the Mesh Creator's own preview canvas)
+//   "touch: one finger..."    camera drag/pinch, then movement key input
+//   "Button editor"           select/drag/resize/fade any button, named layouts
+//   "Backpack"                the small virtual file system
+//   "Properties"              grid-lock/world-clock/move-speed/minimap panel
+//   "Mesh Creator"            multi-part custom shapes, with live preview
+//   "Build mode / palette"    which kind the place tile adds next
+//   "Object Inspector"        colour/resize/relocate/duplicate a placed object
+//   "an "expanding" world"    windowed floor loading + auto-scatter
+//   "the frame"               the render loop itself, and the HUD/compass/
+//                             minimap/selection-ring draws it calls each tick
+//   "Button Drawer"           the slide-out row of bubbles (see also
+//                             ~/bubble-drawer/README.md, this is a copy)
+//   "Quickbar"                the always-visible empty bubble slots
+//   save/load, then the final (async () => { ... })() that actually starts
+//   the page once everything above it is defined.
 // ==== SPARK-ENGINE-START ====
 // A second copy of engine/world.py and engine/tiles.py, in JavaScript, so that
 // this page can run a game with nothing behind it -- no Termux, no Cloudflare,
