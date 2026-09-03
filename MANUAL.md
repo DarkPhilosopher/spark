@@ -384,11 +384,17 @@ top bar, and capped altogether so a tablet does not hand you a pad the
 size of a dinner plate. Nothing is measured against any particular phone,
 so a screen I have never seen gets pads in the same proportion.
 
-Every button here — the pad, the top bar, the drawer's own bubbles — can
-be dragged to a new spot, resized, and faded from the button editor (✎),
-either by touch or by typing an exact position as a decimal percent of
-the screen. Anywhere in the world you touch that is not a button turns
+Every button here — the two pads, the top bar, the drawer's own bubbles —
+can be dragged to a new spot, resized, and faded from the button editor
+(✎), either by touch or by typing an exact position as a decimal percent
+of the screen. Anywhere in the world you touch that is not a button turns
 the camera.
+
+The drawer's own bubbles are a column, tallest on a tall screen — if there
+get to be enough of them (built-ins plus whatever you've added with the +
+control) that the column would run past the bottom of the screen, it wraps
+sideways into a second column instead of letting the bottom ones run off
+the edge where you could no longer reach them.
 
 A real keyboard works: arrows, space, and `w a s d e f`.
 

@@ -14,6 +14,31 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ## Unreleased
 
+### Fixed
+
+- **The button drawer's bubble list could run off the bottom of the
+  screen with no way to reach the buttons that fell past the edge** —
+  reported from a real phone. It was a plain vertical column with no
+  height limit at all; six built-in bubbles plus whatever you'd added
+  with the + control (each `--util`-tall, gap 10px) could add up to more
+  than a shorter screen actually had room for below the drawer's fixed
+  top offset (250px + the safe area), and the last few — sometimes the
+  +/× controls themselves — ended up positioned off-screen, not just
+  visually cramped. Fixed by capping `.bubbles`' height to what is
+  actually left below that offset and turning on `flex-wrap` at the same
+  time: once a column reaches the cap, the next bubble starts a new
+  column to the right instead of continuing to add to a column that's
+  already run out of room. flex-wrap moves a whole bubble to the next
+  column rather than ever slicing one in half, so nothing renders
+  partially cut off either — every bubble stays a complete, separate
+  circle, just arranged in more columns when there isn't room for one
+  long one. `max-width` plus `overflow-x:auto` on the same element is a
+  fallback for a pathological number of custom bubbles that would need
+  more columns than even a wide phone has room for — scrolls sideways
+  rather than running off the *right* edge instead of the bottom.
+  Validated with `node --check` and a full `html.parser` pass; not
+  seen on a real screen yet, same caveat as the pad split below.
+
 ### Added
 
 - **The 3D view's on-screen controls are two pads now, not one — a

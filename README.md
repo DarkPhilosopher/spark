@@ -740,7 +740,10 @@ into the tab, and whole arrangements of them saved under a name and swapped
 between. A Backpack (a small file system) and a Properties panel (grid-lock
 status, move speed, an opt-in minimap, and a clock driven by the world's own
 time) live in the top bar too, and a heading meter tracks which way the
-camera is facing across the top of the screen.
+camera is facing across the top of the screen. The button drawer's own
+bubbles wrap into extra columns rather than running off the bottom of a
+shorter screen once there are enough of them (built-ins plus whatever
+you've added with its own + control).
 
 Build mode turns the tab into a level editor: pick a kind from a searchable
 palette and place it where you stand, or design an entirely new multi-part
