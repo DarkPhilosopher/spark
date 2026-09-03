@@ -1186,6 +1186,9 @@ function blankBarrenProject() {
            do: [{tile: "place", args: {kind: "block"}}]},
           {when: [{tile: "key", args: {key: "d"}}],
            do: [{tile: "toggle_flight", args: {}}]},
+          {when: [{tile: "key", args: {key: "remove"}},
+                  {tile: "touch", args: {kind: "anything"}}],
+           do: [{tile: "vanish", args: {target: "it"}}]},
         ],
       },
       {

@@ -328,6 +328,42 @@
            display:flex;gap:8px;padding:6px}
   #quickbar .bubble{font-size:16px}
 
+  /* Mesh Creator and Build/palette -- same near-fullscreen, inset-from-
+     every-edge shape as Properties, and the same game colours (this pair
+     is not the Backpack's deliberate exception). */
+  #mesh-modal,#palette-modal{position:fixed;inset:6vh 6vw;z-index:17;
+                             display:none;flex-direction:column;
+                             background:rgba(74,80,88,.96);
+                             border:1px solid var(--line);border-radius:12px;
+                             overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.35);
+                             backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+  #mesh-modal.on,#palette-modal.on{display:flex}
+  #mesh-titlebar{display:flex;align-items:center;gap:8px;padding:12px 14px;
+                 font-weight:700;border-bottom:1px solid var(--line);flex:0 0 auto}
+  #mesh-titlebar span{margin-right:auto}
+  #mesh-titlebar button{min-height:34px;padding:4px 12px}
+  #mesh-preview-wrap{flex:0 0 auto;height:34vh;position:relative;
+                     border-bottom:1px solid var(--line)}
+  #mesh-canvas{position:absolute;inset:0;width:100%;height:100%;
+              display:block;touch-action:none}
+  #mesh-body{flex:1 1 auto;overflow-y:auto;touch-action:pan-y;
+            padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+  #mesh-body .row{display:flex;flex-wrap:wrap;gap:8px}
+  #mesh-body label{display:flex;flex-direction:column;gap:4px;
+                   font-size:11px;color:var(--dim)}
+  #mesh-body input[type=number],#mesh-body select{width:100%;min-width:0;
+      font:inherit;color:var(--ink);background:rgba(102,109,118,.5);
+      border:1px solid var(--line);border-radius:6px;padding:6px 8px;
+      min-height:32px}
+  #mesh-body button{flex:1;font-size:12px;padding:6px 10px;min-height:36px}
+  #mesh-part-list,#palette-list{display:flex;flex-direction:column;gap:4px;
+      max-height:148px;min-height:0;overflow-y:auto;touch-action:pan-y}
+  .mesh-part-row,.palette-item{font-size:12px;padding:8px 10px;
+      border-radius:8px;background:rgba(102,109,118,.5);cursor:pointer;
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mesh-part-row.on,.palette-item.on{background:var(--accent);
+      color:var(--bg);font-weight:700}
+
   #veil{position:fixed;inset:0;z-index:9;display:none;place-items:center;
         background:rgba(58,63,70,.96);padding:24px;text-align:center}
   #veil.on{display:grid}
@@ -479,6 +515,60 @@
     <span class="c-pt c-s">S</span><span class="c-pt c-w">W</span>
   </div>
   <div id="compass-pointer">▲</div>
+</div>
+
+<!-- Mesh Creator: build a custom multi-part shape (a cube here, a sphere
+     there, each offset and sized on its own) and save it as a new,
+     placeable kind. The preview is a second, small WebGL renderer -- same
+     Renderer class as the main view, its own canvas, so it costs nothing
+     extra to keep working and shows exactly what will actually be
+     placed. -->
+<div id="mesh-modal">
+  <div id="mesh-titlebar">
+    <span>🧩 Mesh Creator</span>
+    <button id="mesh-close" title="close">✕</button>
+  </div>
+  <div id="mesh-preview-wrap"><canvas id="mesh-canvas"></canvas></div>
+  <div id="mesh-body">
+    <div id="mesh-part-list"></div>
+    <div class="row"><button id="mesh-add-part">+ add a part</button></div>
+    <div class="row">
+      <label style="flex:1">shape
+        <select id="mesh-part-shape"><option value="cube">cube</option><option value="sphere">sphere</option></select>
+      </label>
+      <label style="flex:1">color <select id="mesh-part-color"></select></label>
+    </div>
+    <div class="row">
+      <label style="flex:1">x <input id="mesh-part-dx" type="number" step="0.05" value="0"></label>
+      <label style="flex:1">y <input id="mesh-part-dy" type="number" step="0.05" value="0"></label>
+      <label style="flex:1">z <input id="mesh-part-dz" type="number" step="0.05" value="0"></label>
+    </div>
+    <div class="row">
+      <label style="flex:1">width <input id="mesh-part-sx" type="number" step="0.05" min="0.05" max="3" value="0.5"></label>
+      <label style="flex:1">height <input id="mesh-part-sy" type="number" step="0.05" min="0.05" max="3" value="0.5"></label>
+      <label style="flex:1">depth <input id="mesh-part-sz" type="number" step="0.05" min="0.05" max="3" value="0.5"></label>
+    </div>
+    <div class="row"><button id="mesh-delete-part">delete this part</button></div>
+    <div class="row">
+      <button id="mesh-new">clear / start over</button>
+      <button id="mesh-save">save as new kind…</button>
+    </div>
+  </div>
+</div>
+
+<!-- Build mode: pick which kind the place tile (▦ / "a") adds next, from
+     everything the project already has plus anything saved in the Mesh
+     Creator, and a Remove tool for taking placed objects back out. Local
+     play only -- see setPaletteKind()'s own note. -->
+<div id="palette-modal">
+  <div id="mesh-titlebar">
+    <span>🎨 Build</span>
+    <button id="palette-close" title="close">✕</button>
+  </div>
+  <div id="mesh-body">
+    <div class="row"><button id="palette-mesh-creator">🧩 open the Mesh Creator</button></div>
+    <div id="palette-list"></div>
+  </div>
 </div>
 
 <div id="veil"><div>
@@ -718,6 +808,11 @@ class Thing {
     this.full = !!template.full;     // fills its whole grid cell
     this.ghost = !!template.ghost;   // placed but not confirmed yet
     this.flying = !!template.flying; // walking (grounded) unless true
+    // A multi-part shape from the mesh creator: {shape,dx,dy,dz,sx,sy,sz,
+    // color}[], each relative to this thing's own (x,y,z). Only rendering
+    // cares -- when set, buildThings() draws these instead of the usual
+    // single shape/size.
+    this.parts = template.parts || null;
     this.brain = template.brain || [];
     this.facing = [0, -1];
     this.owner = null;
@@ -831,9 +926,14 @@ const ACTIONS = {
   // yet solid; press the same tile again to confirm the one you are already
   // previewing. One preview per presser at a time.
   place: (obj, world, a) => {
-    const kind = a.kind;
+    // world.memory.palette_kind overrides which kind gets placed, when set
+    // -- the build mode's palette writes it directly (see setPaletteKind
+    // below). Pending lookup is by owner alone, not kind: switching the
+    // palette mid-placement must still confirm whatever ghost is already
+    // started, not strand it.
+    const kind = world.memory.palette_kind || a.kind;
     const pending = world.things.find(t =>
-      t.alive && t.kind === kind && t.ghost && t.owner === obj);
+      t.alive && t.ghost && t.owner === obj);
     if (pending) {
       pending.ghost = false;
       pending.solid = true;
@@ -1321,6 +1421,24 @@ class Renderer {
     const data = [];
     for (const thing of things) {
       const rgb = COLOR_RGB[thing.color] || COLOR_RGB.white;
+      // A mesh-creator shape: several parts instead of the usual single
+      // one, each offset from this thing's own (x, y, z). Skips the rest
+      // of the loop body entirely -- a multi-part thing has no single
+      // shape/size of its own.
+      if (thing.parts && thing.parts.length) {
+        const alpha = thing.ghost ? 0.45 : 1;
+        const cx = thing.x + 0.5, cz = thing.y + 0.5, baseY = thing.z || 0;
+        for (const part of thing.parts) {
+          const prgb = (part.color && COLOR_RGB[part.color]) || rgb;
+          const sx = part.sx || 0.5, sy = part.sy || sx, sz = part.sz || sx;
+          const px = cx + (part.dx || 0) - sx / 2;
+          const py = baseY + (part.dz || 0);
+          const pz = cz + (part.dy || 0) - sz / 2;
+          if (part.shape === "sphere") pushSphere(data, px, py, pz, sx, sy, sz, prgb, alpha);
+          else pushBox(data, px, py, pz, sx, sy, sz, prgb, undefined, alpha);
+        }
+        continue;
+      }
       const shot = thing.kind === "shot";
       const scale = shot ? 1 : (thing.size === undefined ? 100 : thing.size) / 100;
       const sphere = thing.shape === "sphere";
@@ -1648,9 +1766,13 @@ function drawHud() {
 }
 
 // -- touch: one finger turns the camera, two pinch it ----------------------
-function bindCamera(canvas) {
+// rend defaults to the main game renderer, so every existing call site
+// (just bindCamera($("#gl"))) still targets it exactly as before; the mesh
+// creator's own preview canvas passes its own renderer instead.
+function bindCamera(canvas, rend, minDist, maxDist) {
   const touches = new Map();
   let lastPinch = null;
+  const lo = minDist || MIN_DIST, hi = maxDist || MAX_DIST;
 
   canvas.addEventListener("pointerdown", e => {
     canvas.setPointerCapture(e.pointerId);
@@ -1661,16 +1783,17 @@ function bindCamera(canvas) {
     if (!touches.has(e.pointerId)) return;
     const last = touches.get(e.pointerId);
     touches.set(e.pointerId, [e.clientX, e.clientY]);
+    const r = rend || renderer;
 
     if (touches.size === 1) {
-      renderer.yaw -= (e.clientX - last[0]) * 0.008;
-      renderer.pitch += (e.clientY - last[1]) * 0.006;
-      renderer.pitch = Math.max(0.18, Math.min(1.5, renderer.pitch));
+      r.yaw -= (e.clientX - last[0]) * 0.008;
+      r.pitch += (e.clientY - last[1]) * 0.006;
+      r.pitch = Math.max(0.18, Math.min(1.5, r.pitch));
     } else if (touches.size === 2) {
       const [a, b] = [...touches.values()];
       const gap = Math.hypot(a[0] - b[0], a[1] - b[1]);
-      if (lastPinch) renderer.dist *= lastPinch / Math.max(1, gap);
-      renderer.dist = Math.max(MIN_DIST, Math.min(MAX_DIST, renderer.dist));
+      if (lastPinch) r.dist *= lastPinch / Math.max(1, gap);
+      r.dist = Math.max(lo, Math.min(hi, r.dist));
       lastPinch = gap;
     }
   });
@@ -1684,8 +1807,8 @@ function bindCamera(canvas) {
 
   canvas.addEventListener("wheel", e => {
     e.preventDefault();
-    renderer.dist = Math.max(MIN_DIST,
-      Math.min(MAX_DIST, renderer.dist * (1 + e.deltaY * 0.001)));
+    const r = rend || renderer;
+    r.dist = Math.max(lo, Math.min(hi, r.dist * (1 + e.deltaY * 0.001)));
   }, {passive: false});
 }
 
@@ -2359,6 +2482,200 @@ function setupProperties() {
   }, 500);
 }
 
+/* ---------------------------------------------------------------------
+ * Mesh Creator -- build a custom shape out of several cube/sphere parts,
+ * each with its own offset, size, and colour, and save it as a new,
+ * placeable kind. The preview is a second Renderer on its own canvas --
+ * the exact same class the main 3D view uses, so what you see here is
+ * exactly what gets placed, not an approximation of it.
+ * ------------------------------------------------------------------- */
+let meshParts = [];
+let meshSelected = null;
+let meshRenderer = null;
+let meshLoopRunning = false;
+
+function ensureMeshRenderer() {
+  if (meshRenderer) return;
+  meshRenderer = new Renderer($("#mesh-canvas"));
+  meshRenderer.centre = [0.5, 0.35, 0.5];
+  meshRenderer.yaw = 0.6; meshRenderer.pitch = 0.5; meshRenderer.dist = 2.2;
+  meshRenderer.radius = 3;
+  bindCamera($("#mesh-canvas"), meshRenderer, 1, 20);   // closer minimum zoom than the main view
+}
+
+function meshFrame() {
+  if (!$("#mesh-modal").classList.contains("on")) { meshLoopRunning = false; return; }
+  const fake = {kind: "preview", color: "white", parts: meshParts, ghost: false, x: 0, y: 0, z: 0};
+  meshRenderer.buildThings(meshParts.length ? [fake] : []);
+  meshRenderer.draw();
+  requestAnimationFrame(meshFrame);
+}
+
+function renderMeshPartList() {
+  const box = $("#mesh-part-list");
+  box.innerHTML = "";
+  if (!meshParts.length) {
+    const empty = document.createElement("div");
+    empty.className = "mesh-part-row";
+    empty.style.cursor = "default";
+    empty.textContent = "(no parts yet -- add one below)";
+    box.appendChild(empty);
+    return;
+  }
+  meshParts.forEach((p, i) => {
+    const row = document.createElement("div");
+    row.className = "mesh-part-row" + (i === meshSelected ? " on" : "");
+    row.textContent = (p.shape || "cube") + " (" + (p.color || "white") + ")";
+    row.onclick = () => selectMeshPart(i);
+    box.appendChild(row);
+  });
+}
+
+function selectMeshPart(i) {
+  meshSelected = i;
+  const p = meshParts[i];
+  if (!p) return;
+  $("#mesh-part-shape").value = p.shape || "cube";
+  $("#mesh-part-color").value = p.color || "white";
+  $("#mesh-part-dx").value = p.dx || 0;
+  $("#mesh-part-dy").value = p.dy || 0;
+  $("#mesh-part-dz").value = p.dz || 0;
+  $("#mesh-part-sx").value = p.sx || 0.5;
+  $("#mesh-part-sy").value = p.sy || 0.5;
+  $("#mesh-part-sz").value = p.sz || 0.5;
+  renderMeshPartList();
+}
+
+function applyMeshFieldsToSelected() {
+  if (meshSelected === null || !meshParts[meshSelected]) return;
+  const p = meshParts[meshSelected];
+  p.shape = $("#mesh-part-shape").value;
+  p.color = $("#mesh-part-color").value;
+  p.dx = parseFloat($("#mesh-part-dx").value) || 0;
+  p.dy = parseFloat($("#mesh-part-dy").value) || 0;
+  p.dz = parseFloat($("#mesh-part-dz").value) || 0;
+  p.sx = Math.max(0.05, parseFloat($("#mesh-part-sx").value) || 0.5);
+  p.sy = Math.max(0.05, parseFloat($("#mesh-part-sy").value) || 0.5);
+  p.sz = Math.max(0.05, parseFloat($("#mesh-part-sz").value) || 0.5);
+  renderMeshPartList();
+}
+
+function openMeshCreator() {
+  ensureMeshRenderer();
+  renderMeshPartList();
+  $("#mesh-modal").classList.add("on");
+  if (!meshLoopRunning) { meshLoopRunning = true; meshFrame(); }
+}
+
+function setupMeshCreator() {
+  const colorSelect = $("#mesh-part-color");
+  for (const name of Object.keys(COLOR_RGB)) {
+    const opt = document.createElement("option");
+    opt.value = name; opt.textContent = name;
+    colorSelect.appendChild(opt);
+  }
+
+  $("#mesh-add-part").onclick = () => {
+    meshParts.push({shape: "cube", dx: 0, dy: 0, dz: 0, sx: 0.5, sy: 0.5, sz: 0.5, color: "white"});
+    selectMeshPart(meshParts.length - 1);
+  };
+  $("#mesh-delete-part").onclick = () => {
+    if (meshSelected === null) return;
+    meshParts.splice(meshSelected, 1);
+    meshSelected = meshParts.length ? Math.min(meshSelected, meshParts.length - 1) : null;
+    if (meshSelected !== null) selectMeshPart(meshSelected); else renderMeshPartList();
+  };
+  $("#mesh-new").onclick = () => {
+    if (meshParts.length && !confirm("Clear the current mesh and start a new one?")) return;
+    meshParts = []; meshSelected = null;
+    renderMeshPartList();
+  };
+  for (const id of ["mesh-part-shape", "mesh-part-color", "mesh-part-dx", "mesh-part-dy",
+                     "mesh-part-dz", "mesh-part-sx", "mesh-part-sy", "mesh-part-sz"]) {
+    $("#" + id).addEventListener("input", applyMeshFieldsToSelected);
+    $("#" + id).addEventListener("change", applyMeshFieldsToSelected);
+  }
+
+  $("#mesh-save").onclick = () => {
+    if (!meshParts.length) { window.alert("add at least one part first"); return; }
+    const name = (prompt("Save this mesh as a new kind named:", "mymesh") || "").trim();
+    if (!name) return;
+    const safe = name.replace(/[^A-Za-z0-9_-]/g, "");
+    if (!safe) { window.alert("give it a name"); return; }
+    const glyph = (prompt("One-letter glyph for it:", safe[0].toUpperCase()) || safe[0]).slice(0, 1);
+    const template = {
+      kind: safe, glyph, color: meshParts[0].color || "white", health: 1,
+      count: 0, solid: true, role: "prop",
+      parts: JSON.parse(JSON.stringify(meshParts)), brain: [],
+    };
+    // both places a template can live: the project (so it round-trips
+    // through save/load) and the live world (so it is placeable this
+    // instant, with no restart needed).
+    if (project && project.characters) {
+      const idx = project.characters.findIndex(c => c.kind === safe);
+      if (idx >= 0) project.characters[idx] = template; else project.characters.push(template);
+    }
+    if (world) world.templates[safe] = template;
+    drawerToast('saved "' + safe + '" -- pick it in 🎨 Build');
+    $("#mesh-modal").classList.remove("on");
+  };
+
+  $("#mesh-close").onclick = () => $("#mesh-modal").classList.remove("on");
+}
+
+/* ---------------------------------------------------------------------
+ * Build mode / palette -- pick which kind the place tile adds next.
+ *
+ * Local play only: world.memory.palette_kind is set here by writing
+ * straight to the live JS World object, which only exists for the copy
+ * of the game running in this browser tab. A LIVE game (mirrored from a
+ * real Termux server) has no such object to write into, so the palette
+ * has nothing to affect there and place quietly keeps using whatever
+ * kind its own tile says (see the "place" action).
+ * ------------------------------------------------------------------- */
+function renderPaletteList() {
+  const box = $("#palette-list");
+  box.innerHTML = "";
+  if (!world) {
+    box.textContent = "Not available in LIVE mode -- switch to \"run here\" first.";
+    return;
+  }
+  const current = world.memory.palette_kind;
+  const kinds = Object.keys(world.templates).filter(k => k !== "shot");
+  if (!kinds.length) {
+    const empty = document.createElement("div");
+    empty.className = "palette-item";
+    empty.style.cursor = "default";
+    empty.textContent = "(nothing to place yet)";
+    box.appendChild(empty);
+    return;
+  }
+  for (const kind of kinds) {
+    const row = document.createElement("div");
+    row.className = "palette-item" + (kind === current ? " on" : "");
+    row.textContent = kind;
+    row.onclick = () => {
+      world.memory.palette_kind = kind;
+      drawerToast('now placing "' + kind + '"');
+      renderPaletteList();
+    };
+    box.appendChild(row);
+  }
+}
+
+function openPalette() {
+  renderPaletteList();
+  $("#palette-modal").classList.add("on");
+}
+
+function setupPalette() {
+  $("#palette-close").onclick = () => $("#palette-modal").classList.remove("on");
+  $("#palette-mesh-creator").onclick = () => {
+    $("#palette-modal").classList.remove("on");
+    openMeshCreator();
+  };
+}
+
 /* Quickbar -- a fixed row of plain bubble slots, always visible, no tab
  * to slide open first (that's what the drawer is for). Each slot is
  * still a real [data-editable] button, so it can be dragged/resized/
@@ -2551,9 +2868,17 @@ window.addEventListener("unhandledrejection",
     // walking (grounded, w/s fly buttons do nothing) <-> flying (w/s
     // change altitude). Same key ("d") as pressing it on a keyboard.
     {icon: "🕊", label: "toggle walk/fly mode", onTap: () => pressed.add("d"), locked: true},
+    // "remove" is not a real keyboard key -- pressed is just a set of
+    // strings, and nothing requires those strings to be real keys. Any
+    // WHEN row can watch for one that only a UI button ever sends.
+    {icon: "🗑", label: "remove the object I'm touching", onTap: () => pressed.add("remove"), locked: true},
+    {icon: "🎨", label: "build: pick what to place, or open the Mesh Creator",
+     onTap: () => openPalette(), locked: true},
   ]});
   setupBackpack();
   setupProperties();
+  setupMeshCreator();
+  setupPalette();
   makeQuickbar(7);
 
   // Turning the phone swaps which region is which shape, and a camera framed

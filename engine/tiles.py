@@ -698,10 +698,16 @@ def a_place(obj, world, a, it):
     not yet solid; press the same tile again to confirm the one you are
     already previewing, which makes it solid and opaque. One preview per
     presser at a time -- pressing while someone else's preview is still
-    pending starts your own, it does not confirm theirs."""
-    kind = a["kind"]
+    pending starts your own, it does not confirm theirs.
+
+    `world.memory["palette_kind"]` overrides which kind gets placed, when
+    set -- the build mode's palette writes it directly (browser-only, see
+    world3d.html), so a game never has to know about it. Pending lookup is
+    by owner alone, not kind: switching the palette mid-placement must
+    still confirm whatever ghost you already started, not strand it."""
+    kind = world.memory.get("palette_kind") or a["kind"]
     pending = next((t for t in world.things
-                     if t.alive and t.kind == kind and t.ghost and t.owner is obj),
+                     if t.alive and t.ghost and t.owner is obj),
                     None)
     if pending is not None:
         pending.ghost = False

@@ -16,6 +16,32 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ### Added
 
+- **Mesh Creator and Build mode.** The Mesh Creator (🧩) builds a custom
+  shape out of several cube/sphere parts, each with its own offset, size,
+  and colour, previewed live in a second WebGL view (the same `Renderer`
+  the main 3D view uses — what you see is exactly what gets placed, not
+  an approximation), and saves it as a new, immediately placeable kind.
+  Build mode (🎨, in the button drawer) is a palette of every kind that
+  exists — built in and anything just saved from the Mesh Creator — pick
+  one to make the place tile (`a`) add that instead. A new 🗑 drawer
+  bubble removes whatever placed object you're touching (`vanish`, on a
+  new virtual `"remove"` key that no physical keyboard key sends).
+
+  **Why the palette is local-play only.** It works by writing straight
+  into the running JS `World` object's memory, which only exists for the
+  copy of the game in this browser tab — a `LIVE` game mirrored from a
+  real Termux server has no such object here to write into. The `place`
+  tile still checks for it, though, so nothing breaks; the palette
+  simply has nothing to affect in that mode, and quietly does nothing
+  when opened there.
+
+  **Why the pending-ghost lookup changed.** It used to also match on
+  `kind`, so switching the palette while a ghost was still waiting to be
+  confirmed would strand it — a new ghost of the newly-picked kind would
+  start instead, invisible-ish and unconfirmable forever. Matching on
+  ownership alone confirms whatever you already started, regardless of
+  what the palette says now.
+
 - **3D world editor: shapes, altitude, walking vs. flying, and a
   placeable object.** Characters can now be a sphere as well as a cube
   (`shape`), can be resized (`size`, a percent), and can change altitude
