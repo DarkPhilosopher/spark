@@ -150,6 +150,12 @@ plain numbered list instead: type the number, press enter. Typing `browser`
 needs a real interactive terminal to run; the big-picture menu is purely a
 nicer way to use one when you have it.
 
+**`SPARK_PLAIN=1`** asks for the plain numbered list even on a terminal that
+would otherwise get the big-picture one — for a terminal that answers
+`isatty()` with yes but does not actually handle this cleanly (some SSH
+clients, some IDE terminal panes), or simply a preference for typing
+numbers.
+
 Opening the browser editor (`b`, or `browser`) starts the editor server next
 to the menus and opens your browser at it. You keep both: the menus stay where
 they were, and both editors read and write the same `games/` folder. They do
@@ -789,6 +795,7 @@ anywhere, as plain `spark ...`, once you have run the install command.
 | `python3 tests/check_mytiles.py` | check the gate in front of Python tiles |
 | `python3 tests/check_update.py` | check updating, in throwaway clones |
 | `python3 tests/check_engines.py` | check both engines still play games identically |
+| `python3 tests/check_menu.py` | check the terminal's big-picture menu and its fallback |
 | `node tests/store.test.js` | check the editor's save and load logic |
 | `node tests/deck.test.js` | check the deck's screens and the box you type in |
 

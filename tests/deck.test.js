@@ -217,8 +217,12 @@ console.log("\nwhat is a command and what is chat");
  *
  * This is the part that earns its keep: it is how the missing deckSave was
  * found. A screen that references something that no longer exists parses
- * perfectly and only falls over when somebody presses the button. */
-function screens() {
+ * perfectly and only falls over when somebody presses the button.
+ *
+ * opts.guest runs it as amEditor() => false instead -- see the guest-mode
+ * block below, which is what actually presses the barred buttons rather
+ * than just checking they exist. */
+function screens(opts = {}) {
   const project = {
     name: "probe", world: {width: 30, height: 14, wrap: false, speed: 6},
     tiles: [{name: "hunt", when: [{tile: "see", args: {}}],
@@ -247,11 +251,17 @@ function screens() {
     module.exports = {${names.join(", ")}, deckPush, deckPop, deckHome,
                       renderDeck, stack};
   `;
+  const logLines = [];
   const nodes = {
     "#keys": {textContent: "", scrollTop: 0, append() {}},
     "#screen": {textContent: ""},
     "#backkey": {disabled: false},
-    "#log": {children: [], append() {}, scrollTop: 0, scrollHeight: 0},
+    // note() (declared inside src, so it isn't one of this function's own
+    // args below -- there is no intercepting it directly) appends here.
+    // Reading it back is how the guest-mode block, further down, sees
+    // what a barred button actually said.
+    "#log": {children: [], append(n) { this.children.push(n); logLines.push(n); },
+             scrollTop: 0, scrollHeight: 0},
     "#deck": {classList: {add() {}, remove() {}, toggle() {},
                           contains: () => false}},
     "#page": {hidden: true},
@@ -274,7 +284,7 @@ function screens() {
     myTiles: () => project.tiles,
     past: [], codeFiles: [], showEverything: true,
     charIdx: 0, rowIdx: 0, side: "when",
-    amEditor: () => true,
+    amEditor: () => !opts.guest,
     describe: (s, use) => use.tile,
     fitsHalf: () => true,
     ghConfig: () => null,
@@ -291,7 +301,7 @@ function screens() {
     me: {role: "owner", name: "host"},
   };
   new Function(...Object.keys(args), body)(...Object.values(args));
-  return {api: mod.exports, names};
+  return {api: mod.exports, names, log: logLines};
 }
 
 console.log("\nevery screen actually builds");
@@ -316,6 +326,33 @@ console.log("\nevery screen actually builds");
   ok("back pops it", a2.stack.length === 1);
   a2.deckPop();
   ok("back at the bottom does nothing", a2.stack.length === 1);
+}
+
+console.log("\na guest sees the same buttons, but the game-changing ones refuse");
+{
+  const {api, log} = screens({guest: true});
+
+  const title = api.titleScreen();
+  const byKey = items => Object.fromEntries(items.filter(Boolean).map(i => [i.key, i]));
+  const t = byKey(title.items);
+  ok("play is not barred for a guest", t.play.kind !== "foreign");
+  for (const key of ["continue", "new game", "editor"])
+    ok(key + " is barred for a guest", t[key] && t[key].kind === "foreign", t[key]);
+
+  log.length = 0;
+  await t["new game"].go();
+  ok("pressing a barred title-screen button says so, not silently nothing",
+     log.length === 1 && log[0].cls === "bad", log);
+
+  const ed = byKey(api.editorScreen().items);
+  for (const key of ["edit", "characters", "brain", "tiles", "save", "3d world"])
+    ok(key + " is barred in the editor too, for a guest",
+       ed[key] && ed[key].kind === "foreign", ed[key]);
+
+  log.length = 0;
+  await ed.save.go();
+  ok("pressing a barred editor button says so too",
+     log.length === 1 && log[0].cls === "bad", log);
 }
 
 console.log("\n" + pass + " passed, " + fail + " failed");

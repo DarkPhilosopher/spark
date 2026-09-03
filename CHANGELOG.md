@@ -16,6 +16,32 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ### Added
 
+- **Three small follow-ups to the big-picture menu, from auditing it right
+  after building it:**
+
+  - `SPARK_PLAIN=1` opts out of the big-picture menu even on a real
+    terminal — for a terminal that answers `isatty()` with yes but doesn't
+    actually handle this cleanly (some SSH clients, some IDE terminal
+    panes), or simply a preference for typing numbers.
+  - `tests/check_menu.py` (new): drives the terminal's menu through a real
+    pseudo-terminal — arrow keys, a digit jump, escape/`0` for back, the
+    title screen through to the editor and back, `SPARK_PLAIN` — plus the
+    piped-input fallback. None of this had permanent coverage before; it
+    had only been checked by hand while building it.
+  - `tests/deck.test.js` gained a guest-mode pass: presses every barred
+    button on the new title screen and editor screen as a guest, and
+    checks each one actually refuses (says so, doesn't run the real
+    action) rather than just checking the buttons exist. Also new: no
+    prior version of this file ever ran as a guest at all.
+
+- **Fixed: `tests/check_permissions.py` left `games/index.json` stale.** It
+  already deleted the temporary game file it made along the way, but never
+  refreshed the listing that a save through the server (earlier in the same
+  test) had already baked that file's name into — so running the test once
+  left a permanent stale entry in the real `games/index.json`, naming a game
+  that no longer existed. Fixed by calling `server.export_static()` after
+  the cleanup, the same as the app's own "delete a game" path already does.
+
 - **A big-picture menu in the terminal, and a title screen in the browser —
   both now a game menu first, an editor second.**
 

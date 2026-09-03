@@ -207,7 +207,9 @@ picks it — a big **SPARK** title screen, then Play or Editor once a game is
 open, the same idea as the browser's, just typed instead of tapped. Typing a
 number still works too, for whichever option that is. Piped input (a script,
 a test) falls back to the plain numbered list automatically, so nothing here
-needs a real interactive terminal to work.
+needs a real interactive terminal to work. `SPARK_PLAIN=1` asks for that same
+plain list even on a real terminal, for a terminal that only claims to
+support the cursor-repositioning this needs, or just a preference.
 
 ### See the demo first
 
@@ -848,6 +850,7 @@ Once `python3 spark.py install` has been run, every one of these works as plain
 | `python3 tests/check_update.py` | check updating, and that it never eats your games |
 | `python3 tests/check_multiplayer.py` | check two players share one world |
 | `python3 tests/check_engines.py` | check the Python and JavaScript engines still agree |
+| `python3 tests/check_menu.py` | check the terminal's big-picture menu, and its numbered-list fallback |
 
 ---
 
@@ -925,7 +928,7 @@ inert, exactly as it would arriving any other way.
     engine/tunnel.py     finds and runs cloudflared or ngrok for public play
     engine/rng.py        seeded dice, so both engines can roll the same numbers
     tests/store.test.js  17 checks on the editor's save and load logic
-    tests/deck.test.js   82 checks: every screen builds, and what the box understands
+    tests/deck.test.js   101 checks: every screen builds, and what the box understands
     tests/check_docs.py  fails if this README has drifted from the code
     tests/check_sync.py  checks the GitHub push/pull logic, without the network
     tests/check_permissions.py  checks a guest can only do what their code allows
@@ -937,6 +940,8 @@ inert, exactly as it would arriving any other way.
     tests/check_mytiles.py      checks the approval gate, and that a guest cannot write code
     tests/check_update.py       clones a fake GitHub and updates from it, games and all
     tests/check_engines.py      plays every game twice, once per engine, and compares
+    tests/check_menu.py         drives the terminal's menu through a real pty: arrow keys,
+                                 digits, escape, and the fallback with no terminal at all
     tests/engine_trace.js       runs the JavaScript engine from a terminal, for that test
 
 Two files are **generated** — do not edit them by hand:

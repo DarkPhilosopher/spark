@@ -1,6 +1,7 @@
 """The no-code editor: every choice is a numbered menu, nothing is typed as code."""
 
 import json
+import os
 import shutil
 import sys
 
@@ -201,7 +202,12 @@ def _render_menu(options, selected, allow_back, back_label, first):
 
 
 def _big_menu(options, prompt, allow_back, back_label):
-    if not (sys.stdin.isatty() and sys.stdout.isatty()):
+    # SPARK_PLAIN is the escape hatch: some terminals answer isatty() with
+    # yes but still don't handle cursor-repositioning ANSI cleanly (some SSH
+    # clients, some IDE terminal panes) -- anyone who hits that, or simply
+    # prefers typing numbers, can opt out without it being an all-or-nothing
+    # code change.
+    if os.environ.get("SPARK_PLAIN") or not (sys.stdin.isatty() and sys.stdout.isatty()):
         return _UNSUPPORTED
     n = len(options)
     total = n + (1 if allow_back else 0)
