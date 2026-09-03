@@ -747,13 +747,16 @@ shape from scratch in the Mesh Creator and it joins the palette alongside
 everything the game already defines. Tapping anything already in the world
 opens the Object Inspector — recolour it, resize it (uniformly, or stretch
 width/height/depth independently), cycle its shape, move it, duplicate it,
-or delete it, all without touching the game's JSON by hand. A
+or delete it, all without touching the game's JSON by hand. Tap several
+objects with 🧬 (Merge) armed and it combines all of them into one new
+placeable kind, at whichever geometry is left once any part sitting
+entirely inside another has been dropped. A
 world can also be marked "expanding," so its floor loads in around you as you
 wander instead of all at once, with new ground able to scatter things onto
 itself as it appears (`games/Game 008008.json` is a working example, with
 pink stone-sized cones standing in for an ore you mine by walking into it).
-Build mode, the Inspector, and expanding worlds all only work in the local,
-in-browser engine (`RUNNING HERE`, below) — they edit the live JavaScript
+Build mode, the Inspector, Merge, and expanding worlds all only work in the
+local, in-browser engine (`RUNNING HERE`, below) — they edit the live JavaScript
 world directly, which has no meaning for a game somebody else is hosting.
 
 The full control reference, key by key, is in
@@ -847,6 +850,7 @@ Once `python3 spark.py install` has been run, every one of these works as plain
 | `python3 spark.py games/chase.json` | open the menus with that game already loaded |
 | `node tests/store.test.js` | check the editor's save and load logic |
 | `node tests/deck.test.js` | check the deck's screens and what the box understands |
+| `node tests/mesh_merge.test.js` | check the 3D view's merge-objects-into-one-mesh geometry |
 | `python3 tests/check_docs.py` | check this README still matches the code |
 | `python3 tests/check_sync.py` | check the GitHub push/pull logic |
 | `python3 tests/check_permissions.py` | check guests cannot exceed their code |
@@ -950,6 +954,8 @@ inert, exactly as it would arriving any other way.
     tests/check_engines.py      plays every game twice, once per engine, and compares
     tests/check_menu.py         drives the terminal's menu through a real pty: arrow keys,
                                  digits, escape, and the fallback with no terminal at all
+    tests/mesh_merge.test.js    checks the 3D view's merge-objects arithmetic: offsets,
+                                 and dropping geometry that ends up fully hidden inside another part
     tests/engine_trace.js       runs the JavaScript engine from a terminal, for that test
 
 Two files are **generated** — do not edit them by hand:

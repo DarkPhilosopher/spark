@@ -9,12 +9,37 @@ outcome) stays together.
 
 ## Tasks
 
-- [ ] **For later, not yet started (noted 2026-09-02):** a function to
-  mesh multiple selected 3D objects into one combined 3D shape —
-  multi-select several placed objects, merge them into a single mesh.
-  Nothing built yet; needs its own design pass (how selection works
-  alongside the existing single-`selected` ghost/place flow, what "merge"
-  actually produces in the `Thing`/render model) before starting.
+- [x] **(noted 2026-09-02):** a function to mesh multiple selected 3D
+  objects into one combined 3D shape — multi-select several placed
+  objects, merge them into a single mesh.
+  **How it went (2026-09-03):** built as a new drawer bubble, 🧬 Merge —
+  arm it, tap objects one at a time (each gets its own green ring,
+  `mergeSelection`/`drawMergeHighlights`), tap 🧬 again to combine.
+  Resolved the design questions the note above raised: selection is its
+  own parallel array alongside the existing single-`inspectTarget`
+  selection, not sharing it, since Inspector-select and merge-select are
+  different modes of the same tap (`pickObjectAt` branches on
+  `mergeArmed`); "merge" produces a new placeable kind, `parts:
+  [...]` in exactly the shape the Mesh Creator already writes, via the
+  same "save as new kind" template/registration path it uses, then
+  removes the originals. A Thing that's already a merged/mesh-creator
+  shape contributes its own parts individually rather than being
+  flattened, so merging a merge stays composable. Also did the "removing
+  the inner geometry" half of the ask, honestly scoped: not real CSG
+  (cutting polygons where solids overlap) — that's a much bigger
+  undertaking than this hand-rolled renderer is set up for and too risky
+  to ship unverified. What it does instead: a part whose whole bounding
+  box sits inside another's is dropped outright (`dropHiddenParts`),
+  correct and cheap for the common case (props built into or stacked
+  inside each other); a part that only partly overlaps keeps its full
+  geometry, same as any two overlapping opaque objects always render
+  correctly via ordinary depth testing. Verified with a new permanent
+  test, `tests/mesh_merge.test.js` (17 checks: offsets, the
+  fully-contained-part-dropped case, partial overlap surviving,
+  duplicate-bounds collapsing to one not zero, and composing an
+  already-merged object) — no headless WebGL here to render an actual
+  frame and look at it, so this is arithmetic-level verification, not a
+  substitute for eyes on a real device.
 
 - [x] Reorganize the buttons on screen in the 3D world editor
   (`world3d.html`) so the layout actually looks and fits well.

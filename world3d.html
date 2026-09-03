@@ -59,6 +59,14 @@
       display:none}
   #select-highlight.on{display:block}
 
+  /* One of these per object queued for 🧬 merge (see mergeSelection) --
+     a pool of plain divs rather than one fixed element, since there can be
+     any number of them. Good, not accent, so a merge-in-progress reads as
+     visibly different from the single Inspector selection ring above. */
+  .merge-highlight{position:absolute;top:0;left:0;width:40px;height:40px;
+      margin:-20px 0 0 -20px;border-radius:50%;pointer-events:none;
+      border:3px solid var(--good);box-shadow:0 0 10px var(--good)}
+
   /* top bar: the name and badge, then the buttons you press rarely */
   #bar{position:absolute;top:0;left:0;right:0;z-index:4;display:flex;
        flex-direction:column;gap:6px;padding:8px;
@@ -425,6 +433,7 @@
   <canvas id="gl"></canvas>
   <div id="labels"></div>
   <div id="select-highlight"></div>
+  <div id="merge-highlights"></div>
 
   <div id="bar">
     <div class="barrow">
@@ -1625,6 +1634,39 @@ function pushShape(shape, out, x, y, z, sx, sy, sz, rgb, alpha) {
   }
 }
 
+/* The world-unit width/height/depth a single-shape (no `parts`) Thing
+ * actually renders at, folding together size, the per-axis sx/sy/sz
+ * stretch, role/shape-based height, and "full" -- exactly what
+ * buildThings() draws it with. Pulled out on its own so mergeThings()
+ * (below) can convert a placed Thing into an equivalent mesh part using
+ * the identical numbers, rather than a second copy of this that could
+ * drift out of sync with what is actually on screen. */
+function effectiveDims(thing) {
+  const shot = thing.kind === "shot";
+  const shape = thing.shape || "cube";
+  const round = ROUND_HEIGHT_SHAPES.has(shape);
+  const tall = thing.role === "player" ? 1.15 : (thing.solid ? 1.0 : 0.75);
+  // "full" fills its whole grid cell edge to edge and floor to ceiling --
+  // for placed/buildable objects, not the smaller action-demo props.
+  const baseSize = thing.full ? 1.0 : (shot ? 0.34 : 0.86);
+  const baseScale = thing.size === undefined ? 100 : thing.size;
+  // sx/sz stretch width/depth independently of height; unset (the common
+  // case) just falls back to the same uniform `size` this always used.
+  // See the `stretch` tile, and Thing's constructor.
+  const scaleX = shot ? 1 : (thing.sx === undefined ? baseScale : thing.sx) / 100;
+  const scaleZ = shot ? 1 : (thing.sz === undefined ? baseScale : thing.sz) / 100;
+  const sizeX = baseSize * scaleX, sizeZ = baseSize * scaleZ;
+  // Height: sy overrides win outright; otherwise a round shape matches its
+  // own (stretched) width so an unstretched sphere/gem stays round rather
+  // than getting squashed by the role-based height every other shape
+  // uses, and everything else keeps that role-based height.
+  const height = shot ? 0.34 : thing.full ? 1.0
+    : thing.sy !== undefined ? tall * (thing.sy / 100)
+    : round ? sizeX
+    : tall * (baseScale / 100);
+  return {sizeX, height, sizeZ};
+}
+
 class Renderer {
   constructor(canvas) {
     this.canvas = canvas;
@@ -1769,28 +1811,8 @@ class Renderer {
         }
         continue;
       }
-      const shot = thing.kind === "shot";
       const shape = thing.shape || "cube";
-      const round = ROUND_HEIGHT_SHAPES.has(shape);
-      const tall = thing.role === "player" ? 1.15 : (thing.solid ? 1.0 : 0.75);
-      // "full" fills its whole grid cell edge to edge and floor to ceiling --
-      // for placed/buildable objects, not the smaller action-demo props.
-      const baseSize = thing.full ? 1.0 : (shot ? 0.34 : 0.86);
-      const baseScale = thing.size === undefined ? 100 : thing.size;
-      // sx/sz stretch width/depth independently of height; unset (the
-      // common case) just falls back to the same uniform `size` this
-      // always used. See the `stretch` tile, and Thing's constructor above.
-      const scaleX = shot ? 1 : (thing.sx === undefined ? baseScale : thing.sx) / 100;
-      const scaleZ = shot ? 1 : (thing.sz === undefined ? baseScale : thing.sz) / 100;
-      const sizeX = baseSize * scaleX, sizeZ = baseSize * scaleZ;
-      // Height: sy overrides win outright; otherwise a round shape matches
-      // its own (stretched) width so an unstretched sphere/gem stays
-      // round rather than getting squashed by the role-based height every
-      // other shape uses, and everything else keeps that role-based height.
-      const height = shot ? 0.34 : thing.full ? 1.0
-        : thing.sy !== undefined ? tall * (thing.sy / 100)
-        : round ? sizeX
-        : tall * (baseScale / 100);
+      const {sizeX, height, sizeZ} = effectiveDims(thing);
       const insetX = (1 - sizeX) / 2, insetZ = (1 - sizeZ) / 2;
       // still being placed -- see-through until pressed again to confirm it
       const alpha = thing.ghost ? 0.45 : 1;
@@ -2149,6 +2171,7 @@ function frame() {
   drawHud();
   drawCompass();
   drawSelection();
+  drawMergeHighlights();
   drawMinimap();
   requestAnimationFrame(frame);
 }
@@ -3387,7 +3410,9 @@ function pickObjectAt(sx, sy) {
     const d = Math.hypot(at[0] - sx, at[1] - sy);
     if (d < bestDist) { bestDist = d; best = t; }
   }
-  if (best) openInspector(best);
+  if (!best) return;
+  if (mergeArmed) addToMergeSelection(best);
+  else openInspector(best);
 }
 
 // A tap selects; a drag (used for turning the camera) must not also
@@ -3537,6 +3562,171 @@ function setupInspector() {
     $("#inspect-modal").classList.remove("on");
     inspectTarget = null;
   };
+}
+
+/* ---------------------------------------------------------------------
+ * Merge -- combine several separately-placed objects into one multi-part
+ * Thing, the same {shape,dx,dy,dz,sx,sy,sz,color} parts the Mesh Creator
+ * already produces (see buildThings()'s parts branch and the Mesh
+ * Creator section above). Tap 🧬 to arm it, tap objects one at a time to
+ * add them (each gets its own ring, see drawMergeHighlights below), tap
+ * 🧬 again to combine everything queued into a new placeable kind --
+ * named the same way the Mesh Creator's own "save as new kind" already
+ * asks. Local play only, same reasoning as the rest of this file's tools:
+ * it spawns into and removes from the live World object directly.
+ *
+ * "Removing the inner geometry": genuine CSG -- actually cutting the
+ * polygons where two solids overlap -- is a much bigger undertaking than
+ * this hand-rolled low-poly renderer is set up for, and risky to get
+ * right unverified (no headless WebGL here to render a frame and look).
+ * What dropHiddenParts does instead, correctly and cheaply: any part
+ * whose entire bounding box sits inside another part's is dropped
+ * outright, since it can never be seen from outside an opaque shape --
+ * no reason to keep its triangles. Parts that only partly overlap keep
+ * their full geometry; the renderer's ordinary depth testing already
+ * draws the visible result of that correctly, the same as any two
+ * overlapping opaque objects always have, merged or not.
+ * ------------------------------------------------------------------- */
+let mergeArmed = false;      // true while tapping objects to add to the merge
+let mergeSelection = [];     // the Things queued so far, in tap order
+
+// The box (in the merged Thing's own local space -- see mergeThings) one
+// part occupies, from its dx/dy/dz offset and sx/sy/sz extent.
+function partBounds(p) {
+  const sx = p.sx || 0.5, sy = p.sy || sx, sz = p.sz || sx;
+  const x0 = (p.dx || 0) - sx / 2, y0 = (p.dz || 0), z0 = (p.dy || 0) - sz / 2;
+  return {x0, x1: x0 + sx, y0, y1: y0 + sy, z0, z1: z0 + sz};
+}
+
+function boxInside(a, b) {
+  const pad = 1e-6;
+  return a.x0 >= b.x0 - pad && a.x1 <= b.x1 + pad &&
+         a.y0 >= b.y0 - pad && a.y1 <= b.y1 + pad &&
+         a.z0 >= b.z0 - pad && a.z1 <= b.z1 + pad;
+}
+
+function dropHiddenParts(parts) {
+  const bounds = parts.map(partBounds);
+  return parts.filter((p, i) => {
+    for (let j = 0; j < parts.length; j++) {
+      if (i === j) continue;
+      // Fully inside another part's box -> hidden, drop it. Two parts
+      // with identical bounds are each "inside" the other; keep only the
+      // higher index of a tied pair so an exact duplicate does not
+      // vanish entirely.
+      if (boxInside(bounds[i], bounds[j]) &&
+          !(i < j && boxInside(bounds[j], bounds[i]))) {
+        return false;
+      }
+    }
+    return true;
+  });
+}
+
+/* Every selected Thing becomes one or more parts, offset from the first
+ * selected one. A Thing that is already itself a merged/mesh-creator
+ * shape (has its own `parts`) contributes those individually rather than
+ * being flattened into one opaque box -- merging a merge stays
+ * composable, the same shape it would be if you had built the whole
+ * thing in the Mesh Creator from the start. */
+function mergeThings(selection) {
+  if (selection.length < 2) return null;
+  const ref = selection[0];
+  const parts = [];
+  for (const t of selection) {
+    const dxBase = t.x - ref.x, dyBase = t.y - ref.y, dzBase = (t.z || 0) - (ref.z || 0);
+    if (t.parts && t.parts.length) {
+      for (const p of t.parts) {
+        parts.push({
+          shape: p.shape || "cube",
+          dx: dxBase + (p.dx || 0), dy: dyBase + (p.dy || 0), dz: dzBase + (p.dz || 0),
+          sx: p.sx || 0.5, sy: p.sy || p.sx || 0.5, sz: p.sz || p.sx || 0.5,
+          color: p.color || t.color || "white",
+        });
+      }
+    } else {
+      const {sizeX, height, sizeZ} = effectiveDims(t);
+      parts.push({
+        shape: t.shape || "cube", dx: dxBase, dy: dyBase, dz: dzBase,
+        sx: sizeX, sy: height, sz: sizeZ, color: t.color || "white",
+      });
+    }
+  }
+  return {parts: dropHiddenParts(parts), ref};
+}
+
+function mergeSelectedObjects() {
+  if (!world) { drawerToast("not available in LIVE mode"); return; }
+  if (mergeSelection.length < 2) {
+    drawerToast(mergeSelection.length === 0 ? "merge cancelled"
+                                             : "need at least 2 objects -- cancelled");
+    return;
+  }
+  const combined = mergeThings(mergeSelection);
+  if (!combined || !combined.parts.length) { drawerToast("nothing left to merge"); return; }
+  const name = (prompt("Save the merged shape as a kind named:", "merged") || "").trim();
+  if (!name) return;
+  const safe = name.replace(/[^A-Za-z0-9_-]/g, "");
+  if (!safe) { window.alert("give it a name"); return; }
+  const glyph = (prompt("One-letter glyph for it:", safe[0].toUpperCase())
+                 || safe[0].toUpperCase()).slice(0, 1);
+  const template = {
+    kind: safe, glyph, color: combined.ref.color || "white", health: 1,
+    count: 0, solid: true, role: "prop",
+    parts: combined.parts, brain: [],
+  };
+  // Both places a template can live: the project (so it round-trips
+  // through save/load) and the live world (so it is placeable this
+  // instant, with no restart needed) -- same as the Mesh Creator's save.
+  if (project && project.characters) {
+    const idx = project.characters.findIndex(c => c.kind === safe);
+    if (idx >= 0) project.characters[idx] = template; else project.characters.push(template);
+  }
+  world.templates[safe] = template;
+  const spawned = world.spawn(safe, combined.ref.x, combined.ref.y);
+  if (spawned) spawned.z = combined.ref.z || 0;
+  for (const t of mergeSelection) world.remove(t);
+  drawerToast('merged ' + mergeSelection.length + ' objects into "' + safe + '"');
+}
+
+function toggleMerge() {
+  if (mergeArmed) {
+    mergeArmed = false;
+    mergeSelectedObjects();
+    mergeSelection = [];
+    return;
+  }
+  mergeArmed = true;
+  mergeSelection = [];
+  drawerToast("tap objects to merge, then tap 🧬 again to combine them (at least 2)");
+}
+
+function addToMergeSelection(t) {
+  if (mergeSelection.includes(t)) { drawerToast(t.kind + " is already queued"); return; }
+  mergeSelection.push(t);
+  drawerToast(mergeSelection.length + " queued -- tap 🧬 again when done");
+}
+
+// Called every frame (see frame() below) -- a ring per queued object,
+// projected the same way drawSelection()'s single ring is, a pool of
+// plain divs grown or shrunk to match how many are currently queued.
+function drawMergeHighlights() {
+  const box = $("#merge-highlights");
+  while (box.children.length < mergeSelection.length)
+    box.appendChild(document.createElement("div")).className = "merge-highlight";
+  while (box.children.length > mergeSelection.length)
+    box.removeChild(box.lastChild);
+  mergeSelection.forEach((t, i) => {
+    const el = box.children[i];
+    if (!t.alive) { el.style.display = "none"; return; }
+    const {height} = effectiveDims(t);
+    const top = height + (t.z || 0);
+    const at = renderer.project(t.x + 0.5, top, t.y + 0.5);
+    if (!at) { el.style.display = "none"; return; }
+    el.style.display = "block";
+    el.style.left = at[0] + "px";
+    el.style.top = at[1] + "px";
+  });
 }
 
 /* Quickbar -- a fixed row of plain bubble slots, always visible, no tab
@@ -3741,6 +3931,10 @@ window.addEventListener("unhandledrejection",
     // whatever you're touching, or your pending ghost if you have one --
     // colour, resize, and relocate it directly, live.
     {icon: "🎯", label: "inspect: colour, resize, relocate", onTap: () => openInspector(), locked: true},
+    // arm it, tap several objects, tap again to combine them into one
+    // placeable kind -- see toggleMerge() and the Merge section above.
+    {icon: "🧬", label: "merge: tap several objects, tap again to combine them",
+     onTap: () => toggleMerge(), locked: true},
   ]});
   setupBackpack();
   setupProperties();

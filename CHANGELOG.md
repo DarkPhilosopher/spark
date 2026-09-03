@@ -16,6 +16,41 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ### Added
 
+- **Merge (🧬, in the button drawer): combine several separately-placed
+  objects into one new placeable kind, in the 3D view.** Arm it, tap
+  objects one at a time — each gets its own green ring — tap 🧬 again to
+  combine everything queued (asks for a name and a glyph, the same
+  prompts the Mesh Creator's own "save as new kind" already uses). Each
+  selected object becomes one or more `parts` — its own shape, colour,
+  and the exact width/height/depth `buildThings()` would actually render
+  it at (`effectiveDims()`, pulled out of `buildThings()` so both use the
+  identical numbers) — offset from whichever was tapped first. An object
+  that's already itself a merged/mesh-creator shape contributes its own
+  parts individually rather than being flattened into one opaque box, so
+  merging a merge stays composable.
+
+  **Removing the inner geometry**, honestly scoped: real CSG — cutting
+  the polygons where two solids actually overlap — is a much bigger
+  undertaking than this hand-rolled low-poly renderer is set up for, and
+  too risky to ship unverified (no headless WebGL here to render a frame
+  and look). What it does instead, correct and cheap: any part whose
+  entire bounding box sits inside another part's is dropped outright
+  (`dropHiddenParts`) — it could never be seen from outside an opaque
+  shape, so its triangles were only ever costing polygons for nothing.
+  Parts that only partly overlap keep their full geometry; ordinary depth
+  testing already draws the visible result of that correctly, the same
+  as it always has for any two overlapping opaque objects, merged or not.
+
+  `tests/mesh_merge.test.js` (new, 17 checks): the merge arithmetic
+  itself — offsets, the fully-contained-part-dropped case, a part that
+  only partly overlaps surviving, an exact duplicate pair collapsing to
+  one instead of zero or two, and composing an already-merged object.
+  Closes the task noted in CLAUDE.md on 2026-09-02.
+
+  Local play only, same reasoning as Build mode and the Inspector: it
+  spawns into and removes from the live World object directly, which
+  only exists for the copy of the game running in this browser tab.
+
 - **Four new shapes, ten new colours, and a second way to resize —
   stretching one axis at a time instead of only uniformly.**
 
