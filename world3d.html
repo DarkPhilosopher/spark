@@ -305,24 +305,25 @@
   .prop-toggle{min-width:64px;min-height:34px;font-size:12px;padding:6px 10px}
   .prop-toggle.on{background:var(--accent);color:var(--bg);border-color:var(--accent)}
 
-  /* Compass -- top centre, always up, whatever the camera does. The ring
-     rotates opposite the camera's yaw so the pointer always names the
-     direction actually facing the middle of the screen. */
+  /* Compass -- a meter across the top, not a dial: ticks scroll sideways
+     as the camera turns (see drawCompass()), the current heading always
+     sits under the fixed centre marker, same idea as a flight HUD. */
   #compass{position:fixed;top:calc(8px + env(safe-area-inset-top));
            left:50%;transform:translateX(-50%);z-index:4;
-           width:52px;height:52px}
-  #compass-ring{position:absolute;inset:0;border-radius:50%;
-                background:rgba(74,80,88,.75);border:1px solid var(--line);
-                backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
-  .c-pt{position:absolute;font:700 10px/1 ui-monospace,monospace;
-       color:var(--ink)}
-  .c-n{top:4px;left:50%;transform:translateX(-50%)}
-  .c-s{bottom:4px;left:50%;transform:translateX(-50%)}
-  .c-e{right:5px;top:50%;transform:translateY(-50%)}
-  .c-w{left:5px;top:50%;transform:translateY(-50%)}
-  .c-n{color:var(--accent)}
-  #compass-pointer{position:absolute;top:-7px;left:50%;transform:translateX(-50%);
-                   font-size:11px;color:var(--accent)}
+           width:min(94vw,480px);height:32px;overflow:hidden;
+           background:rgba(74,80,88,.75);border:1px solid var(--line);
+           border-radius:8px;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+  #compass-tape{position:absolute;top:0;left:50%;height:100%;white-space:nowrap}
+  .compass-tick{position:absolute;top:0;bottom:0;transform:translateX(-50%);
+                display:flex;align-items:center;justify-content:center}
+  .compass-tick.minor::before{content:"";display:block;width:1px;height:8px;
+                              background:var(--dim)}
+  .compass-tick.major{font:700 11px/1 ui-monospace,monospace;color:var(--ink);
+                      width:28px}
+  .compass-tick.major.north{color:var(--accent)}
+  #compass-marker{position:absolute;top:0;bottom:0;left:50%;width:2px;
+                  background:var(--accent);transform:translateX(-50%);
+                  pointer-events:none}
 
   /* Quickbar -- a fixed row of plain bubble slots, always visible, no tab
      to open first. Reuses the drawer's own .bubble look for consistency,
@@ -520,12 +521,12 @@
 
 <!-- Compass: which way the camera is facing, not the character -- the
      ring rotates under a fixed pointer, same idea as a map app. -->
+<!-- A meter, not a dial: ticks scroll sideways as the camera turns, the
+     current heading always sits under the fixed centre marker -- built
+     and positioned in JS, see setupCompass()/drawCompass(). -->
 <div id="compass" title="camera heading">
-  <div id="compass-ring">
-    <span class="c-pt c-n">N</span><span class="c-pt c-e">E</span>
-    <span class="c-pt c-s">S</span><span class="c-pt c-w">W</span>
-  </div>
-  <div id="compass-pointer">▲</div>
+  <div id="compass-tape"></div>
+  <div id="compass-marker"></div>
 </div>
 
 <!-- Mesh Creator: build a custom multi-part shape (a cube here, a sphere
@@ -1731,12 +1732,40 @@ function frame() {
   requestAnimationFrame(frame);
 }
 
-/* The ring turns with the camera, the pointer at the top stays fixed --
- * same idea as a map app's compass, not a real-world heading, just this
- * world's own yaw=0 called "north". */
+/* A meter, not a dial: the tape is built once, spanning far more than a
+ * full turn each way, and the whole thing just slides sideways under a
+ * fixed centre marker as the camera's yaw changes. Not a real-world
+ * heading, just this world's own yaw=0 called "north".
+ *
+ * Built wide (8 full turns each direction) rather than regenerated every
+ * frame, because sliding one already-built strip is one style write; the
+ * only reason it is wide at all is so spinning the camera several times
+ * over never scrolls it out of ticks -- an ordinary swipe never gets
+ * anywhere close to the edge of it. */
+const COMPASS_PX_PER_DEG = 4;
+const COMPASS_NAMES = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+
+function setupCompass() {
+  const tape = $("#compass-tape");
+  const span = 8 * 360;
+  for (let deg = -span; deg <= span; deg += 15) {
+    const tick = document.createElement("div");
+    const wrapped = ((deg % 360) + 360) % 360;
+    const isMajor = wrapped % 45 === 0;
+    tick.className = "compass-tick " + (isMajor ? "major" : "minor");
+    if (isMajor) {
+      const name = COMPASS_NAMES[wrapped / 45];
+      tick.textContent = name;
+      if (name === "N") tick.classList.add("north");
+    }
+    tick.style.left = (deg * COMPASS_PX_PER_DEG) + "px";
+    tape.appendChild(tick);
+  }
+}
+
 function drawCompass() {
   const deg = renderer.yaw * 180 / Math.PI;
-  $("#compass-ring").style.transform = `rotate(${-deg}deg)`;
+  $("#compass-tape").style.transform = `translateX(${-deg * COMPASS_PX_PER_DEG}px)`;
 }
 
 function drawGlyphs(things) {
@@ -2890,6 +2919,7 @@ window.addEventListener("unhandledrejection",
   setupProperties();
   setupMeshCreator();
   setupPalette();
+  setupCompass();
   makeQuickbar(7);
 
   // Turning the phone swaps which region is which shape, and a camera framed
