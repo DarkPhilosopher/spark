@@ -566,6 +566,10 @@
   </div>
   <div id="mesh-preview-wrap"><canvas id="mesh-canvas"></canvas></div>
   <div id="mesh-body">
+    <div class="row">
+      <select id="mesh-load-select"><option value="">— load an existing mesh to edit —</option></select>
+      <button id="mesh-load-btn">load</button>
+    </div>
     <div id="mesh-part-list"></div>
     <div class="row"><button id="mesh-add-part">+ add a part</button></div>
     <div class="row">
@@ -621,6 +625,9 @@
   <div id="mesh-body">
     <div class="row">
       <label style="flex:1">color <select id="inspect-color"></select></label>
+      <label style="flex:1">shape
+        <select id="inspect-shape"><option value="cube">cube</option><option value="sphere">sphere</option></select>
+      </label>
     </div>
     <div class="row">
       <label style="flex:2">size <input id="inspect-size" type="range" min="20" max="300" step="1" value="100"></label>
@@ -631,6 +638,7 @@
       <label style="flex:1">y <input id="inspect-y" type="number" step="1"></label>
       <label style="flex:1">z (altitude) <input id="inspect-z" type="number" step="1" min="0" max="8"></label>
     </div>
+    <div class="row"><button id="inspect-delete">🗑 delete this object</button></div>
   </div>
 </div>
 
@@ -2610,6 +2618,7 @@ let meshParts = [];
 let meshSelected = null;
 let meshRenderer = null;
 let meshLoopRunning = false;
+let meshEditingKind = null;   // set while editing an existing saved mesh, so save overwrites it by default
 
 function ensureMeshRenderer() {
   if (meshRenderer) return;
@@ -2677,9 +2686,35 @@ function applyMeshFieldsToSelected() {
   renderMeshPartList();
 }
 
+function refreshMeshLoadSelect() {
+  const sel = $("#mesh-load-select");
+  sel.innerHTML = '<option value="">— load an existing mesh to edit —</option>';
+  if (!world) return;
+  const withParts = Object.keys(world.templates)
+    .filter(k => world.templates[k].parts && world.templates[k].parts.length)
+    .sort((a, b) => a.localeCompare(b));
+  for (const kind of withParts) {
+    const opt = document.createElement("option");
+    opt.value = kind; opt.textContent = kind;
+    sel.appendChild(opt);
+  }
+}
+
+function loadMeshForEditing(kind) {
+  const template = world && world.templates[kind];
+  if (!template || !template.parts) return;
+  meshParts = JSON.parse(JSON.stringify(template.parts));
+  meshEditingKind = kind;
+  meshSelected = meshParts.length ? 0 : null;
+  renderMeshPartList();
+  if (meshSelected !== null) selectMeshPart(0);
+  drawerToast('editing "' + kind + '"');
+}
+
 function openMeshCreator() {
   ensureMeshRenderer();
   renderMeshPartList();
+  refreshMeshLoadSelect();
   $("#mesh-modal").classList.add("on");
   if (!meshLoopRunning) { meshLoopRunning = true; meshFrame(); }
 }
@@ -2704,8 +2739,18 @@ function setupMeshCreator() {
   };
   $("#mesh-new").onclick = () => {
     if (meshParts.length && !confirm("Clear the current mesh and start a new one?")) return;
-    meshParts = []; meshSelected = null;
+    meshParts = []; meshSelected = null; meshEditingKind = null;
+    $("#mesh-load-select").value = "";
     renderMeshPartList();
+  };
+  $("#mesh-load-btn").onclick = () => {
+    const kind = $("#mesh-load-select").value;
+    if (!kind) return;
+    if (meshParts.length && !confirm('Replace the current mesh with "' + kind + '"?')) {
+      $("#mesh-load-select").value = "";
+      return;
+    }
+    loadMeshForEditing(kind);
   };
   for (const id of ["mesh-part-shape", "mesh-part-color", "mesh-part-dx", "mesh-part-dy",
                      "mesh-part-dz", "mesh-part-sx", "mesh-part-sy", "mesh-part-sz"]) {
@@ -2715,11 +2760,14 @@ function setupMeshCreator() {
 
   $("#mesh-save").onclick = () => {
     if (!meshParts.length) { window.alert("add at least one part first"); return; }
-    const name = (prompt("Save this mesh as a new kind named:", "mymesh") || "").trim();
+    const existing = meshEditingKind && world && world.templates[meshEditingKind];
+    const name = (prompt("Save this mesh as a kind named:",
+                          meshEditingKind || "mymesh") || "").trim();
     if (!name) return;
     const safe = name.replace(/[^A-Za-z0-9_-]/g, "");
     if (!safe) { window.alert("give it a name"); return; }
-    const glyph = (prompt("One-letter glyph for it:", safe[0].toUpperCase()) || safe[0]).slice(0, 1);
+    const glyphDefault = (existing && existing.glyph) || safe[0].toUpperCase();
+    const glyph = (prompt("One-letter glyph for it:", glyphDefault) || glyphDefault).slice(0, 1);
     const template = {
       kind: safe, glyph, color: meshParts[0].color || "white", health: 1,
       count: 0, solid: true, role: "prop",
@@ -2733,6 +2781,7 @@ function setupMeshCreator() {
       if (idx >= 0) project.characters[idx] = template; else project.characters.push(template);
     }
     if (world) world.templates[safe] = template;
+    meshEditingKind = safe;
     drawerToast('saved "' + safe + '" -- pick it in 🎨 Build');
     $("#mesh-modal").classList.remove("on");
   };
@@ -2876,6 +2925,7 @@ function openInspector(pickedTarget) {
   inspectTarget = target;
   $("#inspect-title").textContent = "🎯 " + target.kind + (target.ghost ? " (still being placed)" : "");
   $("#inspect-color").value = target.color || "white";
+  $("#inspect-shape").value = target.shape || "cube";
   const size = target.size === undefined ? 100 : target.size;
   $("#inspect-size").value = size;
   $("#inspect-size-num").value = size;
@@ -2917,12 +2967,25 @@ function setupInspector() {
   colorSelect.addEventListener("change", () => {
     if (inspectTarget && inspectTarget.alive) inspectTarget.color = colorSelect.value;
   });
+  $("#inspect-shape").addEventListener("change", () => {
+    // has no visible effect on a mesh-creator object (parts override
+    // shape entirely in the renderer), same as it always has -- shape
+    // only ever meant anything for a single-shape thing.
+    if (inspectTarget && inspectTarget.alive) inspectTarget.shape = $("#inspect-shape").value;
+  });
   $("#inspect-size").addEventListener("input", () => applyInspectorSize(true));
   $("#inspect-size-num").addEventListener("input", () => applyInspectorSize(false));
   for (const id of ["inspect-x", "inspect-y", "inspect-z"]) {
     $("#" + id).addEventListener("input", applyInspectorPosition);
     $("#" + id).addEventListener("change", applyInspectorPosition);
   }
+  $("#inspect-delete").onclick = () => {
+    if (!inspectTarget) return;
+    if (!confirm('Delete this ' + inspectTarget.kind + '? This cannot be undone.')) return;
+    world.remove(inspectTarget);
+    inspectTarget = null;
+    $("#inspect-modal").classList.remove("on");
+  };
   $("#inspect-close").onclick = () => {
     $("#inspect-modal").classList.remove("on");
     inspectTarget = null;
