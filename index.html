@@ -1,0 +1,2242 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Spark editor</title>
+<style>
+  :root{
+    --bg:#14161a; --panel:#1d2026; --panel2:#252932; --line:#333945;
+    --ink:#e8eaed; --dim:#9aa3b2; --when:#4a86c7; --do:#c98a3c;
+    --accent:#4dd0e1; --bad:#d0554f;
+    /* Nothing you are meant to press is smaller than this. A fingertip is
+       about 9mm across, which is roughly 48 device-independent pixels. */
+    --tap:48px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:15px/1.4 system-ui,-apple-system,"Roboto",sans-serif;
+       padding-bottom:50vh;-webkit-text-size-adjust:100%}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;
+     color:var(--dim);margin:18px 12px 8px}
+  button{font:inherit;color:inherit;background:var(--panel2);
+         border:1px solid var(--line);border-radius:11px;padding:12px 14px;
+         min-height:var(--tap)}
+  button:active{filter:brightness(1.35)}
+  input,select{font:inherit;color:inherit;background:var(--panel2);
+               border:1px solid var(--line);border-radius:10px;padding:12px;
+               width:100%;min-height:var(--tap)}
+
+  #top{position:sticky;top:0;z-index:5;background:var(--panel);
+       border-bottom:1px solid var(--line)}
+  header{padding:8px 8px 0;display:flex;gap:8px;align-items:center}
+  header select{width:auto;flex:1;min-width:0}
+  header button{min-width:var(--tap);font-size:19px;padding:8px}
+
+  /* the big row: play, save, new */
+  #actions{display:flex;gap:8px;padding:8px}
+  #actions button{flex:1;font-size:15px}
+  #play3d{background:#22323c;border-color:var(--accent);color:var(--accent);
+          font-weight:700}
+  #status{font-size:12px;color:var(--accent);padding:0 12px;height:16px}
+  #where{font:12px/1.6 ui-monospace,monospace;color:var(--dim);padding:6px 12px 0;
+         letter-spacing:.03em}
+  #where b{font-weight:700}
+  #where .t{color:#5dd97f} #where .f{color:#6b7280}
+
+  .strip{display:flex;gap:6px;overflow-x:auto;padding:0 12px 4px}
+  .cast{white-space:nowrap;background:var(--panel2);border:1px solid var(--line);
+        border-radius:22px;padding:12px 18px;min-height:var(--tap);
+        display:flex;align-items:center}
+  .cast.on{border-color:var(--accent);color:var(--accent)}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+         margin:0 8px;padding:10px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .field{font-size:12px;color:var(--dim);display:block;margin-bottom:3px}
+  details summary{padding:8px 12px;color:var(--dim);font-size:13px}
+
+  .row{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+       margin:0 8px 8px;padding:6px;display:flex;gap:6px;align-items:flex-start}
+  .row.on{border-color:var(--accent)}
+  .row .body{flex:1;min-width:0}
+  .row .side{display:flex;gap:6px;flex-wrap:wrap;align-items:center;
+             min-height:var(--tap);padding:4px;border-radius:9px}
+  .row .side.over{background:#2f3a44;outline:1px dashed var(--accent)}
+  .tag{font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--dim);
+       padding:0 2px}
+  .rowbtns{display:flex;flex-direction:column;gap:4px}
+  .rowbtns button{padding:8px 10px;font-size:13px;min-height:40px;min-width:40px}
+
+  .chip{border-radius:10px;padding:12px 14px;font-size:14px;line-height:1.2;
+        border:1px solid transparent;touch-action:none;max-width:100%}
+  .chip.when{background:#24384d;border-color:var(--when)}
+  .chip.do{background:#42341f;border-color:var(--do)}
+  /* A tile from the other half, offered here because you asked to see
+     everything. Dashed and dimmed so it is obvious which half it belongs to. */
+  .chip.foreign{opacity:.6;border-style:dashed}
+  /* One of your own named tiles: a whole row folded up under a name. */
+  .chip.mine{background:#2c2440;border-color:#8c6fd0}
+  #tiles .split{flex:0 0 100%;font-size:11px;color:var(--dim);
+                padding:6px 2px 0;letter-spacing:.04em;text-transform:uppercase}
+  #tiles .toggle{flex:0 0 100%;margin:2px 0 4px}
+  /* ------------------------------------------------------------- the deck
+     Eight cells. Six are buttons; the two that are left are the box you type
+     in. The whole thing fills the screen exactly -- no page scroll, ever --
+     which is why every measurement here is a fraction of the viewport and the
+     only thing allowed to scroll is the button area itself.
+
+     Held upright:  2 across, 4 down. Buttons take the first 3 rows, the box
+                    takes the last, across both columns.
+     Held sideways: 4 across, 2 down. Buttons take 3 columns, the box takes the
+                    fourth -- on the right, or the left after /swap side chat.
+
+     More than six buttons and the button area scrolls, up and down only, in
+     the same formation: the grid keeps its column count and simply runs on. */
+  #deck{position:fixed;inset:0;display:grid;gap:8px;padding:8px;
+        background:var(--bg);z-index:40;
+        grid-template-columns:1fr 1fr;grid-template-rows:repeat(4,1fr)}
+  #deck.off{display:none}
+  #keys{grid-column:1 / -1;grid-row:1 / 4;
+        display:grid;gap:8px;grid-template-columns:1fr 1fr;
+        grid-auto-rows:calc((100% - 16px) / 3);
+        overflow-y:auto;overflow-x:hidden;
+        scrollbar-width:thin;-webkit-overflow-scrolling:touch}
+  #talk{grid-column:1 / -1;grid-row:4 / 5;
+        display:flex;flex-direction:column;gap:6px;min-height:0}
+
+  /* sideways: four across, two down */
+  @media (orientation:landscape){
+    #deck{grid-template-columns:repeat(4,1fr);grid-template-rows:1fr 1fr}
+    #keys{grid-column:1 / 4;grid-row:1 / -1;
+          grid-template-columns:1fr 1fr 1fr;
+          grid-auto-rows:calc((100% - 8px) / 2)}
+    #talk{grid-column:4 / 5;grid-row:1 / -1}
+    /* the box on the left instead, after /swap side chat */
+    #deck.swapped #keys{grid-column:2 / 5}
+    #deck.swapped #talk{grid-column:1 / 2}
+  }
+
+  #keys button{width:100%;height:100%;margin:0;font-size:clamp(13px,4.2vmin,22px);
+               font-weight:600;letter-spacing:.01em;border-radius:14px;
+               display:flex;align-items:center;justify-content:center;
+               text-align:center;padding:4px;line-height:1.15;
+               background:var(--panel2);border:1px solid var(--line)}
+  #keys button:active{border-color:var(--accent);color:var(--accent)}
+  #keys button .sub{display:block;font-size:.62em;font-weight:400;
+                    color:var(--dim);margin-top:3px}
+
+  #crumb{display:flex;gap:6px;align-items:center;flex:0 0 auto}
+  #crumb button{flex:0 0 auto;padding:6px 12px;font-size:16px;line-height:1}
+  #crumb button:disabled{opacity:.35}
+  #screen{color:var(--dim);font-size:12px;overflow:hidden;text-overflow:ellipsis;
+          white-space:nowrap}
+  #keys button.mine{background:#2c2440;border-color:#8c6fd0}
+  #keys button.foreign{opacity:.6;border-style:dashed}
+  #keys button.danger{border-color:var(--bad);color:#ff9a94}
+  #log{flex:1;min-height:0;overflow-y:auto;background:var(--panel);
+       border:1px solid var(--line);border-radius:12px;padding:8px;
+       font-size:12px;line-height:1.4;display:flex;flex-direction:column;
+       gap:3px;scrollbar-width:thin}
+  #log .line span{color:var(--dim)}
+  #log .me span{color:var(--accent)}
+  #log .sys{color:var(--dim);font-style:italic}
+  #log .pin{color:var(--good)}
+  #log .bad{color:var(--bad)}
+  #saybar{display:flex;gap:6px}
+  #saybox{flex:1;min-width:0;background:var(--panel);color:var(--ink);
+          border:1px solid var(--line);border-radius:10px;padding:10px;
+          font-size:15px}
+  #saygo{flex:0 0 auto}
+
+  /* a page opened from the deck */
+  #pagebar{position:sticky;top:0;z-index:5;background:var(--bg);
+           display:flex;gap:8px;align-items:center;padding:8px;
+           border-bottom:1px solid var(--line)}
+  #pagename{color:var(--dim);font-size:13px}
+
+  /* the Python editor */
+  #code textarea{width:100%;min-height:220px;font-family:ui-monospace,monospace;
+     font-size:12px;line-height:1.45;background:#12151a;color:var(--ink);
+     border:1px solid var(--line);border-radius:8px;padding:8px;
+     white-space:pre;overflow-wrap:normal;overflow-x:auto}
+  #code .file{display:flex;gap:6px;align-items:center;margin-bottom:6px;
+     flex-wrap:wrap}
+  #code .file button{flex:0 0 auto}
+  #code .mark{font-size:11px;padding:2px 7px;border-radius:99px;
+     border:1px solid var(--line)}
+  #code .mark.on{color:var(--good);border-color:var(--good)}
+  #code .mark.off{color:var(--bad);border-color:var(--bad)}
+  #code pre.err{white-space:pre-wrap;font-size:11px;color:var(--bad);
+     background:#1b1315;border:1px solid var(--bad);border-radius:8px;
+     padding:8px;margin:6px 0;overflow-x:auto}
+  .chip.ghost{position:fixed;z-index:99;pointer-events:none;opacity:.9;
+              box-shadow:0 6px 18px #0009}
+  .chip.lifted{opacity:.3}
+  .empty{color:var(--dim);font-size:12px;padding:9px 4px}
+
+  #palette{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--panel);
+           border-top:1px solid var(--line);max-height:48vh;display:flex;
+           flex-direction:column;padding-bottom:env(safe-area-inset-bottom)}
+  #tabs{display:flex;gap:6px;padding:8px}
+  #tabs button{flex:1}
+  #tabs button.on{border-color:var(--accent);color:var(--accent)}
+  #tiles{overflow-y:auto;padding:0 8px 10px;display:flex;flex-wrap:wrap;gap:8px}
+  #tiles .chip{cursor:pointer}
+  #hint{padding:0 12px 8px;font-size:12px;color:var(--dim)}
+
+  #trash{position:fixed;left:50%;transform:translateX(-50%);bottom:52vh;z-index:98;
+         background:var(--bad);border-radius:24px;padding:14px 24px;display:none;
+         font-weight:700}
+  #trash.on{display:block}
+  #trash.over{outline:3px solid #fff}
+
+  dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);
+         border-radius:14px;padding:14px;width:min(92vw,420px)}
+  dialog::backdrop{background:#000b}
+  dialog h3{margin:0 0 10px;font-size:15px}
+  .note{font-size:12px;color:var(--dim);margin-bottom:10px}
+
+  /* ---- shared world ---- */
+  #stage{display:none;padding:0 8px}
+  #stage.on{display:block}
+  #grid{font:12px/1.05 ui-monospace,monospace;white-space:pre;overflow-x:auto;
+        background:#0d0f12;border:1px solid var(--line);border-radius:10px;
+        padding:8px;letter-spacing:1px}
+  #hud{display:flex;gap:12px;font-size:12px;color:var(--dim);padding:6px 2px}
+  #hud b{color:var(--ink)}
+  #pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:300px;
+       margin:12px auto}
+  #pad button{padding:20px 0;font-size:24px;border-radius:16px}
+  #pad .wide{grid-column:1/4}
+  #people{font-size:12px;color:var(--dim);padding:4px 2px}
+  .pill{display:inline-block;background:var(--panel2);border:1px solid var(--line);
+        border-radius:12px;padding:2px 9px;margin:2px 4px 2px 0;font-size:12px}
+  .code{font:16px/1.4 ui-monospace,monospace;letter-spacing:.18em;color:var(--accent)}
+  .dlgbtns{display:flex;gap:8px;margin-top:14px}
+  .dlgbtns button{flex:1}
+  .danger{border-color:var(--bad);color:#ff9a94}
+</style>
+</head>
+<body>
+
+<div id="top">
+  <header>
+    <select id="games" aria-label="open a game"></select>
+    <button id="people-btn" title="share and multiplayer" hidden>👥</button>
+    <button id="gear" title="commit saves to GitHub" hidden>⚙</button>
+  </header>
+  <!-- The things you press most, on their own row, thumb-sized. Playing comes
+       first because that is what you reach for after every change. -->
+  <div id="actions">
+    <button id="play3d" title="see this world in 3D, in a new tab">▶ 3D</button>
+    <button id="save">save</button>
+    <button id="new">new</button>
+  </div>
+</div>
+<div id="where">Spark exe</div>
+<div id="status"></div>
+
+<div id="stage">
+  <div id="hud"></div>
+  <div id="grid"></div>
+  <div id="people"></div>
+  <div id="pad">
+    <span></span><button data-key="up">▲</button><span></span>
+    <button data-key="left">◀</button>
+    <button data-key="space">●</button>
+    <button data-key="right">▶</button>
+    <span></span><button data-key="down">▼</button><span></span>
+    <button class="wide" id="leave">leave the game</button>
+  </div>
+</div>
+
+<!-- The deck: what you land on. Six buttons and a box to type in, filling the
+     screen. Everything below is a page the deck opens. -->
+<div id="deck">
+  <div id="keys"></div>
+  <div id="talk">
+    <div id="crumb">
+      <button id="backkey" type="button" title="back">‹</button>
+      <span id="screen"></span>
+    </div>
+    <div id="log"></div>
+    <form id="saybar" autocomplete="off">
+      <input id="saybox" placeholder="/help, or say something"
+             autocomplete="off" autocapitalize="off" spellcheck="false">
+      <button id="saygo">go</button>
+    </form>
+  </div>
+</div>
+
+<div id="page" hidden>
+  <div id="pagebar">
+    <button id="back">‹ back</button>
+    <span id="pagename"></span>
+  </div>
+
+<h2 id="cast-h">characters</h2>
+<div class="strip" id="cast"></div>
+<div class="panel" id="props"></div>
+
+<details id="world-details">
+  <summary>world settings</summary>
+  <div class="panel" id="world"></div>
+</details>
+
+<div id="tilesnote" class="note" style="padding:0 8px">
+  Tiles of your own come in two kinds. <b>Fold a row</b> into one named tile
+  with the ⊞ button on any row under <i>brain</i> — that works everywhere,
+  including offline and on other people's phones. <b>Write one in Python</b>
+  below — that runs in Termux only, and only after you switch it on.
+</div>
+
+<details id="codepanel" hidden>
+  <summary>your own tiles, written in Python</summary>
+  <div class="panel" id="code"></div>
+</details>
+
+<h2 id="brain-h">brain <span id="whose"></span></h2>
+<div id="rows"></div>
+<div id="rowbar" style="padding:0 8px 20px;display:flex;gap:6px">
+  <button id="addrow" style="flex:3">+ add a row</button>
+  <button id="undo" style="flex:2" disabled>undo</button>
+</div>
+
+<div id="trash">drop here to delete</div>
+
+<div id="palette">
+  <div id="tabs">
+    <button data-side="when" class="on">WHEN (sensors)</button>
+    <button data-side="do">DO (actions)</button>
+  </div>
+  <div id="hint">tap a tile to add it to the highlighted row - drag a placed tile to move it</div>
+  <div id="tiles"></div>
+</div>
+
+</div><!-- #page -->
+
+<dialog id="dlg"><form method="dialog" id="dlgform"></form></dialog>
+
+<script>
+"use strict";
+
+let catalog = null, project = null, charIdx = 0, rowIdx = 0, side = "when";
+const $ = s => document.querySelector(s);
+const el = (tag, cls, text) => { const n = document.createElement(tag);
+  if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+const chars = () => project.characters;
+const cur = () => chars()[charIdx] || null;
+const kinds = () => chars().map(c => c.kind).concat("anything");
+// A tile may be placed in either half -- see renderPalette -- so a definition
+// is looked for in the half it sits in first, and then in the other one. Without
+// the fallback a tile dropped into the wrong half would draw as a bare id.
+const tileDef = (s, id) => {
+  const here = s === "when" ? catalog.sensors : catalog.actions;
+  const there = s === "when" ? catalog.actions : catalog.sensors;
+  return here.find(t => t.id === id) || there.find(t => t.id === id);
+};
+
+// Does this tile actually do anything in the half it has been put in? A DO tile
+// in the WHEN half stops the row dead (the engine cannot find it among the
+// sensors, so the row never fires); a WHEN tile in the DO half is skipped. Both
+// are allowed -- you asked to see every tile everywhere -- but they are marked.
+const fitsHalf = (s, id) =>
+  (s === "when" ? catalog.sensors : catalog.actions).some(t => t.id === id);
+
+let showEverything = true;   // every tile in both halves, as asked for
+
+// ------------------------------------------------------------------- undo
+//
+// The whole game, copied as text, once per change. Games are small -- a big one
+// is a few kilobytes -- so sixty copies cost less than one photograph, and
+// keeping the entire thing sidesteps the bookkeeping that per-field undo needs:
+// nothing can be half-undone, and nothing has to know which fields exist.
+//
+// The terminal menus keep their own identical stack. The two are deliberately
+// not shared: each is undoing what you did in front of it.
+
+const UNDO_DEPTH = 60;
+let past = [];
+
+function remember() {
+  if (!project) return;
+  past.push(JSON.stringify(project));
+  if (past.length > UNDO_DEPTH) past.shift();
+  paintUndo();
+}
+
+/* Throw away the last mark if nothing actually changed after it -- opening a
+   tile's settings and closing them again should not cost an undo step. */
+function forgetIfSame() {
+  if (past.length && past[past.length - 1] === JSON.stringify(project)) past.pop();
+  paintUndo();
+}
+
+function undo() {
+  if (!past.length) return say("nothing to undo");
+  project = JSON.parse(past.pop());
+  // The cast or the rows may have shrunk under whatever was selected.
+  charIdx = Math.min(charIdx, Math.max(0, chars().length - 1));
+  const c = cur();
+  rowIdx = c ? Math.min(rowIdx, Math.max(0, c.brain.length - 1)) : 0;
+  renderAll();
+  paintUndo();
+  say("undone — " + past.length + " step" + (past.length === 1 ? "" : "s") +
+      " left");
+}
+
+function paintUndo() {
+  const button = $("#undo");
+  if (!button) return;
+  button.disabled = !past.length;
+  button.textContent = past.length ? "undo (" + past.length + ")" : "undo";
+}
+
+// the same four flags the terminal prints above its prompts
+let serverFlags = null;   // last answer from /api/status, when there is a server
+
+// Only the phone running the tunnel can see it, so ask it and redraw. A page
+// that arrived THROUGH the tunnel already knows from its own address.
+function refreshServerFlags() {
+  if (store.mode !== "server") { serverFlags = null; return; }
+  fetch("/api/status").then(r => r.json())
+    .then(f => { serverFlags = f; renderWhere(); })
+    .catch(() => {});
+}
+
+function renderWhere() {
+  const onPages = /github\.io$/i.test(location.hostname) ||
+                  /github/i.test(location.hostname);
+  const viaTunnel = /\.trycloudflare\.com$/i.test(location.hostname);
+  const flags = {Github: onPages || !!ghConfig(),
+                 Browser: true,
+                 Local: store.mode === "server",
+                 Cloudflare: viaTunnel || !!(serverFlags && serverFlags.cloudflare)};
+  const box = $("#where");
+  box.textContent = "Spark exe  ";
+  for (const [name, on] of Object.entries(flags)) {
+    box.append(name + " ");
+    box.append(el("b", on ? "t" : "f", on ? "T" : "F"));
+    box.append("  ");
+  }
+  // a count, not a flag. Only a page served by Spark has a session behind it;
+  // on GitHub Pages there is nobody to count, so the count stays away.
+  if (serverFlags) {
+    box.append("Players ");
+    box.append(el("b", serverFlags.players ? "t" : "f",
+                 String(serverFlags.players)));
+  }
+}
+
+function say(msg) { $("#status").textContent = msg;
+  clearTimeout(say.t); say.t = setTimeout(() => $("#status").textContent = "", 4000); }
+
+// Your own named tiles, kept in the game file so they travel with it.
+const myTiles = () => (project.tiles ||= []);
+const myTile = name => myTiles().find(t => t.name === name);
+
+/* What one of your named tiles does in the half it is sitting in, in English.
+   Its two halves are stored together, so the same tile reads differently
+   depending on where it was dropped -- which is the whole point of it. */
+function describeMine(s, name) {
+  const mine = myTile(name);
+  if (!mine) return "⊞ " + name + " (no such tile)";
+  const inside = (mine[s] || []).length;
+  return "⊞ " + name + (inside ? "" : " (nothing in its " +
+                                          s.toUpperCase() + " half)");
+}
+
+// tile label with its arguments filled in -- mirrors Tile.describe in tiles.py
+function describe(s, use) {
+  if (use.tile === "combo") return describeMine(s, use.args.name);
+  const def = tileDef(s, use.tile);
+  if (!def) return use.tile;
+  let text = def.label;
+  for (const p of def.params)
+    text = text.replaceAll("{" + p.name + "}",
+                           use.args[p.name] ?? p.default ?? "");
+  return text;
+}
+
+function blankProject(name) {
+  return { name, world:{width:30,height:14,wrap:false,speed:6},
+           tiles:[], characters:[ newChar("hero","@") ] };
+}
+function newChar(kind, glyph) {
+  return { kind, glyph, color:"white", health:1, count:1,
+           solid:false, role:"prop", brain:[] };
+}
+
+// ---------------------------------------------------------------- rendering
+
+function renderCast() {
+  const box = $("#cast"); box.textContent = "";
+  chars().forEach((c, i) => {
+    const b = el("button", "cast" + (i === charIdx ? " on" : ""),
+                 c.glyph + "  " + c.kind);
+    b.onclick = () => { charIdx = i; rowIdx = 0; renderAll(); };
+    box.append(b);
+  });
+  const add = el("button", "cast", "+ character");
+  add.onclick = () => {
+    const name = prompt("name it (one word)", "thing" + chars().length);
+    if (!name) return;
+    if (chars().some(c => c.kind === name)) return say("that name is taken");
+    chars().push(newChar(name, name[0]));
+    charIdx = chars().length - 1; rowIdx = 0; renderAll();
+  };
+  box.append(add);
+}
+
+function field(label, node) {
+  const wrap = el("div");
+  wrap.append(el("label", "field", label), node);
+  return wrap;
+}
+function input(type, value, onchange, attrs) {
+  const n = el("input"); n.type = type; n.value = value;
+  Object.assign(n, attrs || {});
+  n.onchange = () => onchange(type === "number" ? Number(n.value) : n.value);
+  return n;
+}
+function select(options, value, onchange) {
+  const n = el("select");
+  for (const o of options) {
+    const opt = el("option", null, String(o));
+    opt.value = o; if (String(o) === String(value)) opt.selected = true;
+    n.append(opt);
+  }
+  n.onchange = () => onchange(n.value);
+  return n;
+}
+
+function renderProps() {
+  const box = $("#props"); box.textContent = "";
+  const c = cur();
+  if (!c) { box.append(el("div", "empty", "add a character to begin")); return; }
+  const grid = el("div", "grid");
+  grid.append(
+    field("name", input("text", c.kind, v => {
+      const name = v.trim(); if (name) { c.kind = name; renderAll(); } })),
+    field("drawn as", input("text", c.glyph,
+      v => { c.glyph = (v || "?").slice(0, 1); renderAll(); }, {maxLength:1})),
+    field("colour", select(catalog.colors, c.color, v => { c.color = v; })),
+    field("health", input("number", c.health, v => c.health = Math.max(1, v), {min:1})),
+    field("how many at start",
+          input("number", c.count, v => c.count = Math.max(0, v), {min:0})),
+    field("role", select(["player","prop"], c.role, v => c.role = v)));
+  box.append(grid);
+
+  const solid = el("button", null, c.solid ? "solid: blocks others"
+                                           : "solid: walk through");
+  solid.style.marginTop = "8px";
+  solid.onclick = () => { c.solid = !c.solid; renderProps(); };
+  const del = el("button", "danger", "delete " + c.kind);
+  del.style.marginTop = "8px";
+  del.onclick = () => {
+    if (!confirm("delete " + c.kind + "?")) return;
+    chars().splice(charIdx, 1); charIdx = 0; rowIdx = 0; renderAll();
+  };
+  const bar = el("div", "grid"); bar.append(solid, del);
+  box.append(bar);
+}
+
+function renderWorld() {
+  const box = $("#world"); box.textContent = "";
+  const w = project.world, grid = el("div", "grid");
+
+  const rename = el("button", null, "rename this game");
+  rename.onclick = async () => {
+    const was = project.name;
+    const now = (prompt("new name for this game", was) || "").trim();
+    if (!now || now === was) return;
+    project.name = now;
+    const out = await store.saveGame(project);
+    if (out.error) { project.name = was; return say(out.error); }
+    if (confirm("delete the old copy, '" + was + "'?")) await store.deleteGame(was);
+    await loadGames(project.name);
+    say("renamed to " + project.name + " — saved to " + out.where);
+  };
+  box.append(field("name", el("div", null, project.name)), rename,
+             el("div", "note", "renaming saves a fresh copy under the new name"));
+
+  grid.append(
+    field("width", input("number", w.width, v => w.width = Math.min(70, Math.max(5, v)))),
+    field("height", input("number", w.height, v => w.height = Math.min(20, Math.max(5, v)))),
+    field("speed (ticks/sec)", input("number", w.speed ?? 6,
+                                     v => w.speed = Math.min(30, Math.max(1, v)))),
+    field("edges wrap", select(["no","yes"], w.wrap ? "yes" : "no",
+                               v => w.wrap = (v === "yes"))));
+  box.append(grid);
+}
+
+function chipFor(s, use, r, i) {
+  const chip = el("div", "chip " + s, describe(s, use));
+  // A tile sitting in the half it does not belong to stays marked once placed,
+  // so a row that never fires shows why on its face rather than in the manual.
+  if (!fitsHalf(s, use.tile)) {
+    chip.classList.add("foreign");
+    chip.title = s === "when" ? "a DO tile here stops the row firing at all"
+                              : "a WHEN tile here is skipped";
+  }
+  chip.dataset.row = r; chip.dataset.side = s; chip.dataset.i = i;
+  chip.addEventListener("pointerdown", e => startDrag(e, chip));
+  return chip;
+}
+
+function renderRows() {
+  const box = $("#rows"); box.textContent = "";
+  const c = cur();
+  $("#whose").textContent = c ? "of " + c.kind : "";
+  if (!c) return;
+  if (!c.brain.length)
+    box.append(el("div", "empty", "  no rows yet - tap “+ add a row”, then tap a tile below"));
+
+  c.brain.forEach((row, r) => {
+    const node = el("div", "row" + (r === rowIdx ? " on" : ""));
+    node.onclick = () => { rowIdx = r; renderRows(); };
+    const body = el("div", "body");
+
+    for (const s of ["when", "do"]) {
+      const line = el("div", "side");
+      line.dataset.row = r; line.dataset.side = s;
+      line.append(el("span", "tag", s.toUpperCase()));
+      row[s].forEach((use, i) => line.append(chipFor(s, use, r, i)));
+      if (!row[s].length) line.append(el("span", "empty",
+        s === "when" ? "never fires" : "does nothing"));
+      body.append(line);
+    }
+
+    const btns = el("div", "rowbtns");
+    const fold = el("button", null, "⊞");
+    fold.title = "fold this whole row into one tile of your own, and name it";
+    fold.onclick = ev => { ev.stopPropagation(); foldRow(r); };
+    const up = el("button", null, "↑");
+    up.onclick = ev => { ev.stopPropagation();
+      if (r > 0) { remember(); const b = c.brain; [b[r-1], b[r]] = [b[r], b[r-1]];
+                   rowIdx = r - 1; renderRows(); } };
+    const del = el("button", null, "✕");
+    del.onclick = ev => { ev.stopPropagation(); remember(); c.brain.splice(r, 1);
+                          rowIdx = Math.max(0, rowIdx - 1); renderRows(); };
+    btns.append(fold, up, del);
+    node.append(body, btns);
+    box.append(node);
+  });
+}
+
+/* Every tile, in whichever half you are looking at.
+ *
+ * The half's own tiles come first, then -- unless you turn it off -- the other
+ * half's, dashed and dimmed under a heading that says what they are. Nothing is
+ * hidden from you: the rule about which tile belongs where is the engine's, and
+ * you may want to place one anyway to see what happens. The marking is there so
+ * that "why does this row never fire" has a visible answer. */
+/* Fold a whole row into one tile of your own, and put that tile in its place.
+ *
+ * Both halves of the row go in together, which is what makes the result usable
+ * on either side: dropped in the WHEN half its sensors are tested, dropped in
+ * the DO half its actions run. The row it came from is replaced by the new tile
+ * in both halves, so the character carries on doing exactly what it did -- the
+ * fold is a tidying, not a change of behaviour. */
+function foldRow(r) {
+  const c = cur();
+  const row = c.brain[r];
+  if (!row.when.length && !row.do.length) return say("that row is empty");
+
+  const name = (prompt("name this tile", "my tile") || "").trim();
+  if (!name) return;
+  if (name.length > 40) return say("that name is too long");
+  const already = myTile(name);
+  if (already && !confirm("you already have a tile called " + name +
+                          ". replace what is inside it?")) return;
+
+  remember();
+  const copy = JSON.parse(JSON.stringify(row));
+  const made = {name, when: copy.when, do: copy.do};
+  const list = myTiles();
+  const at = list.findIndex(t => t.name === name);
+  if (at >= 0) list[at] = made; else list.push(made);
+
+  c.brain[r] = {when: [{tile: "combo", args: {name}}],
+                do:   [{tile: "combo", args: {name}}]};
+  renderRows(); renderPalette();
+  say("made ⊞ " + name + " — it is in the palette now, in both halves");
+}
+
+/* Take one of your tiles away. Rows still pointing at it are left alone: the
+   engine treats a name nobody has defined as simply not firing, and the chip
+   says so, which is kinder than hunting them down and deleting those too. */
+function unfold(name) {
+  if (!confirm("delete your tile " + name + "?\n\nrows using it will stop " +
+               "doing anything, but are not themselves deleted.")) return;
+  remember();
+  const list = myTiles();
+  const at = list.findIndex(t => t.name === name);
+  if (at >= 0) list.splice(at, 1);
+  renderRows(); renderPalette();
+  say("deleted ⊞ " + name);
+}
+
+function renderPalette() {
+  const box = $("#tiles"); box.textContent = "";
+
+  const toggle = el("button", "toggle",
+                    showEverything ? "showing every tile — tap to show only "
+                                     + side.toUpperCase() + " tiles"
+                                   : "showing only " + side.toUpperCase()
+                                     + " tiles — tap to show every tile");
+  toggle.onclick = () => { showEverything = !showEverything; renderPalette(); };
+  box.append(toggle);
+
+  // Your own named tiles first: they are the ones you made, and the reason to
+  // make one is to reach for it often.
+  if (myTiles().length) {
+    box.append(el("div", "split", "your own tiles"));
+    for (const own of myTiles()) {
+      const empty = !(own[side] || []).length;
+      const chip = el("div", "chip mine" + (empty ? " foreign" : ""),
+                      "⊞ " + own.name);
+      chip.title = empty
+        ? "this tile has nothing in its " + side.toUpperCase() + " half"
+        : (own[side] || []).length + " tile(s) in its " + side.toUpperCase()
+          + " half";
+      chip.onclick = () => addTile({id: "combo", params: [],
+                                    args: {name: own.name}});
+      const bin = el("span", null, "  ✕");
+      bin.style.opacity = ".7";
+      bin.onclick = ev => { ev.stopPropagation(); unfold(own.name); };
+      chip.append(bin);
+      box.append(chip);
+    }
+    box.append(el("div", "split", side.toUpperCase() + " tiles"));
+  }
+
+  // `combo` is the machinery behind your own tiles; it is offered as those
+  // chips above rather than as a raw tile asking you to type a name.
+  const plain = defs => defs.filter(d => d.id !== "combo");
+
+  const mine = plain(side === "when" ? catalog.sensors : catalog.actions);
+  for (const def of mine) {
+    const chip = el("div", "chip " + side, def.label);
+    chip.onclick = () => addTile(def);
+    box.append(chip);
+  }
+  if (!showEverything) return;
+
+  const other = side === "when" ? "do" : "when";
+  const theirs = plain(side === "when" ? catalog.actions : catalog.sensors);
+  box.append(el("div", "split",
+                other.toUpperCase() + " tiles — placed here they do not fire"));
+  for (const def of theirs) {
+    const chip = el("div", "chip " + side + " foreign", def.label);
+    chip.title = "a " + other.toUpperCase() + " tile. In the "
+               + side.toUpperCase() + " half "
+               + (side === "when" ? "it stops the row firing at all"
+                                  : "it is skipped");
+    chip.onclick = () => addTile(def);
+    box.append(chip);
+  }
+}
+
+function renderAll() { renderWhere(); renderCast(); renderProps(); renderWorld();
+                       renderRows(); renderPalette(); }
+
+// ---------------------------------------------------------------- editing
+
+function addTile(def) {
+  const c = cur();
+  if (!c) return say("add a character first");
+  remember();
+  if (!c.brain.length) c.brain.push({when:[], do:[]});
+  rowIdx = Math.min(rowIdx, c.brain.length - 1);
+  // A named tile arrives with its name already filled in, so it is placed
+  // without asking anything -- which is the point of having made it.
+  const args = Object.assign({}, def.args || {});
+  for (const p of def.params) if (!(p.name in args)) args[p.name] = p.default;
+  const use = {tile: def.id, args};
+  c.brain[rowIdx][side].push(use);
+  renderRows();
+  if (def.params.length && !def.args)
+    openParams(side, use, rowIdx, c.brain[rowIdx][side].length - 1);
+}
+
+function openParams(s, use, r, i) {
+  // One mark for the whole visit to this dialog, so changing three settings and
+  // closing is a single undo rather than three. Dropped again on the way out if
+  // nothing was actually touched -- see forgetIfSame.
+  remember();
+  const def = tileDef(s, use.tile), form = $("#dlgform");
+  form.textContent = "";
+  form.append(el("h3", null, describe(s, use)));
+
+  for (const p of def.params) {
+    let node;
+    if (p.kind === "int")
+      node = input("number", use.args[p.name] ?? p.default,
+                   v => use.args[p.name] = v);
+    else if (p.kind === "choice")
+      node = select(p.choices, use.args[p.name] ?? p.default,
+                    v => use.args[p.name] = v);
+    else if (p.kind === "kind")
+      node = select(kinds(), use.args[p.name] ?? p.default,
+                    v => use.args[p.name] = v);
+    else
+      node = input("text", use.args[p.name] ?? p.default ?? "",
+                   v => use.args[p.name] = v);
+    form.append(field(p.prompt, node));
+  }
+
+  const btns = el("div", "dlgbtns");
+  const remove = el("button", "danger", "remove tile");
+  remove.type = "button";
+  remove.onclick = () => { cur().brain[r][s].splice(i, 1);
+                           $("#dlg").close(); renderRows(); };
+  const done = el("button", null, "done");
+  done.type = "button";
+  done.onclick = () => { $("#dlg").close(); renderRows(); };
+  btns.append(remove, done);
+  form.append(btns);
+  $("#dlg").showModal();
+}
+
+// --------------------------------------------------- dragging placed tiles
+
+let drag = null, swallowClick = false;
+
+function startDrag(e, chip) {
+  drag = {chip, x:e.clientX, y:e.clientY, live:false,
+          from:{r:+chip.dataset.row, s:chip.dataset.side, i:+chip.dataset.i}};
+  window.addEventListener("pointermove", onDragMove);
+  window.addEventListener("pointerup", onDragEnd, {once:true});
+  window.addEventListener("pointercancel", onDragEnd, {once:true});
+}
+
+function onDragMove(e) {
+  if (!drag) return;
+  if (!drag.live) {
+    if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 8) return;
+    drag.live = true;
+    drag.ghost = drag.chip.cloneNode(true);
+    drag.ghost.classList.add("ghost");
+    document.body.append(drag.ghost);
+    drag.chip.classList.add("lifted");
+    $("#trash").classList.add("on");
+  }
+  e.preventDefault();
+  drag.ghost.style.left = (e.clientX - 40) + "px";
+  drag.ghost.style.top  = (e.clientY - 22) + "px";
+
+  const under = document.elementFromPoint(e.clientX, e.clientY);
+  const zone = under && under.closest(".side");
+  const bin  = under && under.closest("#trash");
+  document.querySelectorAll(".side.over").forEach(n => n.classList.remove("over"));
+  $("#trash").classList.toggle("over", !!bin);
+  if (zone && zone.dataset.side === drag.from.s) zone.classList.add("over");
+}
+
+function onDragEnd(e) {
+  window.removeEventListener("pointermove", onDragMove);
+  if (!drag) return;
+  const d = drag; drag = null;
+  if (!d.live) return;                       // a plain tap: open the params
+  swallowClick = true;                       // ...but a drag must not open it
+  d.ghost.remove();
+  d.chip.classList.remove("lifted");
+  $("#trash").classList.remove("on", "over");
+  document.querySelectorAll(".side.over").forEach(n => n.classList.remove("over"));
+
+  const under = document.elementFromPoint(e.clientX, e.clientY);
+  const zone = under && under.closest(".side");
+  const bin  = under && under.closest("#trash");
+  const brain = cur().brain;
+  remember();
+  const [moved] = brain[d.from.r][d.from.s].splice(d.from.i, 1);
+
+  if (!bin && zone && zone.dataset.side === d.from.s)
+    brain[+zone.dataset.row][zone.dataset.side].push(moved);
+  else if (!bin)
+    brain[d.from.r][d.from.s].splice(d.from.i, 0, moved);   // put it back
+  renderRows();
+  forgetIfSame();          // a drag that put the tile back is not a change
+}
+
+// However the settings dialog is left -- done, remove, Escape, or tapping the
+// backdrop -- the mark openParams laid down is dropped again if nothing moved.
+$("#dlg").addEventListener("close", () => {
+  forgetIfSame();
+  // A tile's settings are the one thing that is still a dialog, so the screen
+  // behind it has to be redrawn by hand once it closes.
+  if (stack.length) renderDeck();
+});
+
+// chips answer a tap by opening their parameters
+document.addEventListener("click", e => {
+  if (swallowClick) { swallowClick = false; return; }
+  const chip = e.target.closest("#rows .chip");
+  if (!chip) return;
+  const r = +chip.dataset.row, s = chip.dataset.side, i = +chip.dataset.i;
+  openParams(s, cur().brain[r][s][i], r, i);
+});
+
+// ------------------------------------------------- where games are kept
+//
+// Two backends behind one interface. With the Python server running we read
+// and write games/ directly. Opened as a plain static page -- GitHub Pages,
+// or a file on the phone -- we fall back to files the server baked out, keep
+// edits in the browser, and optionally commit them through the GitHub API.
+
+const LS_GAME = "spark:game:", LS_GH = "spark:github";
+
+const store = {
+  mode: "static",
+
+  async init() {
+    try {
+      const res = await fetch("api/tiles", {cache: "no-store"});
+      if (res.ok) { this.mode = "server"; return await res.json(); }
+    } catch (e) { /* no server here -- static it is */ }
+    this.mode = "static";
+    // A missing file 404s; opening index.html straight off the SD card makes
+    // fetch throw outright, because file:// pages may not read siblings.
+    let res;
+    try {
+      res = await fetch("tiles.json", {cache: "no-store"});
+    } catch (e) {
+      throw new Error("cannot read tiles.json — open this page through " +
+                      "`python3 spark.py edit` or the GitHub Pages link, " +
+                      "not as a file:// path");
+    }
+    if (!res.ok) throw new Error("tiles.json missing — run: python3 spark.py export");
+    return await res.json();
+  },
+
+  localNames() {
+    return Object.keys(localStorage)
+      .filter(k => k.startsWith(LS_GAME))
+      .map(k => k.slice(LS_GAME.length));
+  },
+
+  async listGames() {
+    if (this.mode === "server") {
+      const res = await api("api/games");
+      if (res.status === 403) return null;    // a guest, not an editor
+      return await res.json();
+    }
+    let shipped = [];
+    try {
+      const res = await fetch("games/index.json", {cache: "no-store"});
+      if (res.ok) shipped = await res.json();
+    } catch (e) { /* fine, browser copies only */ }
+    return [...new Set([...shipped, ...this.localNames()])].sort();
+  },
+
+  async loadGame(name) {
+    if (this.mode === "server") {
+      const res = await api("api/game?name=" + encodeURIComponent(name));
+      return res.ok ? await res.json() : null;
+    }
+    const mine = localStorage.getItem(LS_GAME + name);   // your edits win
+    if (mine) return JSON.parse(mine);
+    try {
+      const res = await fetch("games/" + encodeURIComponent(name) + ".json",
+                              {cache: "no-store"});
+      return res.ok ? await res.json() : null;
+    } catch (e) { return null; }
+  },
+
+  async deleteGame(name) {
+    if (this.mode === "server")
+      await api("api/game?name=" + encodeURIComponent(name), {method: "DELETE"});
+    localStorage.removeItem(LS_GAME + name);
+  },
+
+  async saveGame(proj) {
+    const safe = String(proj.name || "").replace(/[^A-Za-z0-9 _-]/g, "").trim();
+    if (!safe) return {error: "give the game a name"};
+    proj.name = safe;
+
+    if (this.mode === "server") {
+      const res = await api("api/game", {method: "POST",
+        headers: {"Content-Type": "application/json"}, body: JSON.stringify(proj)});
+      const out = await res.json();
+      return res.ok ? {where: "games/" + safe + ".json"} : {error: out.error};
+    }
+
+    localStorage.setItem(LS_GAME + safe, JSON.stringify(proj));
+    const gh = ghConfig();
+    if (!gh) return {where: "this browser"};
+    try {
+      await ghPut("games/" + safe + ".json", JSON.stringify(proj, null, 2),
+                  "spark: save " + safe, gh);
+      const names = await this.listGames();
+      await ghPut("games/index.json", JSON.stringify(names, null, 2),
+                  "spark: update game list", gh);
+      return {where: "this browser + " + gh.owner + "/" + gh.repo};
+    } catch (e) {
+      return {where: "this browser", warn: "GitHub: " + e.message};
+    }
+  },
+};
+
+// ---- committing to GitHub from the phone, via a fine-grained token --------
+
+function ghConfig() {
+  try {
+    const c = JSON.parse(localStorage.getItem(LS_GH) || "null");
+    return (c && c.owner && c.repo && c.token) ? c : null;
+  } catch (e) { return null; }
+}
+
+function b64(text) {
+  const bytes = new TextEncoder().encode(text);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+async function ghPut(path, text, message, gh) {
+  const url = "https://api.github.com/repos/" + gh.owner + "/" + gh.repo +
+              "/contents/" + path;
+  const headers = {Authorization: "Bearer " + gh.token,
+                   Accept: "application/vnd.github+json"};
+  const branch = gh.branch || "main";
+
+  let sha;                                   // updating a file needs its sha
+  const head = await fetch(url + "?ref=" + branch, {headers});
+  if (head.ok) sha = (await head.json()).sha;
+
+  const res = await fetch(url, {method: "PUT", headers,
+    body: JSON.stringify({message, content: b64(text), branch,
+                          ...(sha ? {sha} : {})})});
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({}));
+    throw new Error(detail.message || ("HTTP " + res.status));
+  }
+}
+
+function openGitHubSettings() {
+  const gh = JSON.parse(localStorage.getItem(LS_GH) || "{}");
+  const form = $("#dlgform");
+  form.textContent = "";
+  form.append(el("h3", null, "commit saves to GitHub"));
+  form.append(el("div", "note",
+    "Optional. Games always save in this browser. Add a fine-grained token " +
+    "with Contents: read and write on this one repo, and saving also commits " +
+    "games/*.json. The token is stored in this browser only — anyone with " +
+    "the phone unlocked can read it."));
+
+  const fields = {};
+  for (const [key, label, ph] of [["owner","github user","your-username"],
+                                  ["repo","repo","spark"],
+                                  ["branch","branch","main"],
+                                  ["token","token (ghp_... )","paste here"]]) {
+    const n = el("input");
+    n.type = key === "token" ? "password" : "text";
+    n.value = gh[key] || (key === "branch" ? "main" : "");
+    n.placeholder = ph;
+    fields[key] = n;
+    form.append(field(label, n));
+  }
+
+  const btns = el("div", "dlgbtns");
+  const clear = el("button", "danger", "forget token");
+  clear.type = "button";
+  clear.onclick = () => { localStorage.removeItem(LS_GH); $("#dlg").close();
+                          say("token forgotten"); };
+  const done = el("button", null, "done");
+  done.type = "button";
+  done.onclick = () => {
+    const next = {};
+    for (const k in fields) next[k] = fields[k].value.trim();
+    localStorage.setItem(LS_GH, JSON.stringify(next));
+    $("#dlg").close();
+    say(ghConfig() ? "saves will also commit to " + next.owner + "/" + next.repo
+                   : "saving in this browser only");
+  };
+  btns.append(clear, done);
+  form.append(btns);
+  $("#dlg").showModal();
+}
+
+// ------------------------------------------------------------------ the deck
+//
+// Six buttons and a box to type in, filling the screen. Everything that was
+// here before is still here -- the deck opens it as a page with a back button,
+// rather than replacing it. That is deliberate: the six buttons are a way in,
+// not a smaller Spark.
+//
+// The formation is the CSS above. This half is what the buttons do, and what
+// the box understands.
+
+const LS_SWAP = "spark:chatside", LS_PINS = "spark:pins";
+
+/* Every screen is the same six-button formation.
+ *
+ * A screen is a list of buttons and a name. Opening one pushes it on a stack;
+ * `‹` beside the box pops it. There is no long scrolling page anywhere -- when
+ * a list is longer than six (the cast, the rows, the tile palette, all of
+ * them), the button area scrolls in the same formation rather than changing
+ * shape.
+ *
+ * Two things genuinely are not buttons and stay as they were: a tile's settings
+ * (the dialog), and the Python text editor. Both open over the deck. */
+
+const stack = [];                 // screens, deepest first
+let pinned = [];                  // notes kept by /pin, in this browser
+
+function deckPush(build) {
+  stack.push(build);
+  renderDeck();
+}
+
+function deckPop() {
+  if (stack.length <= 1) return;
+  stack.pop();
+  renderDeck();
+}
+
+function deckHome() {
+  stack.length = 0;
+  stack.push(homeScreen);
+  renderDeck();
+}
+
+/* Rebuild the current screen from scratch. Every action ends by calling this,
+   so nothing has to remember which buttons its change affected. */
+function renderDeck() {
+  if (!stack.length) stack.push(homeScreen);
+  const screen = stack[stack.length - 1]();
+  const box = $("#keys");
+  box.textContent = "";
+  for (const item of screen.items || []) {
+    if (!item) continue;
+    const b = el("button", item.kind || null, item.key);
+    if (item.sub) b.append(el("span", "sub", item.sub));
+    b.onclick = async () => { await item.go(); };
+    box.append(b);
+  }
+  $("#screen").textContent = screen.name || "";
+  $("#backkey").disabled = stack.length <= 1;
+  box.scrollTop = 0;
+}
+
+const item = (key, sub, go, kind) => ({key, sub, go, kind});
+
+// -- the seven you land on, six plus 3d world (scroll to see it) -----------
+
+function homeScreen() {
+  // A guest who joined to play or watch gets play and the box; the four that
+  // change the game would be refused by the server anyway, so they say so here
+  // rather than opening on to nothing.
+  const guest = !amEditor();
+  const barred = what => () => note("you joined as a guest — you can play and "
+                                    + "talk here, not " + what, "bad");
+  return {name: project ? project.name : "spark", items: [
+    item("play", "run the game", deckPlay),
+    item("edit", guest ? "guests cannot" : "open / new / share",
+         guest ? barred("open or save games") : () => deckPush(editScreen),
+         guest ? "foreign" : null),
+    item("characters", guest ? "guests cannot" : castCount(),
+         guest ? barred("change the cast") : () => deckPush(castScreen),
+         guest ? "foreign" : null),
+    item("brain", guest ? "guests cannot" : brainCount(),
+         guest ? barred("change a brain") : () => deckPush(brainScreen),
+         guest ? "foreign" : null),
+    item("tiles", guest ? "guests cannot" : tilesCount(),
+         guest ? barred("make tiles") : () => deckPush(tilesScreen),
+         guest ? "foreign" : null),
+    item("save", guest ? "guests cannot" : "write it down",
+         guest ? barred("save") : deckSave, guest ? "foreign" : null),
+    item("3d world", guest ? "guests cannot" : "start barren",
+         guest ? barred("start a 3d world") : startBarren3D,
+         guest ? "foreign" : null),
+  ]};
+}
+
+/* A fresh, empty 3D world: no clutter, just a sphere you can already move,
+ * plus the spawn/flip-shape/resize starter kit from Game 001, so there is
+ * something to do the moment it opens. Reached from the 3D world tile at
+ * the bottom of the main menu. */
+function blankBarrenProject() {
+  const moveRow = dir => ({when: [{tile: "key", args: {key: dir}}],
+                           do: [{tile: "move", args: {dir}}]});
+  return {
+    name: "barren",
+    world: {width: 20, height: 20, wrap: false, speed: 6},
+    characters: [
+      {
+        kind: "hero", glyph: "@", color: "cyan", health: 3, count: 1,
+        solid: false, role: "player", shape: "sphere",
+        brain: [
+          moveRow("up"), moveRow("down"), moveRow("left"), moveRow("right"),
+          {when: [{tile: "key", args: {key: "space"}}],
+           do: [{tile: "spawn", args: {kind: "cube"}}]},
+          {when: [{tile: "key", args: {key: "e"}},
+                  {tile: "touch", args: {kind: "cube"}}],
+           do: [{tile: "shape", args: {target: "it"}}]},
+          {when: [{tile: "key", args: {key: "f"}},
+                  {tile: "touch", args: {kind: "cube"}}],
+           do: [{tile: "resize", args: {target: "it", amount: 25}}]},
+          {when: [{tile: "key", args: {key: "w"}}],
+           do: [{tile: "fly", args: {dir: "up"}}]},
+          {when: [{tile: "key", args: {key: "s"}}],
+           do: [{tile: "fly", args: {dir: "down"}}]},
+          {when: [{tile: "key", args: {key: "a"}}],
+           do: [{tile: "place", args: {kind: "block"}}]},
+          {when: [{tile: "key", args: {key: "d"}}],
+           do: [{tile: "toggle_flight", args: {}}]},
+        ],
+      },
+      {
+        kind: "cube", glyph: "c", color: "yellow", health: 1, count: 0,
+        solid: true, role: "prop", shape: "cube", size: 100, brain: [],
+      },
+      {
+        kind: "block", glyph: "▦", color: "blue", health: 1, count: 0,
+        solid: false, role: "prop", shape: "cube", full: true, brain: [],
+      },
+    ],
+    tiles: [],
+  };
+}
+
+function startBarren3D() {
+  location.href = "world3d.html#g=" + b64url(JSON.stringify(blankBarrenProject()));
+}
+
+const castCount = () => !project ? "" :
+  chars().length + (chars().length === 1 ? " character" : " characters");
+const brainCount = () => {
+  const c = cur();
+  return !c ? "nobody yet"
+            : c.kind + " — " + c.brain.length +
+              (c.brain.length === 1 ? " row" : " rows");
+};
+const tilesCount = () => {
+  const mine = project ? myTiles().length : 0;
+  return mine ? mine + " of your own" : "make your own";
+};
+
+// -- edit -------------------------------------------------------------------
+
+function editScreen() {
+  return {name: "edit", items: [
+    item("open", "a saved game", () => deckPush(gamesScreen)),
+    item("new", "start again", async () => {
+      const name = (prompt("name your game", "mygame") || "").trim();
+      if (!name) return;
+      project = blankProject(name);
+      past = []; paintUndo(); charIdx = 0; rowIdx = 0;
+      await loadGames(project.name);
+      renderAll(); deckHome();
+      note("new game “" + name + "” — press save to write it down");
+    }),
+    item("rename", project ? project.name : "", async () => {
+      const was = project.name;
+      const now = (prompt("new name for this game", was) || "").trim();
+      if (!now || now === was) return;
+      project.name = now;
+      const out = await store.saveGame(project);
+      if (out.error) { project.name = was; return note(out.error, "bad"); }
+      if (confirm("delete the old copy, “" + was + "”?"))
+        await store.deleteGame(was);
+      await loadGames(project.name);
+      renderDeck();
+      note("renamed to " + project.name);
+    }),
+    item("world", worldSummary(), () => deckPush(worldScreen)),
+    item("share", store.mode === "server" ? "invite people" : "needs the server",
+         () => {
+           if (store.mode !== "server")
+             return note("sharing needs `python3 spark.py host`", "bad");
+           openHostPanel();
+         }),
+    item("github", ghConfig() ? "connected" : "connect a token",
+         openGitHubSettings),
+  ]};
+}
+
+const worldSummary = () => project
+  ? project.world.width + "×" + project.world.height +
+    (project.world.wrap ? " wrap" : "")
+  : "";
+
+function worldScreen() {
+  const w = project.world;
+  const ask = (label, key, low, high) => item(label, String(w[key] ?? ""),
+    () => {
+      const got = parseInt(prompt(label, w[key]), 10);
+      if (!isNaN(got)) { w[key] = Math.max(low, Math.min(high, got)); renderDeck(); }
+    });
+  return {name: "world", items: [
+    ask("width", "width", 5, 70),
+    ask("height", "height", 5, 20),
+    ask("speed", "speed", 1, 30),
+    item("edges", w.wrap ? "wrap around" : "solid",
+         () => { w.wrap = !w.wrap; renderDeck(); }),
+  ]};
+}
+
+function gamesScreen() {
+  return {name: "open a game", items: (gameNames || []).map(n =>
+    item(n, n === (project && project.name) ? "open now" : "", async () => {
+      await openGame(n);
+      deckHome();
+    }))};
+}
+
+// -- characters -------------------------------------------------------------
+
+function castScreen() {
+  const items = chars().map((c, i) => item(c.glyph + "  " + c.kind,
+    c.brain.length + (c.brain.length === 1 ? " row" : " rows"),
+    () => { charIdx = i; rowIdx = 0; renderAll(); deckPush(oneCharScreen); }));
+  items.push(item("+ new", "add a character", () => {
+    const name = (prompt("name it (one word)", "thing" + chars().length) || "")
+      .trim();
+    if (!name) return;
+    if (chars().some(c => c.kind === name)) return note("that name is taken",
+                                                       "bad");
+    remember();
+    chars().push(newChar(name, name[0]));
+    charIdx = chars().length - 1; rowIdx = 0;
+    renderAll(); renderDeck();
+  }));
+  return {name: "characters", items};
+}
+
+function oneCharScreen() {
+  const c = cur();
+  if (!c) return {name: "characters", items: []};
+  const type = (label, key, cast) => item(label, String(c[key]), () => {
+    const got = prompt(label, c[key]);
+    if (got === null) return;
+    remember();
+    c[key] = cast(got);
+    renderAll(); renderDeck();
+  });
+  return {name: c.kind, items: [
+    type("name", "kind", v => v.trim() || c.kind),
+    type("drawn as", "glyph", v => (v || "?").slice(0, 1)),
+    item("colour", c.color, () => deckPush(() => ({
+      name: "colour", items: catalog.colors.map(col =>
+        item(col, col === c.color ? "now" : "", () => {
+          remember(); c.color = col; renderAll(); deckPop();
+        }))}))),
+    type("health", "health", v => Math.max(1, parseInt(v, 10) || 1)),
+    type("how many at start", "count", v => Math.max(0, parseInt(v, 10) || 0)),
+    item("role", c.role, () => {
+      remember(); c.role = c.role === "player" ? "prop" : "player";
+      renderAll(); renderDeck();
+    }),
+    item("solid", c.solid ? "blocks others" : "walk through", () => {
+      remember(); c.solid = !c.solid; renderAll(); renderDeck();
+    }),
+    item("brain", c.brain.length + " rows",
+         () => deckPush(brainScreen)),
+    item("delete", "remove " + c.kind, () => {
+      if (!confirm("delete " + c.kind + "?")) return;
+      remember();
+      chars().splice(charIdx, 1); charIdx = 0; rowIdx = 0;
+      renderAll(); deckPop();
+    }, "danger"),
+  ]};
+}
+
+// -- brain ------------------------------------------------------------------
+
+function brainScreen() {
+  const c = cur();
+  if (!c) return {name: "brain", items: [
+    item("no character yet", "make one first", () => deckPush(castScreen))]};
+  const items = c.brain.map((row, r) => item(
+    "row " + (r + 1),
+    (row.when.length || 0) + " when · " + (row.do.length || 0) + " do",
+    () => { rowIdx = r; renderRows(); deckPush(oneRowScreen); }));
+  items.push(item("+ row", "a new one", () => {
+    remember();
+    c.brain.push({when: [], do: []});
+    rowIdx = c.brain.length - 1;
+    renderRows(); renderDeck();
+  }));
+  items.push(item("undo", past.length ? past.length + " to go" : "nothing yet",
+                  () => { undo(); renderDeck(); }));
+  return {name: "brain of " + c.kind, items};
+}
+
+function oneRowScreen() {
+  const c = cur();
+  const row = c && c.brain[rowIdx];
+  if (!row) return brainScreen();
+  const chip = (half, use, i) => item(
+    describe(half, use), half.toUpperCase() + (fitsHalf(half, use.tile) ? ""
+                                               : " · does not fire here"),
+    () => openParams(half, use, rowIdx, i),
+    fitsHalf(half, use.tile) ? null : "foreign");
+  const items = [];
+  row.when.forEach((use, i) => items.push(chip("when", use, i)));
+  row.do.forEach((use, i) => items.push(chip("do", use, i)));
+  items.push(item("+ WHEN", "a sensor", () => pickTileScreen("when")));
+  items.push(item("+ DO", "an action", () => pickTileScreen("do")));
+  items.push(item("⊞ fold", "into one tile", () => {
+    foldRow(rowIdx); renderDeck();
+  }));
+  items.push(item("delete row", "", () => {
+    if (!confirm("delete row " + (rowIdx + 1) + "?")) return;
+    remember();
+    c.brain.splice(rowIdx, 1);
+    rowIdx = Math.max(0, rowIdx - 1);
+    renderRows(); deckPop();
+  }, "danger"));
+  return {name: "row " + (rowIdx + 1) + " of " + c.kind, items};
+}
+
+/* The palette, as buttons. Thirty-five of them, so this is the screen the
+   scrolling was built for. */
+function pickTileScreen(half) {
+  side = half;
+  deckPush(() => {
+    const items = [];
+    for (const own of myTiles())
+      items.push(item("⊞ " + own.name,
+                      (own[half] || []).length + " inside",
+                      () => { addTile({id: "combo", params: [],
+                                       args: {name: own.name}});
+                              deckPop(); }, "mine"));
+    const here = (half === "when" ? catalog.sensors : catalog.actions)
+      .filter(d => d.id !== "combo");
+    const there = (half === "when" ? catalog.actions : catalog.sensors)
+      .filter(d => d.id !== "combo");
+    for (const def of here)
+      items.push(item(def.label, "", () => { addTile(def); deckPop(); }));
+    if (showEverything)
+      for (const def of there)
+        items.push(item(def.label, "does not fire in this half",
+                        () => { addTile(def); deckPop(); }, "foreign"));
+    return {name: "add a " + half.toUpperCase() + " tile", items};
+  });
+}
+
+// -- tiles ------------------------------------------------------------------
+
+function tilesScreen() {
+  const items = myTiles().map(own => item("⊞ " + own.name,
+    (own.when || []).length + " when · " + (own.do || []).length + " do",
+    () => {
+      if (confirm("delete your tile " + own.name + "?")) {
+        unfold(own.name); renderDeck();
+      }
+    }, "mine"));
+  items.push(item("fold a row", "make one from a row",
+                  () => deckPush(brainScreen)));
+  items.push(item("python", codeSummary(), () => {
+    if ($("#codepanel").hidden)
+      return note("writing Python is for the owner, with the server running",
+                  "bad");
+    openOverlay("#codepanel", "python tiles");
+  }));
+  return {name: "your tiles", items};
+}
+
+const codeSummary = () => {
+  if ($("#codepanel") && $("#codepanel").hidden) return "owner only";
+  const on = codeFiles.filter(f => f.approved).length;
+  return codeFiles.length ? on + " on of " + codeFiles.length : "write one";
+};
+
+// -- the two things that are not buttons ------------------------------------
+
+function openOverlay(sel, name) {
+  $("#deck").classList.add("off");
+  $("#page").hidden = false;
+  $("#pagename").textContent = name;
+  for (const part of PAGE_PARTS)
+    document.querySelectorAll(part).forEach(n => {
+      n.style.display = part === sel ? "" : "none";
+    });
+  if (sel === "#codepanel") $("#codepanel").open = true;
+  window.scrollTo(0, 0);
+}
+
+const PAGE_PARTS = ["#top", "#world-details", "#cast-h", "#cast", "#props",
+                    "#brain-h", "#rows", "#rowbar", "#palette", "#trash",
+                    "#codepanel", "#tilesnote"];
+
+function closePage() {
+  $("#page").hidden = true;
+  $("#deck").classList.remove("off");
+  renderDeck();
+}
+
+async function deckSave() {
+  if (!project) return note("nothing open to save", "bad");
+  const out = await store.saveGame(project);
+  if (out.error) return note(out.error, "bad");
+  await loadGames(project.name);
+  renderDeck();
+  note("saved to " + out.where + (out.warn ? " — " + out.warn : ""));
+}
+
+function deckPlay() {
+  if (store.mode === "server") { startLive(); note("starting the world…"); }
+  else {
+    // No server: the 3D page carries its own engine and can play it here.
+    const packed = btoa(unescape(encodeURIComponent(JSON.stringify(project))))
+      .replace(/\+/g, "-").replace(/\//g, "_");
+    location.href = "world3d.html#g=" + packed;
+  }
+}
+
+// -- the box you type in ----------------------------------------------------
+
+function note(text, kind) {
+  const line = el("div", kind || "sys", text);
+  $("#log").append(line);
+  $("#log").scrollTop = $("#log").scrollHeight;
+  while ($("#log").children.length > 200) $("#log").firstChild.remove();
+}
+
+function chatLine(who, text, mine) {
+  const line = el("div", "line" + (mine ? " me" : ""));
+  line.append(el("span", null, who + ": "));
+  line.append(document.createTextNode(text));
+  $("#log").append(line);
+  $("#log").scrollTop = $("#log").scrollHeight;
+}
+
+function loadPins() {
+  try { pinned = JSON.parse(localStorage.getItem(LS_PINS) || "[]"); }
+  catch (e) { pinned = []; }
+}
+function savePins() {
+  localStorage.setItem(LS_PINS, JSON.stringify(pinned.slice(-100)));
+}
+
+/* Pull the text of  /pin "some note"  or  /pin some note  */
+function quoted(rest) {
+  const m = /^"([^"]*)"|^'([^']*)'/.exec(rest.trim());
+  return m ? (m[1] ?? m[2]) : rest.trim();
+}
+
+function swapSide(to) {
+  const deck = $("#deck");
+  const on = to === undefined ? !deck.classList.contains("swapped")
+                              : to === "left";
+  deck.classList.toggle("swapped", on);
+  localStorage.setItem(LS_SWAP, on ? "left" : "right");
+  note("the box is on the " + (on ? "left" : "right") +
+       " when the phone is sideways");
+}
+
+const COMMANDS = {
+  help() {
+    note("buttons: play, edit, characters, brain, tiles, save", "pin");
+    note("/play /edit /characters /brain /tiles /save — same as the buttons");
+    note("/back — up one screen.  /home — back to the six");
+    note('/pin "note" — keep a note.  /pins — list them.  /unpin 2 — remove one');
+    note("/swap side chat — put the box on the other side when sideways");
+    note("/who — who is connected.  /clear — empty this log");
+    note("anything not starting with / is said to the others, if any");
+  },
+  pins() {
+    if (!pinned.length) return note("no notes pinned");
+    pinned.forEach((p, i) => note((i + 1) + ". " + p, "pin"));
+  },
+  pin(rest) {
+    const text = quoted(rest);
+    if (!text) return note('say what to pin:  /pin "feed the bug first"', "bad");
+    pinned.push(text); savePins();
+    note("pinned " + pinned.length + ". " + text, "pin");
+  },
+  unpin(rest) {
+    const at = parseInt(rest.trim(), 10);
+    if (!at || at < 1 || at > pinned.length)
+      return note("which one? /pins lists them", "bad");
+    note("removed: " + pinned.splice(at - 1, 1)[0]);
+    savePins();
+  },
+  swap(rest) {
+    const said = rest.trim().toLowerCase();
+    if (!/^side chat|^chat side|^side|^chat/.test(said))
+      return note("did you mean /swap side chat ?", "bad");
+    const to = /left/.test(said) ? "left" : /right/.test(said) ? "right"
+                                                              : undefined;
+    swapSide(to);
+  },
+  clear() { $("#log").textContent = ""; },
+  who() {
+    const people = (liveSnap && liveSnap.people) || [];
+    if (!people.length) return note("nobody else is connected");
+    for (const p of people) note(p.name + " — " + p.role, "pin");
+  },
+};
+// The six, reachable by name as well as by button.
+COMMANDS.play = deckPlay;
+COMMANDS.save = deckSave;
+COMMANDS.edit = () => deckPush(editScreen);
+COMMANDS.characters = () => deckPush(castScreen);
+COMMANDS.brain = () => deckPush(brainScreen);
+COMMANDS.tiles = () => deckPush(tilesScreen);
+COMMANDS.back = deckPop;
+COMMANDS.home = deckHome;
+
+function startDeck() {
+  loadPins();
+  if (localStorage.getItem(LS_SWAP) === "left")
+    $("#deck").classList.add("swapped");
+  $("#page").hidden = true;
+  $("#deck").classList.remove("off");
+  deckHome();
+  note("six buttons above. type /help for what this box can do.");
+  if (pinned.length)
+    note(pinned.length + " note" + (pinned.length === 1 ? "" : "s") +
+         " pinned — /pins", "pin");
+}
+
+async function runSaid(said) {
+  said = said.trim();
+  if (!said) return;
+  if (!said.startsWith("/")) return sendChat(said);
+  const cut = said.indexOf(" ");
+  const word = (cut < 0 ? said.slice(1) : said.slice(1, cut)).toLowerCase();
+  const rest = cut < 0 ? "" : said.slice(cut + 1);
+  const fn = COMMANDS[word];
+  if (!fn) return note("no such command: /" + word + " — try /help", "bad");
+  await fn(rest);
+}
+
+async function sendChat(text) {
+  if (store.mode !== "server") {
+    return note("nobody to talk to — chat needs the server running", "bad");
+  }
+  const res = await fetch("api/chat", {
+    method: "POST",
+    headers: {"Content-Type": "application/json", ...authHeaders()},
+    body: JSON.stringify({text}),
+  }).catch(() => null);
+  if (!res || !res.ok) return note("could not say that", "bad");
+  chatLine(me.name || "you", text, true);
+  seenChat = Math.max(seenChat, 0);      // our own line is already on screen
+}
+
+// Chat arrives with the world snapshot, so it needs no polling of its own.
+let seenChat = 0;
+function showNewChat(snap) {
+  for (const line of (snap && snap.chat) || []) {
+    if (line.n <= seenChat) continue;
+    seenChat = line.n;
+    if (line.who === (me.name || "")) continue;     // already shown when sent
+    chatLine(line.who, line.text, false);
+  }
+}
+
+// ------------------------------------------- your own tiles, in Python
+//
+// The one place in Spark where you write code rather than arrange tiles, and
+// therefore the one place with a door on it. The server only answers these
+// routes to the owner -- somebody holding an `edit` code gets 403 -- so the
+// panel is simply hidden when the answer is no. Hiding it is tidiness; the
+// server is the actual protection, as everywhere else here.
+//
+// With no server (GitHub Pages, or a folder opened directly) there is no Python
+// at all, so nothing written here can run in this tab. What the panel does then
+// is keep your text in this browser and, if you have set up a token, commit it
+// to GitHub -- so that the Termux copy can pull it down and run it there.
+
+const LS_CODE = "spark:mytiles";
+let codeFiles = [];       // [{name, text, approved, changed, error, tiles}]
+let codeOpen = null;      // which file is in the box
+
+function localCode() {
+  try { return JSON.parse(localStorage.getItem(LS_CODE) || "{}"); }
+  catch (e) { return {}; }
+}
+function localCodeSave(map) {
+  localStorage.setItem(LS_CODE, JSON.stringify(map));
+}
+
+async function codeApi(method, path, body) {
+  const res = await fetch(path, {
+    method,
+    headers: {"Content-Type": "application/json", ...authHeaders()},
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (res.status === 403) return null;             // not the owner
+  return await res.json().catch(() => ({}));
+}
+
+async function loadCodePanel() {
+  if (store.mode === "server") {
+    const got = await codeApi("GET", "api/mytiles");
+    if (got === null) { $("#codepanel").hidden = true; return; }
+    codeFiles = got.files || [];
+    codeExample = got.example || codeExample;
+  } else {
+    const map = localCode();
+    codeFiles = Object.keys(map).sort().map(name => ({
+      name, text: map[name], approved: false, changed: false,
+      error: "", tiles: [], local: true,
+    }));
+  }
+  $("#codepanel").hidden = false;
+  renderCode();
+}
+
+let codeExample = "";
+
+function renderCode() {
+  const box = $("#code"); box.textContent = "";
+
+  box.append(el("div", "note", store.mode === "server"
+    ? "These run in Termux, on this phone. They cannot run in the 3D view's " +
+      "own engine, which is JavaScript — a game using one will play here " +
+      "through the server, but not offline in the browser."
+    : "There is no Python in a browser, so nothing here can run in this tab. " +
+      "Saved in this browser, and committed to GitHub if you set up a token, " +
+      "so that the copy in Termux can pull it down and run it there."));
+
+  const picker = el("div", "file");
+  for (const f of codeFiles) {
+    const b = el("button", f.name === codeOpen ? "" : null, f.name);
+    if (f.name === codeOpen) b.style.borderColor = "var(--accent)";
+    b.onclick = () => { codeOpen = f.name; renderCode(); };
+    picker.append(b);
+  }
+  const add = el("button", null, "+ new tile");
+  add.onclick = () => {
+    const name = (prompt("name this file (letters, digits, spaces)", "my tile")
+                  || "").trim();
+    if (!name) return;
+    if (codeFiles.some(f => f.name === name)) { codeOpen = name; renderCode();
+                                                return say("that one exists"); }
+    codeFiles.push({name, text: codeExample, approved: false, changed: false,
+                    error: "", tiles: [], local: store.mode !== "server"});
+    codeOpen = name;
+    renderCode();
+  };
+  picker.append(add);
+  box.append(picker);
+
+  const file = codeFiles.find(f => f.name === codeOpen);
+  if (!file) {
+    box.append(el("div", "empty", codeFiles.length
+      ? "pick one above, or make a new one"
+      : "no tiles of your own yet — tap “+ new tile”"));
+    return;
+  }
+
+  if (store.mode === "server") {
+    const marks = el("div", "file");
+    marks.append(el("span", "mark " + (file.approved ? "on" : "off"),
+                    file.approved ? "switched on" : "not switched on"));
+    if (file.changed)
+      marks.append(el("span", "mark off",
+                      "changed since you approved it — read it before switching "
+                      + "it back on"));
+    if (file.tiles && file.tiles.length)
+      marks.append(el("span", "mark", "gives: " + file.tiles.join(", ")));
+    box.append(marks);
+  }
+
+  if (file.error) {
+    box.append(el("div", "note", "this one did not load:"));
+    box.append(el("pre", "err", file.error));
+  }
+
+  const area = el("textarea");
+  area.value = file.text || "";
+  area.spellcheck = false;
+  area.oninput = () => { file.text = area.value; };
+  box.append(area);
+
+  const bar = el("div", "file");
+  const save = el("button", null, "save" + (store.mode === "server"
+                                            ? " and switch on" : ""));
+  save.onclick = () => saveCode(file);
+  const del = el("button", "danger", "delete");
+  del.onclick = () => deleteCode(file);
+  bar.append(save, del);
+
+  if (store.mode === "server" && file.approved) {
+    const off = el("button", null, "switch off");
+    off.onclick = async () => {
+      const got = await codeApi("POST", "api/mytiles/approve",
+                                {name: file.name, on: false});
+      if (got === null) return say("only the owner may do that");
+      codeFiles = got.files || codeFiles;
+      renderCode(); say("switched off — its tiles are off the menus");
+      catalog = await store.init(); renderPalette();
+    };
+    bar.append(off);
+  }
+  if (store.mode === "server" && !file.approved && file.name) {
+    const on = el("button", null, "switch on");
+    on.title = "read it first: switching it on lets this phone run it";
+    on.onclick = async () => {
+      if (!confirm("Switching this on lets Spark run it on this phone.\n\n" +
+                   "Only do that if you have read it and know what it does.\n\n" +
+                   "Switch on " + file.name + "?")) return;
+      const got = await codeApi("POST", "api/mytiles/approve",
+                                {name: file.name, on: true});
+      if (got === null) return say("only the owner may do that");
+      codeFiles = got.files || codeFiles;
+      renderCode(); say("switched on");
+      catalog = await store.init(); renderPalette();
+    };
+    bar.append(on);
+  }
+  if (store.mode !== "server" && ghConfig()) {
+    const push = el("button", null, "commit to GitHub");
+    push.onclick = async () => {
+      try {
+        await ghPut("mytiles/" + file.name + ".py", file.text || "",
+                    "spark: tile " + file.name, ghConfig());
+        say("committed — pull it in Termux to use it");
+      } catch (e) { say("GitHub: " + e.message); }
+    };
+    bar.append(push);
+  }
+  box.append(bar);
+}
+
+async function saveCode(file) {
+  if (store.mode !== "server") {
+    const map = localCode();
+    map[file.name] = file.text || "";
+    localCodeSave(map);
+    return say("kept in this browser");
+  }
+  const got = await codeApi("POST", "api/mytiles",
+                            {name: file.name, text: file.text || ""});
+  if (got === null) return say("only the owner may write these");
+  if (got.error) return say(got.error);
+  codeFiles = got.files || codeFiles;
+  const now = codeFiles.find(f => f.name === file.name);
+  renderCode();
+  catalog = await store.init();          // its tiles may have joined the menus
+  renderPalette();
+  say(now && now.error ? "saved, but it did not load — see the message above"
+                       : "saved and switched on");
+}
+
+async function deleteCode(file) {
+  if (!confirm("delete " + file.name + "?")) return;
+  if (store.mode !== "server") {
+    const map = localCode(); delete map[file.name]; localCodeSave(map);
+    codeFiles = codeFiles.filter(f => f.name !== file.name);
+    codeOpen = null; renderCode(); return say("deleted from this browser");
+  }
+  const got = await codeApi("DELETE",
+    "api/mytiles?name=" + encodeURIComponent(file.name));
+  if (got === null) return say("only the owner may do that");
+  codeFiles = got.files || [];
+  codeOpen = null; renderCode();
+  catalog = await store.init(); renderPalette();
+  say("deleted");
+}
+
+// ------------------------------------------------------------ shared world
+//
+// The host runs the world; everyone else sends keys and draws what comes back.
+// Who you are is decided by the invite code you typed, and the server enforces
+// it -- hiding a button here is only tidiness, never the actual protection.
+
+const LS_TOKEN = "spark:token", LS_OWNER = "spark:ownerkey";
+
+let me = {role: "owner", name: "host"};   // until told otherwise
+let livePoll = null, pressed = new Set();
+let liveSnap = null;                      // the last thing the host sent us
+
+function ownerKey() {
+  const fromUrl = /[#&]owner=([\w-]+)/.exec(location.hash || "");
+  if (fromUrl) {
+    localStorage.setItem(LS_OWNER, fromUrl[1]);
+    history.replaceState(null, "", location.pathname + location.search);
+    return fromUrl[1];
+  }
+  return localStorage.getItem(LS_OWNER) || "";
+}
+
+function authHeaders() {
+  const headers = {};
+  const token = localStorage.getItem(LS_TOKEN);
+  const key = ownerKey();
+  if (token) headers["X-Spark-Token"] = token;
+  if (key) headers["X-Spark-Owner"] = key;
+  return headers;
+}
+
+async function api(path, options = {}) {
+  return fetch(path, {...options,
+    headers: {...(options.headers || {}), ...authHeaders()}});
+}
+
+function amEditor() { return me.role === "owner" || me.role === "edit"; }
+
+function showStage(on) {
+  $("#stage").classList.toggle("on", on);
+  // Playing takes the whole screen, so the deck steps out of the way and comes
+  // back when you leave the game.
+  $("#deck").classList.toggle("off", on);
+  if (on) $("#page").hidden = true;
+  for (const id of ["#rows", "#props", "#palette", "#rowbar", "#cast"])
+    document.querySelectorAll(id).forEach(n => n.style.display = on ? "none" : "");
+  document.querySelectorAll("details").forEach(n => n.style.display = on ? "none" : "");
+  document.querySelectorAll("h2").forEach(n => n.style.display = on ? "none" : "");
+  $("#save").hidden = on || !amEditor();
+  $("#new").hidden = on || !amEditor();
+  $("#games").hidden = on || !amEditor();
+}
+
+function drawWorld(snap) {
+  if (!snap.w) { $("#grid").textContent = "waiting for the host to start a game"; return; }
+  const grid = Array.from({length: snap.h}, () => Array(snap.w).fill(" "));
+  for (const [x, y, glyph] of snap.things)
+    if (y >= 0 && y < snap.h && x >= 0 && x < snap.w) grid[y][x] = glyph;
+  $("#grid").textContent = grid.map(row => row.join("")).join("\n");
+
+  const you = snap.you || {};
+  $("#hud").textContent = "";
+  const bits = [["score", snap.score], ["tick", snap.tick],
+                ["you", you.name + " (" + you.role + ")"]];
+  if (you.health != null) bits.splice(1, 0, ["health", you.health]);
+  for (const [label, value] of bits) {
+    const box = el("span"); box.append(label + " ");
+    box.append(el("b", null, String(value)));
+    $("#hud").append(box);
+  }
+  const people = $("#people"); people.textContent = "";
+  for (const person of snap.people || [])
+    people.append(el("span", "pill",
+      person.name + " · " + person.role + (person.playing ? " · playing" : "")));
+  if (snap.status) say(snap.status === "win" ? "WON" : "LOST");
+  else if (snap.message) say(snap.message);
+}
+
+async function pollLive() {
+  const res = await api("api/live");
+  if (!res.ok) { stopLive(); return say("the host ended your access"); }
+  const snap = await res.json();
+  me = snap.you || me;
+  liveSnap = snap;
+  drawWorld(snap);
+  showNewChat(snap);        // chat rides along with the world, so it needs no
+                            // polling of its own
+  if (pressed.size && me.role !== "watch") {
+    const keys = [...pressed];
+    pressed.clear();
+    api("api/key", {method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({keys})});
+  }
+}
+
+function startLive() {
+  showStage(true);
+  if (livePoll) clearInterval(livePoll);
+  livePoll = setInterval(pollLive, 130);
+  pollLive();
+}
+
+function stopLive() {
+  if (livePoll) clearInterval(livePoll);
+  livePoll = null;
+  showStage(false);
+}
+
+for (const button of document.querySelectorAll("#pad button[data-key]")) {
+  const send = e => { e.preventDefault(); pressed.add(button.dataset.key); };
+  button.addEventListener("pointerdown", send);
+}
+$("#leave").onclick = stopLive;
+
+document.addEventListener("keydown", e => {
+  if (!livePoll) return;
+  const named = {ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left",
+                 ArrowRight: "right", " ": "space"}[e.key];
+  const key = named || (e.key.length === 1 ? e.key.toLowerCase() : null);
+  if (key) { pressed.add(key); e.preventDefault(); }
+});
+
+// ---- joining someone else's world ----------------------------------------
+
+function openJoin() {
+  const form = $("#dlgform");
+  form.textContent = "";
+  form.append(el("h3", null, "join someone's game"));
+  form.append(el("div", "note",
+    "Ask the host for a code. What you may do is decided by the code: " +
+    "edit, play, or watch."));
+  const code = el("input"); code.placeholder = "ABC123";
+  code.style.textTransform = "uppercase";
+  const name = el("input"); name.placeholder = "your name"; name.value = "guest";
+  form.append(field("invite code", code), field("your name", name));
+
+  const btns = el("div", "dlgbtns");
+  const cancel = el("button", null, "cancel");
+  cancel.type = "button"; cancel.onclick = () => $("#dlg").close();
+  const go = el("button", null, "join");
+  go.type = "button";
+  go.onclick = async () => {
+    const res = await fetch("api/join", {method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({code: code.value.trim().toUpperCase(),
+                            name: name.value.trim()})});
+    const out = await res.json();
+    if (!res.ok) return say(out.error || "could not join");
+    localStorage.setItem(LS_TOKEN, out.token);
+    me = {role: out.role, name: out.name};
+    $("#dlg").close();
+    say("joined as " + out.role);
+    renderWhere();
+    startLive();
+  };
+  btns.append(cancel, go);
+  form.append(btns);
+  $("#dlg").showModal();
+}
+
+// ---- the host's panel -----------------------------------------------------
+
+async function openHostPanel() {
+  const res = await api("api/host/invites");
+  if (!res.ok) return openJoin();          // not the host: offer to join instead
+  const info = await res.json();
+  const form = $("#dlgform");
+  form.textContent = "";
+  form.append(el("h3", null, "share this game"));
+  form.append(el("div", "note",
+    "Others on this wifi open " + info.join_url + " and type a code. " +
+    "Each code decides what that person may do."));
+
+  const state = el("div", "note",
+    info.running ? "playing '" + info.game + "' now" : "no game running");
+  form.append(state);
+
+  const startBtn = el("button", null,
+    info.running ? "stop the shared game" : "start '" + (project?.name || "") + "' for everyone");
+  startBtn.type = "button";
+  startBtn.onclick = async () => {
+    await api(info.running ? "api/host/stop" : "api/host/start",
+      {method: "POST", headers: {"Content-Type": "application/json"},
+       body: JSON.stringify({game: project?.name})});
+    $("#dlg").close(); openHostPanel();
+  };
+  form.append(startBtn);
+
+  form.append(el("h3", null, "make a code"));
+  const role = select(["play", "edit", "watch"], "play", () => {});
+  const character = select(["own", ...(project?.characters || []).map(c => c.kind)],
+                           "own", () => {});
+  const note = el("input"); note.placeholder = "who is it for?";
+  form.append(field("they may", role), field("they drive", character),
+              field("label (for you)", note));
+
+  const make = el("button", null, "make the code");
+  make.type = "button";
+  make.onclick = async () => {
+    const res = await api("api/host/invite", {method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({role: role.value, character: character.value,
+                            note: note.value})});
+    if (res.ok) { $("#dlg").close(); openHostPanel(); }
+  };
+  form.append(make);
+
+  if (info.invites.length) {
+    form.append(el("h3", null, "codes in use"));
+    for (const invite of info.invites) {
+      const row = el("div", "note");
+      row.append(el("span", "code", invite.code));
+      row.append("  " + invite.role + " · " + invite.character +
+                 (invite.note ? " · " + invite.note : ""));
+      const kill = el("button", "danger", "revoke");
+      kill.type = "button"; kill.style.marginLeft = "8px";
+      kill.onclick = async () => {
+        await api("api/host/revoke", {method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({code: invite.code})});
+        $("#dlg").close(); openHostPanel();
+      };
+      row.append(kill);
+      form.append(row);
+    }
+  }
+  if (info.people.length) {
+    form.append(el("h3", null, "here now"));
+    const here = el("div");
+    for (const person of info.people)
+      here.append(el("span", "pill", person.name + " · " + person.role));
+    form.append(here);
+  }
+
+  const btns = el("div", "dlgbtns");
+  const watch = el("button", null, "watch the game");
+  watch.type = "button";
+  watch.onclick = () => { $("#dlg").close(); startLive(); };
+  const done = el("button", null, "close");
+  done.type = "button"; done.onclick = () => $("#dlg").close();
+  btns.append(watch, done);
+  form.append(btns);
+  $("#dlg").showModal();
+}
+
+$("#people-btn").onclick = openHostPanel;
+
+// ---------------------------------------------------------------- wiring up
+
+let gameNames = [];
+
+async function loadGames(pick) {
+  const names = await store.listGames();
+  gameNames = names || [];               // the deck's "open" screen reads this
+  const sel = $("#games"); sel.textContent = "";
+  for (const n of names) {
+    const o = el("option", null, n); o.value = n;
+    if (n === pick) o.selected = true;
+    sel.append(o);
+  }
+  if (pick && !names.includes(pick)) {
+    const o = el("option", null, pick + " (unsaved)");
+    o.value = pick; o.selected = true; sel.append(o);
+  }
+}
+
+async function openGame(name) {
+  const loaded = await store.loadGame(name);
+  if (!loaded) return say("could not open " + name);
+  project = loaded;
+  project.characters ||= []; project.world ||= {}; project.tiles ||= [];
+  for (const c of project.characters) {
+    c.brain ||= [];
+    for (const row of c.brain) { row.when ||= []; row.do ||= []; }
+  }
+  // A fresh game means a fresh history: undoing back into the previous game
+  // would quietly replace this one with that one.
+  past = []; paintUndo();
+  charIdx = 0; rowIdx = 0; renderAll();
+  say("opened " + name);
+}
+
+$("#games").onchange = e => openGame(e.target.value);
+
+// ------------------------------------------------- the 3D view
+//
+// The game travels inside the link, base64 in the fragment. That is what makes
+// the new tab work with nothing behind it: the fragment never leaves the
+// browser, so a phone in aeroplane mode with Termux closed still gets the whole
+// world handed to it. When a server *is* reachable the 3D page prefers it and
+// mirrors the running game instead -- see world3d.html.
+function b64url(text) {
+  return b64(text).replace(/\+/g, "-").replace(/\//g, "_");
+}
+
+$("#play3d").onclick = () => {
+  let url = "world3d.html";
+  if (project) {
+    try {
+      url += "#g=" + b64url(JSON.stringify(project));
+    } catch (err) {
+      say("could not pack the game into the link - opening the saved one");
+    }
+  }
+  window.open(url, "_blank", "noopener");
+};
+
+$("#new").onclick = async () => {
+  const name = prompt("name your game", "mygame");
+  if (!name) return;
+  project = blankProject(name.trim());
+  past = []; paintUndo();
+  charIdx = 0; rowIdx = 0;
+  await loadGames(project.name);
+  renderAll();
+  say("new game - press save to write it to games/");
+};
+
+$("#save").onclick = async () => {
+  const out = await store.saveGame(project);
+  if (out.error) return say(out.error);
+  await loadGames(project.name);
+  say("saved to " + out.where + (out.warn ? " — " + out.warn : ""));
+};
+
+$("#gear").onclick = openGitHubSettings;
+
+$("#addrow").onclick = () => {
+  const c = cur();
+  if (!c) return say("add a character first");
+  remember();
+  c.brain.push({when:[], do:[]});
+  rowIdx = c.brain.length - 1;
+  renderRows();
+};
+
+$("#undo").onclick = undo;
+
+// -- the deck's own wiring --------------------------------------------------
+
+$("#back").onclick = closePage;
+$("#backkey").onclick = deckPop;
+$("#saybar").onsubmit = e => {
+  e.preventDefault();
+  const box = $("#saybox");
+  const said = box.value;
+  box.value = "";
+  runSaid(said);
+};
+
+for (const tab of document.querySelectorAll("#tabs button"))
+  tab.onclick = () => {
+    side = tab.dataset.side;
+    document.querySelectorAll("#tabs button").forEach(b => b.classList.remove("on"));
+    tab.classList.add("on");
+    renderPalette();
+  };
+
+(async function boot() {
+  try {
+    catalog = await store.init();
+  } catch (e) {
+    $("#status").textContent = e.message;
+    return;
+  }
+  refreshServerFlags();
+  setInterval(refreshServerFlags, 5000);
+  const names = await store.listGames();
+
+  if (names === null) {
+    // The server knows us as a guest, not an editor. There is nothing to edit
+    // here -- go straight to the game.
+    $("#people-btn").hidden = false;
+    $("#save").hidden = $("#new").hidden = $("#games").hidden = true;
+    project = blankProject("guest");
+    renderWhere();
+    // A guest gets the deck too: play, and the box to talk in. That is most of
+    // what the box is for.
+    startDeck();
+    if (localStorage.getItem(LS_TOKEN)) {
+      startLive();
+      say("rejoining…");
+    } else {
+      openJoin();
+    }
+    return;
+  }
+
+  await loadGames(names[0]);
+  if (names.length) await openGame(names[0]);
+  else { project = blankProject("mygame"); renderAll(); }
+  $("#gear").hidden = (store.mode === "server");
+  $("#people-btn").hidden = (store.mode !== "server");
+  // Owner-only, and the server decides: a guest's request comes back 403 and
+  // loadCodePanel leaves the panel hidden.
+  await loadCodePanel();
+  startDeck();
+  say(store.mode === "server" ? "saving to games/ on this phone"
+                              : "saving in this browser");
+})();
+</script>
+</body>
+</html>

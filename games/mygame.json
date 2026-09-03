@@ -1,0 +1,217 @@
+{
+  "name": "mygame",
+  "world": {
+    "width": 30,
+    "height": 14,
+    "wrap": false,
+    "speed": 6
+  },
+  "characters": [
+    {
+      "kind": "hero",
+      "glyph": "@",
+      "color": "cyan",
+      "health": 3,
+      "count": 1,
+      "solid": false,
+      "role": "player",
+      "brain": [
+        {
+          "when": [
+            {
+              "tile": "key",
+              "args": {
+                "key": "up"
+              }
+            }
+          ],
+          "do": [
+            {
+              "tile": "move",
+              "args": {
+                "dir": "up"
+              }
+            }
+          ]
+        },
+        {
+          "when": [
+            {
+              "tile": "key",
+              "args": {
+                "key": "down"
+              }
+            }
+          ],
+          "do": [
+            {
+              "tile": "move",
+              "args": {
+                "dir": "down"
+              }
+            }
+          ]
+        },
+        {
+          "when": [
+            {
+              "tile": "key",
+              "args": {
+                "key": "left"
+              }
+            }
+          ],
+          "do": [
+            {
+              "tile": "move",
+              "args": {
+                "dir": "left"
+              }
+            }
+          ]
+        },
+        {
+          "when": [
+            {
+              "tile": "key",
+              "args": {
+                "key": "right"
+              }
+            }
+          ],
+          "do": [
+            {
+              "tile": "move",
+              "args": {
+                "dir": "right"
+              }
+            }
+          ]
+        },
+        {
+          "when": [
+            {
+              "tile": "touch",
+              "args": {
+                "kind": "apple"
+              }
+            }
+          ],
+          "do": [
+            {
+              "tile": "score",
+              "args": {
+                "amount": 1
+              }
+            },
+            {
+              "tile": "vanish",
+              "args": {
+                "target": "it"
+              }
+            },
+            {
+              "tile": "say",
+              "args": {
+                "text": "yum!"
+              }
+            }
+          ]
+        },
+        {
+          "when": [
+            {
+              "tile": "score_at_least",
+              "args": {
+                "value": 5
+              }
+            }
+          ],
+          "do": [
+            {
+              "tile": "win",
+              "args": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "apple",
+      "glyph": "o",
+      "color": "green",
+      "health": 1,
+      "count": 5,
+      "solid": false,
+      "role": "prop",
+      "brain": []
+    },
+    {
+      "kind": "bug",
+      "glyph": "B",
+      "color": "red",
+      "health": 2,
+      "count": 2,
+      "solid": false,
+      "role": "prop",
+      "brain": [
+        {
+          "when": [
+            {
+              "tile": "timer",
+              "args": {
+                "every": 2
+              }
+            },
+            {
+              "tile": "see",
+              "args": {
+                "kind": "hero",
+                "range": 8
+              }
+            }
+          ],
+          "do": [
+            {
+              "tile": "move",
+              "args": {
+                "dir": "toward it"
+              }
+            }
+          ]
+        },
+        {
+          "when": [
+            {
+              "tile": "timer",
+              "args": {
+                "every": 4
+              }
+            },
+            {
+              "tile": "touch",
+              "args": {
+                "kind": "hero"
+              }
+            }
+          ],
+          "do": [
+            {
+              "tile": "damage",
+              "args": {
+                "target": "it",
+                "amount": 1
+              }
+            },
+            {
+              "tile": "say",
+              "args": {
+                "text": "the bug bit you!"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,744 @@
+{
+  "sensors": [
+    {
+      "id": "always",
+      "label": "always",
+      "params": []
+    },
+    {
+      "id": "key",
+      "label": "key {key} is pressed",
+      "params": [
+        {
+          "name": "key",
+          "prompt": "Which key?",
+          "kind": "choice",
+          "choices": [
+            "up",
+            "down",
+            "left",
+            "right",
+            "space",
+            "w",
+            "a",
+            "s",
+            "d",
+            "e",
+            "f"
+          ],
+          "default": "up"
+        }
+      ]
+    },
+    {
+      "id": "see",
+      "label": "I see {kind} within {range}",
+      "params": [
+        {
+          "name": "kind",
+          "prompt": "See what?",
+          "kind": "kind",
+          "choices": [],
+          "default": "anything"
+        },
+        {
+          "name": "range",
+          "prompt": "How many squares away?",
+          "kind": "int",
+          "choices": [],
+          "default": 6
+        }
+      ]
+    },
+    {
+      "id": "touch",
+      "label": "I am touching {kind}",
+      "params": [
+        {
+          "name": "kind",
+          "prompt": "Touching what?",
+          "kind": "kind",
+          "choices": [],
+          "default": "anything"
+        }
+      ]
+    },
+    {
+      "id": "timer",
+      "label": "every {every} ticks",
+      "params": [
+        {
+          "name": "every",
+          "prompt": "How many ticks between firings?",
+          "kind": "int",
+          "choices": [],
+          "default": 4
+        }
+      ]
+    },
+    {
+      "id": "health_below",
+      "label": "my health is below {value}",
+      "params": [
+        {
+          "name": "value",
+          "prompt": "Below what health?",
+          "kind": "int",
+          "choices": [],
+          "default": 2
+        }
+      ]
+    },
+    {
+      "id": "score_at_least",
+      "label": "the score is at least {value}",
+      "params": [
+        {
+          "name": "value",
+          "prompt": "What score?",
+          "kind": "int",
+          "choices": [],
+          "default": 10
+        }
+      ]
+    },
+    {
+      "id": "chance",
+      "label": "{percent}% of the time",
+      "params": [
+        {
+          "name": "percent",
+          "prompt": "Percent chance (0-100)?",
+          "kind": "int",
+          "choices": [],
+          "default": 25
+        }
+      ]
+    },
+    {
+      "id": "at_edge",
+      "label": "I am at the edge of the world",
+      "params": []
+    },
+    {
+      "id": "recall",
+      "label": "I remember {name} is {value}",
+      "params": [
+        {
+          "name": "name",
+          "prompt": "Which name?",
+          "kind": "text",
+          "choices": [],
+          "default": "chrome"
+        },
+        {
+          "name": "value",
+          "prompt": "Is what?",
+          "kind": "text",
+          "choices": [],
+          "default": "com.android.chrome"
+        }
+      ]
+    },
+    {
+      "id": "spent",
+      "label": "my range or time has run out",
+      "params": []
+    },
+    {
+      "id": "place_has",
+      "label": "placeholder {who} has {face} {test} {amount}",
+      "params": [
+        {
+          "name": "who",
+          "prompt": "Which placeholder?",
+          "kind": "text",
+          "choices": [],
+          "default": "thing"
+        },
+        {
+          "name": "face",
+          "prompt": "Regard it as what?",
+          "kind": "choice",
+          "choices": [
+            "value",
+            "x",
+            "y",
+            "z"
+          ],
+          "default": "value"
+        },
+        {
+          "name": "test",
+          "prompt": "Compared how?",
+          "kind": "choice",
+          "choices": [
+            "at least",
+            "at most",
+            "exactly"
+          ],
+          "default": "at least"
+        },
+        {
+          "name": "amount",
+          "prompt": "Compared with what? (a number, or any box)",
+          "kind": "text",
+          "choices": [],
+          "default": "1"
+        }
+      ]
+    },
+    {
+      "id": "combo",
+      "label": "the tile called \"{name}\"",
+      "params": [
+        {
+          "name": "name",
+          "prompt": "Which of your own tiles?",
+          "kind": "text",
+          "choices": [],
+          "default": ""
+        }
+      ]
+    },
+    {
+      "id": "place_named",
+      "label": "placeholder {who} is named \"{text}\"",
+      "params": [
+        {
+          "name": "who",
+          "prompt": "Which placeholder?",
+          "kind": "text",
+          "choices": [],
+          "default": "thing"
+        },
+        {
+          "name": "text",
+          "prompt": "Named what?",
+          "kind": "text",
+          "choices": [],
+          "default": "hero"
+        }
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "id": "move",
+      "label": "move {dir}",
+      "params": [
+        {
+          "name": "dir",
+          "prompt": "Move which way?",
+          "kind": "choice",
+          "choices": [
+            "up",
+            "down",
+            "left",
+            "right",
+            "random",
+            "toward it",
+            "away from it",
+            "forward"
+          ],
+          "default": "toward it"
+        }
+      ]
+    },
+    {
+      "id": "face",
+      "label": "face {dir}",
+      "params": [
+        {
+          "name": "dir",
+          "prompt": "Which way do I face?",
+          "kind": "choice",
+          "choices": [
+            "north",
+            "north-east",
+            "east",
+            "south-east",
+            "south",
+            "south-west",
+            "west",
+            "north-west",
+            "toward it",
+            "away from it"
+          ],
+          "default": "north"
+        }
+      ]
+    },
+    {
+      "id": "shoot",
+      "label": "shoot {dir} up to {reach} squares, for {life} ticks",
+      "params": [
+        {
+          "name": "dir",
+          "prompt": "Shoot which way?",
+          "kind": "choice",
+          "choices": [
+            "up",
+            "down",
+            "left",
+            "right",
+            "random",
+            "toward it",
+            "away from it",
+            "forward"
+          ],
+          "default": "forward"
+        },
+        {
+          "name": "reach",
+          "prompt": "How many squares does it fly? (0 = for ever)",
+          "kind": "int",
+          "choices": [],
+          "default": 8
+        },
+        {
+          "name": "life",
+          "prompt": "How many ticks does it last? (0 = for ever)",
+          "kind": "int",
+          "choices": [],
+          "default": 12
+        }
+      ]
+    },
+    {
+      "id": "say",
+      "label": "say \"{text}\"",
+      "params": [
+        {
+          "name": "text",
+          "prompt": "Say what?",
+          "kind": "text",
+          "choices": [],
+          "default": "hello!"
+        }
+      ]
+    },
+    {
+      "id": "score",
+      "label": "change the score by {amount}",
+      "params": [
+        {
+          "name": "amount",
+          "prompt": "Change score by how much?",
+          "kind": "int",
+          "choices": [],
+          "default": 1
+        }
+      ]
+    },
+    {
+      "id": "damage",
+      "label": "hurt {target} by {amount}",
+      "params": [
+        {
+          "name": "target",
+          "prompt": "Hurt whom?",
+          "kind": "choice",
+          "choices": [
+            "it",
+            "self"
+          ],
+          "default": "it"
+        },
+        {
+          "name": "amount",
+          "prompt": "By how much?",
+          "kind": "int",
+          "choices": [],
+          "default": 1
+        }
+      ]
+    },
+    {
+      "id": "heal",
+      "label": "heal myself by {amount}",
+      "params": [
+        {
+          "name": "amount",
+          "prompt": "By how much?",
+          "kind": "int",
+          "choices": [],
+          "default": 1
+        }
+      ]
+    },
+    {
+      "id": "spawn",
+      "label": "make a new {kind}",
+      "params": [
+        {
+          "name": "kind",
+          "prompt": "Make what?",
+          "kind": "kind",
+          "choices": [],
+          "default": "apple"
+        }
+      ]
+    },
+    {
+      "id": "shape",
+      "label": "flip {target}'s shape between cube and sphere",
+      "params": [
+        {
+          "name": "target",
+          "prompt": "Flip whom?",
+          "kind": "choice",
+          "choices": [
+            "it",
+            "self"
+          ],
+          "default": "it"
+        }
+      ]
+    },
+    {
+      "id": "resize",
+      "label": "change {target}'s size by {amount}",
+      "params": [
+        {
+          "name": "target",
+          "prompt": "Resize whom?",
+          "kind": "choice",
+          "choices": [
+            "it",
+            "self"
+          ],
+          "default": "it"
+        },
+        {
+          "name": "amount",
+          "prompt": "By how much? (percent points, can be negative)",
+          "kind": "int",
+          "choices": [],
+          "default": 25
+        }
+      ]
+    },
+    {
+      "id": "fly",
+      "label": "fly {dir}",
+      "params": [
+        {
+          "name": "dir",
+          "prompt": "Which way?",
+          "kind": "choice",
+          "choices": [
+            "up",
+            "down"
+          ],
+          "default": "up"
+        }
+      ]
+    },
+    {
+      "id": "toggle_flight",
+      "label": "switch between walking and flying",
+      "params": []
+    },
+    {
+      "id": "place",
+      "label": "add a new {kind}, see-through until placed again to confirm it",
+      "params": [
+        {
+          "name": "kind",
+          "prompt": "Add what?",
+          "kind": "kind",
+          "choices": [],
+          "default": "block"
+        }
+      ]
+    },
+    {
+      "id": "remember",
+      "label": "remember {name} is {value}",
+      "params": [
+        {
+          "name": "name",
+          "prompt": "Call it what?",
+          "kind": "text",
+          "choices": [],
+          "default": "chrome"
+        },
+        {
+          "name": "value",
+          "prompt": "Which is?",
+          "kind": "text",
+          "choices": [],
+          "default": "com.android.chrome"
+        }
+      ]
+    },
+    {
+      "id": "open",
+      "label": "open {object} at {target}",
+      "params": [
+        {
+          "name": "object",
+          "prompt": "Which app? (a name you remembered, or a package)",
+          "kind": "text",
+          "choices": [],
+          "default": "chrome"
+        },
+        {
+          "name": "target",
+          "prompt": "Open what? (a name you remembered, or a URL)",
+          "kind": "text",
+          "choices": [],
+          "default": "http://127.0.0.1:8765/"
+        }
+      ]
+    },
+    {
+      "id": "vanish",
+      "label": "make {target} disappear",
+      "params": [
+        {
+          "name": "target",
+          "prompt": "Who disappears?",
+          "kind": "choice",
+          "choices": [
+            "it",
+            "self"
+          ],
+          "default": "it"
+        }
+      ]
+    },
+    {
+      "id": "teleport",
+      "label": "jump to a random empty square",
+      "params": []
+    },
+    {
+      "id": "combo",
+      "label": "the tile called \"{name}\"",
+      "params": [
+        {
+          "name": "name",
+          "prompt": "Which of your own tiles?",
+          "kind": "text",
+          "choices": [],
+          "default": ""
+        }
+      ]
+    },
+    {
+      "id": "place_name",
+      "label": "name {who} is \"{text}\"",
+      "params": [
+        {
+          "name": "who",
+          "prompt": "Which placeholder?",
+          "kind": "text",
+          "choices": [],
+          "default": "thing"
+        },
+        {
+          "name": "text",
+          "prompt": "Name it what?",
+          "kind": "text",
+          "choices": [],
+          "default": "hero"
+        }
+      ]
+    },
+    {
+      "id": "place_value",
+      "label": "value {who} = {a} {op} {b}",
+      "params": [
+        {
+          "name": "who",
+          "prompt": "Which placeholder?",
+          "kind": "text",
+          "choices": [],
+          "default": "thing"
+        },
+        {
+          "name": "a",
+          "prompt": "First box of the sum?",
+          "kind": "text",
+          "choices": [],
+          "default": "0"
+        },
+        {
+          "name": "op",
+          "prompt": "And then?",
+          "kind": "choice",
+          "choices": [
+            "plus",
+            "minus",
+            "times",
+            "divided by",
+            "remainder",
+            "to the power of",
+            "but no more than",
+            "but no less than",
+            "how far from"
+          ],
+          "default": "plus"
+        },
+        {
+          "name": "b",
+          "prompt": "Second box of the sum?",
+          "kind": "text",
+          "choices": [],
+          "default": "1"
+        }
+      ]
+    },
+    {
+      "id": "place_vector",
+      "label": "vector {who} {axis} = {a} {op} {b}",
+      "params": [
+        {
+          "name": "who",
+          "prompt": "Which placeholder?",
+          "kind": "text",
+          "choices": [],
+          "default": "thing"
+        },
+        {
+          "name": "axis",
+          "prompt": "Which axis -- x, y or z?",
+          "kind": "choice",
+          "choices": [
+            "x",
+            "y",
+            "z"
+          ],
+          "default": "x"
+        },
+        {
+          "name": "a",
+          "prompt": "First box of the sum?",
+          "kind": "text",
+          "choices": [],
+          "default": "0"
+        },
+        {
+          "name": "op",
+          "prompt": "And then?",
+          "kind": "choice",
+          "choices": [
+            "plus",
+            "minus",
+            "times",
+            "divided by",
+            "remainder",
+            "to the power of",
+            "but no more than",
+            "but no less than",
+            "how far from"
+          ],
+          "default": "plus"
+        },
+        {
+          "name": "b",
+          "prompt": "Second box of the sum?",
+          "kind": "text",
+          "choices": [],
+          "default": "1"
+        }
+      ]
+    },
+    {
+      "id": "place_here",
+      "label": "copy my place into vector {who}",
+      "params": [
+        {
+          "name": "who",
+          "prompt": "Which placeholder?",
+          "kind": "text",
+          "choices": [],
+          "default": "home"
+        }
+      ]
+    },
+    {
+      "id": "place_jump",
+      "label": "jump to vector {who}",
+      "params": [
+        {
+          "name": "who",
+          "prompt": "Which placeholder?",
+          "kind": "text",
+          "choices": [],
+          "default": "home"
+        }
+      ]
+    },
+    {
+      "id": "place_move",
+      "label": "move by vector {who}",
+      "params": [
+        {
+          "name": "who",
+          "prompt": "Which placeholder?",
+          "kind": "text",
+          "choices": [],
+          "default": "step"
+        }
+      ]
+    },
+    {
+      "id": "win",
+      "label": "win the game",
+      "params": []
+    },
+    {
+      "id": "lose",
+      "label": "lose the game",
+      "params": []
+    }
+  ],
+  "colors": [
+    "white",
+    "red",
+    "green",
+    "yellow",
+    "blue",
+    "magenta",
+    "cyan",
+    "grey"
+  ],
+  "directions": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "random",
+    "toward it",
+    "away from it",
+    "forward"
+  ],
+  "bearings": [
+    "north",
+    "north-east",
+    "east",
+    "south-east",
+    "south",
+    "south-west",
+    "west",
+    "north-west",
+    "toward it",
+    "away from it"
+  ],
+  "keys": [
+    "up",
+    "down",
+    "left",
+    "right",
+    "space",
+    "w",
+    "a",
+    "s",
+    "d",
+    "e",
+    "f"
+  ]
+}
