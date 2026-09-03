@@ -887,6 +887,10 @@ document.addEventListener("click", e => {
 // edits in the browser, and optionally commit them through the GitHub API.
 
 const LS_GAME = "spark:game:", LS_GH = "spark:github";
+// The most recently opened game's name -- what "continue" on the title
+// screen reopens, and what boot prefers over just the alphabetically first
+// game in the list (see boot() near the bottom of this file).
+const LS_LAST = "spark:lastgame";
 
 const store = {
   mode: "static",
@@ -1061,9 +1065,14 @@ function openGitHubSettings() {
 
 // ------------------------------------------------------------------ the deck
 //
-// Six buttons and a box to type in, filling the screen. Everything that was
-// here before is still here -- the deck opens it as a page with a back button,
-// rather than replacing it. That is deliberate: the six buttons are a way in,
+// Buttons and a box to type in, filling the screen -- always the same
+// formation, just a different set of buttons per screen. A title screen
+// first (play, continue, new game, editor), a game menu before it is
+// anything else; the editor -- characters, brain, tiles, save, and
+// everything edit already covered -- lives one tap in, behind "editor", not
+// crowded onto the first screen alongside play. Everything that was here
+// before is still here -- the deck opens it as a page with a back button,
+// rather than replacing it. That is deliberate: the buttons are a way in,
 // not a smaller Spark.
 //
 // The formation is the CSS above. This half is what the buttons do, and what
@@ -1098,14 +1107,14 @@ function deckPop() {
 
 function deckHome() {
   stack.length = 0;
-  stack.push(homeScreen);
+  stack.push(titleScreen);
   renderDeck();
 }
 
 /* Rebuild the current screen from scratch. Every action ends by calling this,
    so nothing has to remember which buttons its change affected. */
 function renderDeck() {
-  if (!stack.length) stack.push(homeScreen);
+  if (!stack.length) stack.push(titleScreen);
   const screen = stack[stack.length - 1]();
   const box = $("#keys");
   box.textContent = "";
@@ -1123,17 +1132,68 @@ function renderDeck() {
 
 const item = (key, sub, go, kind) => ({key, sub, go, kind});
 
-// -- the seven you land on, six plus 3d world (scroll to see it) -----------
+// -- the title screen: play, continue, new game, editor --------------------
+//
+// A game menu first, an editor second -- Play and Continue are the two
+// headline choices, same as any title screen; everything that *changes* the
+// game (characters, brain, tiles, save, the game-file housekeeping in edit,
+// the 3D quick-start) lives one tap in, behind Editor (see editorScreen
+// below), rather than crowded onto this first screen alongside them.
 
-function homeScreen() {
-  // A guest who joined to play or watch gets play and the box; the four that
-  // change the game would be refused by the server anyway, so they say so here
-  // rather than opening on to nothing.
+function titleScreen() {
+  // A guest who joined to play or watch gets play and the box; the rest
+  // would be refused by the server anyway, so they say so here rather than
+  // opening on to nothing.
   const guest = !amEditor();
   const barred = what => () => note("you joined as a guest — you can play and "
                                     + "talk here, not " + what, "bad");
   return {name: project ? project.name : "spark", items: [
     item("play", "run the game", deckPlay),
+    item("continue", guest ? "guests cannot" : "your last game",
+         guest ? barred("switch games") : deckContinue,
+         guest ? "foreign" : null),
+    item("new game", guest ? "guests cannot" : "start again",
+         guest ? barred("start a new game") : deckNewGame,
+         guest ? "foreign" : null),
+    item("editor", guest ? "guests cannot" : "characters, brain, tiles…",
+         guest ? barred("change the game") : () => deckPush(editorScreen),
+         guest ? "foreign" : null),
+  ]};
+}
+
+/* Reopens whichever game was last opened (tracked in LS_LAST -- see
+   openGame() and boot() below), then plays it straight away, the way a
+   title screen's "continue" jumps back into your save rather than its
+   menu. Nothing remembered yet (a brand new browser profile) just plays
+   whatever's already loaded, same as "play". */
+async function deckContinue() {
+  const last = localStorage.getItem(LS_LAST);
+  if (last && last !== project.name && gameNames.includes(last))
+    await openGame(last);
+  deckPlay();
+}
+
+/* Shared by the title screen's "new game" and edit's own "new" -- one tap
+   in from the title, or reached again from inside the editor's file
+   housekeeping, either way the same thing happens. */
+async function deckNewGame() {
+  const name = (prompt("name your game", "mygame") || "").trim();
+  if (!name) return;
+  project = blankProject(name);
+  past = []; paintUndo(); charIdx = 0; rowIdx = 0;
+  await loadGames(project.name);
+  renderAll(); deckHome();
+  note("new game “" + name + "” — press save to write it down");
+}
+
+// -- the editor: everything that changes the game, one tap in from the ----
+// -- title screen (six things, plus the 3D quick-start -- scroll to see it)
+
+function editorScreen() {
+  const guest = !amEditor();
+  const barred = what => () => note("you joined as a guest — you can play and "
+                                    + "talk here, not " + what, "bad");
+  return {name: (project ? project.name : "spark") + " — editor", items: [
     item("edit", guest ? "guests cannot" : "open / new / share",
          guest ? barred("open or save games") : () => deckPush(editScreen),
          guest ? "foreign" : null),
@@ -1226,15 +1286,7 @@ const tilesCount = () => {
 function editScreen() {
   return {name: "edit", items: [
     item("open", "a saved game", () => deckPush(gamesScreen)),
-    item("new", "start again", async () => {
-      const name = (prompt("name your game", "mygame") || "").trim();
-      if (!name) return;
-      project = blankProject(name);
-      past = []; paintUndo(); charIdx = 0; rowIdx = 0;
-      await loadGames(project.name);
-      renderAll(); deckHome();
-      note("new game “" + name + "” — press save to write it down");
-    }),
+    item("new", "start again", deckNewGame),
     item("rename", project ? project.name : "", async () => {
       const was = project.name;
       const now = (prompt("new name for this game", was) || "").trim();
@@ -1534,9 +1586,11 @@ function swapSide(to) {
 
 const COMMANDS = {
   help() {
-    note("buttons: play, edit, characters, brain, tiles, save", "pin");
-    note("/play /edit /characters /brain /tiles /save — same as the buttons");
-    note("/back — up one screen.  /home — back to the six");
+    note("title screen: play, continue, new game, editor", "pin");
+    note("inside editor: edit, characters, brain, tiles, save", "pin");
+    note("/play /continue /editor /edit /characters /brain /tiles /save "
+         + "— same as the buttons");
+    note("/back — up one screen.  /home — back to the title screen");
     note('/pin "note" — keep a note.  /pins — list them.  /unpin 2 — remove one');
     note("/swap side chat — put the box on the other side when sideways");
     note("/who — who is connected.  /clear — empty this log");
@@ -1574,8 +1628,10 @@ const COMMANDS = {
     for (const p of people) note(p.name + " — " + p.role, "pin");
   },
 };
-// The six, reachable by name as well as by button.
+// Every button, reachable by name as well as by tapping it.
 COMMANDS.play = deckPlay;
+COMMANDS.continue = deckContinue;
+COMMANDS.editor = () => deckPush(editorScreen);
 COMMANDS.save = deckSave;
 COMMANDS.edit = () => deckPush(editScreen);
 COMMANDS.characters = () => deckPush(castScreen);
@@ -1591,7 +1647,7 @@ function startDeck() {
   $("#page").hidden = true;
   $("#deck").classList.remove("off");
   deckHome();
-  note("six buttons above. type /help for what this box can do.");
+  note("play, continue, new game, editor — type /help for what this box can do.");
   if (pinned.length)
     note(pinned.length + " note" + (pinned.length === 1 ? "" : "s") +
          " pinned — /pins", "pin");
@@ -2119,6 +2175,7 @@ async function openGame(name) {
   // would quietly replace this one with that one.
   past = []; paintUndo();
   charIdx = 0; rowIdx = 0; renderAll();
+  try { localStorage.setItem(LS_LAST, name); } catch (e) { /* private mode */ }
   say("opened " + name);
 }
 
@@ -2228,8 +2285,16 @@ for (const tab of document.querySelectorAll("#tabs button"))
     return;
   }
 
-  await loadGames(names[0]);
-  if (names.length) await openGame(names[0]);
+  // Prefer whatever was last open (see openGame()) over just the
+  // alphabetically first game -- reopening the page should pick up where
+  // you left off, not wherever the list happens to start.
+  let opening = names[0];
+  try {
+    const last = localStorage.getItem(LS_LAST);
+    if (last && names.includes(last)) opening = last;
+  } catch (e) { /* private mode -- just use names[0] */ }
+  await loadGames(opening);
+  if (names.length) await openGame(opening);
   else { project = blankProject("mygame"); renderAll(); }
   $("#gear").hidden = (store.mode === "server");
   $("#people-btn").hidden = (store.mode !== "server");

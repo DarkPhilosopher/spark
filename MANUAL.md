@@ -128,55 +128,82 @@ recent **say** message.
 
 ## Controls: the terminal menus
 
-Everything is a numbered list. Type the number, press enter.
+A big **SPARK** title screen, one option highlighted at a time — a game menu,
+not a numbered list, on any real terminal:
 
 | Key | Does |
 |---|---|
-| a number | choose that item |
-| `0` or enter | go back, or done, or quit at the top level |
-| `browser` or `b` | open the drag-and-drop editor, at any prompt |
+| ↑ ↓ | move the highlight |
+| enter | pick the highlighted option |
+| a digit, 1–9 | jump straight to that option, no arrows needed |
+| `0`, or Escape | go back, or quit at the title screen |
+| `b` | open the drag-and-drop editor |
+| `w` | who is connected |
 | enter on a question | accept the `[default]` shown in brackets |
 | Ctrl-C | leave Spark |
 
-Typing **browser** starts the editor server next to the menus and opens your
-browser at it. You keep both: the menus stay where they were, and both editors
-read and write the same `games/` folder. They do not watch each other, so after
-saving in one, re-open the game in the other to see the change. The server stops
-when you leave Spark.
+**Wherever that cannot work** — input piped in from a script, output piped to
+a file, an old or unusual terminal — every menu falls back on its own to a
+plain numbered list instead: type the number, press enter. Typing `browser`
+(or just `b`) still opens the drag-and-drop editor there, and `players` (or
+`w`) still lists who is connected, both at any prompt. Nothing about Spark
+needs a real interactive terminal to run; the big-picture menu is purely a
+nicer way to use one when you have it.
+
+Opening the browser editor (`b`, or `browser`) starts the editor server next
+to the menus and opens your browser at it. You keep both: the menus stay where
+they were, and both editors read and write the same `games/` folder. They do
+not watch each other, so after saving in one, re-open the game in the other to
+see the change. The server stops when you leave Spark.
 
 The screens, in order of depth:
 
-1. **Main menu** — with nothing open: *learn how* (the tutorial), new game, open
-   a game. With a game open: play, characters, world settings, save, rename,
-   send to GitHub, invite someone to play, new game, open a game.
-2. **Characters** — add a character, or pick one to edit.
-3. **One character** — its brain, its letter, colour, health, how many start,
+1. **Title screen** — with nothing open: *learn how* (the tutorial), new game,
+   open a game. With a game open: play it, editor, new game, open a game — a
+   game menu first, an editor second, the way play and options stay apart in
+   any game.
+2. **Editor** — one tap (or digit) in from the title screen, with a game open:
+   characters and their brains, your own tiles, world settings, save, rename,
+   send to GitHub, invite someone to play.
+3. **Characters** — add a character, or pick one to edit.
+4. **One character** — its brain, its letter, colour, health, how many start,
    player or prop, solid or walk-through, delete.
-4. **Its brain** — the list of `WHEN ... DO ...` rows: add, change, delete, move
+5. **Its brain** — the list of `WHEN ... DO ...` rows: add, change, delete, move
    a row up.
-5. **One row** — add or remove WHEN tiles and DO tiles.
-6. **One tile** — answer its questions, one per screen.
+6. **One row** — add or remove WHEN tiles and DO tiles.
+7. **One tile** — answer its questions, one per screen.
 
 ---
 
 ## Controls: the deck (what the browser opens on)
 
-Six buttons and a box, filling the screen.
+A title screen, then an editor — a game menu first, filling the screen.
 
 | Button | Opens |
 |---|---|
 | play | the game — live through Termux, or the 3D view with no server |
+| continue | reopens whichever game you last had open, then plays it |
+| new game | start again, blank |
+| editor | six more buttons, everything that changes the game |
+
+**Editor**, one tap in:
+
+| Button | Opens |
+|---|---|
 | edit | open, new, rename, world, share, github |
 | characters | a button per character, then a button per setting |
 | brain | a button per row, then a button per tile in it |
 | tiles | your folded tiles, and the Python editor |
 | save | writes the game down. No screen: it saves and says where |
+| 3d world | a fresh, empty 3D world, ready to move around in |
 
 **Every screen is the same formation.** There is no long page anywhere. What
 used to be a panel is now a screen of buttons:
 
 | Screen | Its buttons |
 |---|---|
+| title | play · continue · new game · editor |
+| editor | edit · characters · brain · tiles · save · 3d world |
 | edit | open · new · rename · world · share · github |
 | open | one per saved game |
 | world | width · height · speed · edges |
@@ -187,7 +214,7 @@ used to be a panel is now a screen of buttons:
 | add a tile | your own tiles, then all thirty-five — **this is what the scrolling is for** |
 | your tiles | one per folded tile (tap to delete) · fold a row · python |
 
-`‹` beside the box goes back one screen; `/home` returns to the six.
+`‹` beside the box goes back one screen; `/home` returns to the title screen.
 
 **The two things that are not buttons**, because they cannot be: a tile's
 settings, and the Python text editor. Both open over the deck with their own
@@ -195,7 +222,9 @@ back button.
 
 ### The formation
 
-Eight cells, six of them buttons.
+Eight cells, up to six of them buttons — the title screen only fills four and
+leaves the rest of the grid empty, the editor and most other screens use the
+full six.
 
 | Held | Grid | Buttons | Box |
 |---|---|---|---|
@@ -215,12 +244,12 @@ and remembers which side you left it on. `/swap side chat left` and
 | Typed | What happens |
 |---|---|
 | `/help` | lists all of this on screen |
-| `/play` `/edit` `/characters` `/brain` `/tiles` `/save` | the same as the buttons |
+| `/play` `/continue` `/editor` `/edit` `/characters` `/brain` `/tiles` `/save` | the same as the buttons |
 | `/pin "note"` | keeps a note. Quotes are optional: `/pin feed the bug` works |
 | `/pins` | lists them, numbered |
 | `/unpin 2` | removes number 2 |
 | `/back` | up one screen — the same as `‹` |
-| `/home` | back to the six |
+| `/home` | back to the title screen |
 | `/swap side chat` | the box changes sides when sideways |
 | `/who` | who is connected |
 | `/clear` | empties the log |
@@ -761,7 +790,7 @@ anywhere, as plain `spark ...`, once you have run the install command.
 | `python3 tests/check_update.py` | check updating, in throwaway clones |
 | `python3 tests/check_engines.py` | check both engines still play games identically |
 | `node tests/store.test.js` | check the editor's save and load logic |
-| `node tests/deck.test.js` | check the six buttons and the box you type in |
+| `node tests/deck.test.js` | check the deck's screens and the box you type in |
 
 ---
 

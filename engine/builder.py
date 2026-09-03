@@ -1,12 +1,47 @@
 """The no-code editor: every choice is a numbered menu, nothing is typed as code."""
 
 import json
+import shutil
 import sys
 
 from . import brain, runner, status, tiles
 from .world import COLORS
 
 CLEAR = "\033[H\033[2J"
+
+# ---------------------------------------------------------------------------
+# the big-picture logo -- a block-letter "SPARK", used only on the title
+# screen (see header()'s big= and main_menu() below). Every other screen
+# keeps the plain "====" header: one splash screen, not one on every menu.
+# ---------------------------------------------------------------------------
+
+_LOGO_FONT = {
+    "S": [" ### ", "#    ", " ### ", "    #", " ### "],
+    "P": ["#### ", "#   #", "#### ", "#    ", "#    "],
+    "A": [" ### ", "#   #", "#####", "#   #", "#   #"],
+    "R": ["#### ", "#   #", "#### ", "#  # ", "#   #"],
+    "K": ["#   #", "#  # ", "###  ", "#  # ", "#   #"],
+}
+
+
+def _logo_lines(word="SPARK"):
+    rows = ["" for _ in range(5)]
+    for ch in word:
+        glyph = _LOGO_FONT[ch]
+        for r in range(5):
+            rows[r] += glyph[r] + " "
+    return [row.rstrip() for row in rows]
+
+
+def logo(word="SPARK"):
+    """The block-letter banner, or plain text if the terminal is too narrow
+    for it (see MANUAL.md's minimum: 34 columns) -- never assume more room
+    than a screen actually has."""
+    lines = _logo_lines(word)
+    width = shutil.get_terminal_size(fallback=(80, 24)).columns
+    if width < len(lines[0]) + 4:
+        return [word]
+    return lines
 
 # ---------------------------------------------------------------------------
 # undo
@@ -64,9 +99,15 @@ def forget_history():
 # tiny prompt helpers -- all input goes through these
 # --------------------------------------------------------------------------
 
-def header(title):
+def header(title, big=False):
+    """big=True is the title screen alone (see main_menu) -- one splash per
+    visit to the menus, not one on every single screen underneath it."""
     print(CLEAR + status.line())
     print("=" * 46)
+    if big:
+        for line in logo():
+            print(" " + line)
+        print()
     print(" " + title)
     print("=" * 46)
 
@@ -95,11 +136,24 @@ def ask_yes(prompt, default=False):
 
 
 def menu(options, prompt="pick a number", allow_back=True, back_label="back"):
-    """Show a numbered list. Returns the index, or None for back/blank.
+    """One option highlighted at a time, arrow keys to move, enter to pick --
+    the "big picture" menu every screen in the terminal uses. Falls back to
+    a classic numbered list wherever that cannot work (piped input, a
+    terminal too old or dumb for it) so nothing here ever requires a real
+    interactive tty. Either way: returns the index chosen, or None for
+    back/blank/quit.
 
-    Two words work at any menu instead of a number: `browser` opens the
-    drag-and-drop editor, `players` lists who is connected.
+    Two things work at any menu without being in the list: `browser` (or
+    just `b`) opens the drag-and-drop editor, `players` (`w`, for "who") lists
+    who is connected.
     """
+    result = _big_menu(options, prompt, allow_back, back_label)
+    if result is not _UNSUPPORTED:
+        return result
+    return _classic_menu(options, prompt, allow_back, back_label)
+
+
+def _classic_menu(options, prompt, allow_back, back_label):
     for i, label in enumerate(options, 1):
         print(" %2d. %s" % (i, label))
     if allow_back:
@@ -118,6 +172,76 @@ def menu(options, prompt="pick a number", allow_back=True, back_label="back"):
         if answer.isdigit() and 1 <= int(answer) <= len(options):
             return int(answer) - 1
         print("  pick one of the numbers shown, or type browser or players")
+
+
+# ---------------------------------------------------------------------------
+# the big-picture menu itself -- arrow keys move a highlight, enter picks it
+# ---------------------------------------------------------------------------
+
+_UNSUPPORTED = object()   # sentinel: this terminal can't do it, use _classic_menu
+HILITE, RESET, DIM = "\033[1;36m", "\033[0m", "\033[2m"
+
+
+def _render_menu(options, selected, allow_back, back_label, first):
+    """Prints the list the first time; every call after that rewrites it in
+    place, moving the cursor back up over exactly what it printed rather
+    than clearing the whole screen -- whatever the caller already printed
+    above (the header, a line of game info) stays put untouched."""
+    items = list(options) + ([back_label] if allow_back else [])
+    if not first:
+        sys.stdout.write("\033[%dA" % (len(items) + 2))   # +2: blank line, footer
+    for i, label in enumerate(items):
+        arrow = HILITE + " > " + RESET if i == selected else "   "
+        text = (HILITE + label + RESET) if i == selected else label
+        sys.stdout.write("%s%s\033[K\n" % (arrow, text))
+    sys.stdout.write("\033[K\n")
+    sys.stdout.write(DIM + " ↑↓ move . enter pick . 1-9 jump . "
+                      "b browser . w who's here" + RESET + "\033[K\n")
+    sys.stdout.flush()
+
+
+def _big_menu(options, prompt, allow_back, back_label):
+    if not (sys.stdin.isatty() and sys.stdout.isatty()):
+        return _UNSUPPORTED
+    n = len(options)
+    total = n + (1 if allow_back else 0)
+    selected = 0
+    first = True
+    try:
+        while True:
+            _render_menu(options, selected, allow_back, back_label, first)
+            first = False
+            with runner.Keyboard() as kb:
+                if kb.saved is None:
+                    return _UNSUPPORTED
+                sys.stdout.write(runner.HIDE)
+                try:
+                    key = runner.read_key(kb.fd)
+                finally:
+                    sys.stdout.write(runner.SHOW)
+            if key in ("up", "left"):
+                selected = (selected - 1) % total
+            elif key in ("down", "right"):
+                selected = (selected + 1) % total
+            elif key == "enter":
+                return None if (allow_back and selected == n) else selected
+            elif key.isdigit() and key != "0" and int(key) <= n:
+                return int(key) - 1
+            elif key == "0" and allow_back:
+                return None
+            elif key in ("escape", "quit") and allow_back:
+                return None
+            elif key == "b":
+                open_browser_editor()
+                first = True
+            elif key == "w":
+                players_screen()
+                first = True
+    except Exception:
+        # A polish feature, not a load-bearing one -- any surprise here
+        # (an exotic terminal, a signal mid-read) falls back rather than
+        # taking the whole menu down with it.
+        return _UNSUPPORTED
 
 
 def kinds_in(project):
@@ -693,22 +817,22 @@ def open_screen():
 
 
 def main_menu(project=None):
+    """The title screen: Play or Editor when a game is open, otherwise just
+    enough to get one open. Everything that changes the game -- characters,
+    tiles, world settings, save, rename, GitHub, invite -- lives one level
+    in, behind Editor (see editor_screen), the way a game's own menu keeps
+    "play" apart from "options" instead of one long list of everything at
+    once."""
     while True:
-        header("SPARK  --  build a game out of tiles")
+        header("build a game out of tiles", big=True)
         if project:
             print(" open: %s  (%d characters)\n"
                   % (project["name"], len(project["characters"])))
-            options = ["play it", "characters and their brains",
-                       "your own tiles (%d)" % len(my_tiles(project)),
-                       "world settings", "save", "rename this game",
-                       "send this game to GitHub", "invite someone to play",
-                       "start a new game", "open a game"]
+            options = ["play it", "editor", "start a new game", "open a game"]
         else:
             print(" nothing open yet\n")
             options = ["learn how (guided, about ten minutes)",
                        "start a new game", "open a game"]
-        print(" (type browser at any prompt for the drag-and-drop editor,")
-        print("  or players to see who is connected)\n")
         choice = menu(options, "pick a number", back_label="quit")
         if choice is None:
             print("bye")
@@ -721,7 +845,37 @@ def main_menu(project=None):
             project = brain.load(saved)
         elif label == "play it":
             runner.play(project)
-        elif label == "characters and their brains":
+        elif label == "editor":
+            project = editor_screen(project)
+        elif label == "start a new game":
+            name = ask("Name your game", "mygame").strip() or "mygame"
+            project = brain.new_project(name)
+            forget_history()
+        elif label == "open a game":
+            opened = open_screen()
+            if opened is not None:
+                project = opened
+                forget_history()   # undoing into the last game would swap it in
+
+
+def editor_screen(project):
+    """Everything that changes the game, one level in from the title
+    screen. Returns the project -- the same one, unless a rename gave it a
+    new file, or the save this screen offers changed nothing about which
+    object it is, just what's on disk."""
+    while True:
+        header("Editor for '%s'" % project["name"])
+        print(" %d characters\n" % len(project["characters"]))
+        options = ["characters and their brains",
+                    "your own tiles (%d)" % len(my_tiles(project)),
+                    "world settings", "save", "rename this game",
+                    "send this game to GitHub", "invite someone to play"]
+        choice = menu(options, "pick a number")
+        if choice is None:
+            return project
+        label = options[choice]
+
+        if label == "characters and their brains":
             characters_screen(project)
         elif label.startswith("your own tiles"):
             my_tiles_screen(project)
@@ -738,12 +892,3 @@ def main_menu(project=None):
             push_screen(project)
         elif label == "invite someone to play":
             invite_screen()
-        elif label == "start a new game":
-            name = ask("Name your game", "mygame").strip() or "mygame"
-            project = brain.new_project(name)
-            forget_history()
-        elif label == "open a game":
-            opened = open_screen()
-            if opened is not None:
-                project = opened
-                forget_history()   # undoing into the last game would swap it in

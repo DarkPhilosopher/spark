@@ -87,20 +87,32 @@ menu, as *learn how*.
 Otherwise, there are three ways in. All of them edit the same `games/*.json`
 files, so you can start a game in one and finish it in another.
 
-### The deck: six buttons and a box
+### The deck: a title screen, then an editor
 
-The browser opens on **six buttons and a box to type in**, filling the screen.
+The browser opens on a **title screen** — a game menu first, an editor second,
+the way a real game keeps "play" apart from "options" instead of listing
+everything at once:
 
 | | |
 |---|---|
 | **play** | run the game — live through Termux, or in the 3D view if there is no server |
+| **continue** | reopen whichever game you last had open, then play it |
+| **new game** | start again, blank |
+| **editor** | everything that changes the game, one tap in |
+
+**Editor** opens six more buttons — this is the part that used to be the whole
+deck:
+
+| | |
+|---|---|
 | **edit** | open, save, rename, new, GitHub, sharing |
 | **characters** | the cast, and what each one looks like |
 | **brain** | the rows, the tiles, undo, and ⊞ fold |
 | **tiles** | your own — folded ones and Python ones |
 | **save** | write the game down |
+| **3d world** | a fresh, empty 3D world to try building in |
 
-**Every screen is the same six-button formation** — not just this one. Opening
+**Every screen is the same button formation** — not just these two. Opening
 *characters* gives you a button per character; opening one of those gives you a
 button per setting; *brain* gives a button per row, and a row gives a button per
 tile. The tile palette is buttons too, all thirty-five of them, which is what
@@ -109,16 +121,17 @@ the scrolling is for. `‹` beside the box goes back up one.
 Only two things are not buttons, because they cannot be: a tile's settings, and
 the Python text editor. Both open over the deck.
 
-**How it sits on the screen.** Eight cells. Six are buttons, and the two left
-over are the box.
+**How it sits on the screen.** Eight cells. Up to six are buttons, and the two
+left over are the box — shown here with the editor's own six, since the title
+screen only has four and leaves the rest of the grid empty.
 
     held upright                 held sideways
     ┌──────────┬──────────┐      ┌───────┬───────┬───────┬────────┐
-    │  play    │  edit    │      │ play  │ chars │ tiles │        │
+    │  edit    │characters│      │ edit  │ brain │  3d   │        │
     ├──────────┼──────────┤      ├───────┼───────┼───────┤  box   │
-    │ characters│ brain   │      │ edit  │ brain │ save  │        │
+    │  brain   │  tiles   │      │ chars │ tiles │       │        │
     ├──────────┼──────────┤      └───────┴───────┴───────┴────────┘
-    │  tiles   │  save    │
+    │  save    │ 3d world │
     ├──────────┴──────────┤      /swap side chat puts the box on the left
     │        box          │
     └─────────────────────┘
@@ -134,11 +147,11 @@ world:
 | Typed | What happens |
 |---|---|
 | `/help` | everything below, on screen |
-| `/play` `/edit` `/characters` `/brain` `/tiles` `/save` | the same as the buttons |
+| `/play` `/continue` `/editor` `/edit` `/characters` `/brain` `/tiles` `/save` | the same as the buttons |
 | `/pin "feed the bug first"` | keep a note. Quotes optional |
 | `/pins` | list them |
 | `/unpin 2` | remove one |
-| `/back` `/home` | up one screen; back to the six |
+| `/back` `/home` | up one screen; back to the title screen |
 | `/swap side chat` | put the box on the other side when the phone is sideways |
 | `/who` | who is connected |
 | `/clear` | empty the log |
@@ -150,8 +163,8 @@ is still a person in the room. One line is capped at 300 characters and only the
 last 40 are kept: a shared world is a conversation while it is happening, not a
 record afterwards, so nothing said reaches the disk.
 
-Guests get the deck too — **play** and the box — but not the four buttons that
-change the game.
+Guests get the deck too — **play** and the box — but not **continue**, **new
+game**, or **editor**.
 
 ### 1. Drag and drop, in your browser
 
@@ -185,12 +198,16 @@ fine-grained token with **Contents: read and write** on that one repo. Then
 every save also commits `games/*.json`. See
 [Putting it on GitHub](#putting-it-on-github).
 
-### 3. Numbered menus, in the terminal
+### 3. A menu of its own, in the terminal
 
     python3 spark.py
 
-No browser involved. Every choice is a number you type. Slower than dragging,
-but it works anywhere, including over a phone keyboard with one thumb.
+No browser involved. On a real terminal, arrow keys move a highlight and enter
+picks it — a big **SPARK** title screen, then Play or Editor once a game is
+open, the same idea as the browser's, just typed instead of tapped. Typing a
+number still works too, for whichever option that is. Piped input (a script,
+a test) falls back to the plain numbered list automatically, so nothing here
+needs a real interactive terminal to work.
 
 ### See the demo first
 
@@ -819,7 +836,7 @@ Once `python3 spark.py install` has been run, every one of these works as plain
 | `python3 spark.py pull [game ...]` | overwrite games here with GitHub's |
 | `python3 spark.py games/chase.json` | open the menus with that game already loaded |
 | `node tests/store.test.js` | check the editor's save and load logic |
-| `node tests/deck.test.js` | check the six buttons and what the box understands |
+| `node tests/deck.test.js` | check the deck's screens and what the box understands |
 | `python3 tests/check_docs.py` | check this README still matches the code |
 | `python3 tests/check_sync.py` | check the GitHub push/pull logic |
 | `python3 tests/check_permissions.py` | check guests cannot exceed their code |

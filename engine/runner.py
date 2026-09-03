@@ -57,6 +57,33 @@ class Keyboard:
         return keys
 
 
+def read_key(fd):
+    """Block for exactly one keypress, decoding an arrow-key escape sequence.
+
+    A separate blocking read from Keyboard.pressed()'s non-blocking poll,
+    which the tick loop above needs instead -- this one is for the menus
+    (see builder.py's big-picture menu), which want to sit still until
+    something is actually pressed rather than spin a loop.
+
+    An escape sequence arrives as three bytes close together: ESC, `[`, then
+    the direction letter. A lone Escape keypress is only the first of those,
+    so the short wait below is what tells the two apart -- if nothing more
+    shows up in 50ms, it was just Escape.
+    """
+    ch = os.read(fd, 1).decode("utf-8", "replace")
+    if ch == "\x1b":
+        if select.select([fd], [], [], 0.05)[0]:
+            rest = os.read(fd, 2).decode("utf-8", "replace")
+            if rest[:1] == "[":
+                return ESCAPES.get(rest[1:2], "escape")
+        return "escape"
+    if ch in ("\r", "\n"):
+        return "enter"
+    if ch in ("\x03", "\x04"):
+        return "quit"
+    return ch.lower()
+
+
 def draw(world, speed):
     out = [HOME_CLEAR]
     out += world.render()

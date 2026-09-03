@@ -17,9 +17,9 @@ const src = html.slice(html.indexOf("const LS_SWAP"),
 // wherever you are -- that is the whole point of the redesign. These are read
 // straight out of the source rather than run, because building them needs the
 // rest of the page.
-const SCREENS = ["homeScreen", "editScreen", "worldScreen", "gamesScreen",
-                 "castScreen", "oneCharScreen", "brainScreen", "oneRowScreen",
-                 "tilesScreen"];
+const SCREENS = ["titleScreen", "editorScreen", "editScreen", "worldScreen",
+                 "gamesScreen", "castScreen", "oneCharScreen", "brainScreen",
+                 "oneRowScreen", "tilesScreen"];
 
 let pass = 0, fail = 0;
 const ok = (name, cond, extra) => {
@@ -122,8 +122,11 @@ console.log("every screen is buttons, not a page\n");
     const body = src.slice(at, src.indexOf("\nfunction ", at + 10));
     ok(name + " returns items", /items\s*[:=]/.test(body), name);
   }
-  ok("the six on the home screen are the ones asked for",
-     ["play", "edit", "characters", "brain", "tiles", "save"].every(k =>
+  ok("the title screen is play/continue/new game/editor",
+     ["play", "continue", "new game", "editor"].every(k =>
+       new RegExp('item\\("' + k + '"').test(src)));
+  ok("the editor screen still has the six it always did",
+     ["edit", "characters", "brain", "tiles", "save"].every(k =>
        new RegExp('item\\("' + k + '"').test(src)));
   ok("there is a back that pops one screen", /function deckPop\b/.test(src));
   ok("...and a way home", /function deckHome\b/.test(src));
@@ -134,7 +137,8 @@ console.log("every screen is buttons, not a page\n");
 console.log("\nwhat the box understands");
 {
   const d = harness();
-  for (const key of ["play", "edit", "characters", "brain", "tiles", "save"])
+  for (const key of ["play", "continue", "editor", "edit", "characters",
+                     "brain", "tiles", "save"])
     ok("/" + key + " is a command too", typeof d.COMMANDS[key] === "function");
   for (const key of ["help", "pin", "pins", "unpin", "swap", "clear", "who",
                      "back", "home"])
@@ -235,9 +239,9 @@ function screens() {
     actions: [{id: "move", label: "move {dir}", params: []},
               {id: "combo", label: 'the tile called "{name}"', params: []}],
   };
-  const names = ["homeScreen", "editScreen", "worldScreen", "gamesScreen",
-                 "castScreen", "oneCharScreen", "brainScreen", "oneRowScreen",
-                 "tilesScreen"];
+  const names = ["titleScreen", "editorScreen", "editScreen", "worldScreen",
+                 "gamesScreen", "castScreen", "oneCharScreen", "brainScreen",
+                 "oneRowScreen", "tilesScreen"];
   const body = `
     ${src}
     module.exports = {${names.join(", ")}, deckPush, deckPop, deckHome,

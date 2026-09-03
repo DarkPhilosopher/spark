@@ -16,6 +16,36 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ### Added
 
+- **A big-picture menu in the terminal, and a title screen in the browser —
+  both now a game menu first, an editor second.**
+
+  In the terminal: a big **SPARK** logo, one option highlighted at a time,
+  arrow keys to move and enter to pick — `engine/builder.py`'s `menu()`
+  renders this on any real terminal, so all twenty-some screens in the
+  terminal app get it for free, not just the main one. A digit still jumps
+  straight to that option, and `b`/`w` are one-key shortcuts for opening the
+  browser editor and listing who's connected. Wherever a real terminal isn't
+  available — piped input, a script, an old terminal — it falls back on its
+  own to the plain numbered list this always was; nothing here needs a tty
+  to run (`engine/runner.py` gained `read_key()`, a blocking single-keypress
+  reader with arrow-key decoding, alongside the existing non-blocking
+  `Keyboard.pressed()` the play loop already used).
+
+  The terminal's own main menu is restructured to match: a title screen
+  (play it / editor / new game / open a game) instead of one long list, with
+  everything that changes the game — characters, tiles, world settings,
+  save, rename, GitHub, invite — moved one screen in, behind **editor**
+  (`editor_screen()`, new).
+
+  In the browser: the deck now opens on a title screen — **play, continue,
+  new game, editor** — before the six buttons that used to be the whole
+  deck (edit/characters/brain/tiles/save/3d world), which now live behind
+  **editor** (`editorScreen()`, renamed from `homeScreen()`). **Continue**
+  reopens whichever game you last had open (tracked in `localStorage` under
+  `spark:lastgame`) and plays it; the same key now also makes the page's own
+  boot sequence prefer your last game over just the alphabetically first one
+  in the list. `/continue` and `/editor` join the box's existing commands.
+
 - **Resized objects now scale their glyph label, selection ring, and tap
   target with them.** All three used to sit at a fixed, role-based
   height, so an object made taller through the Inspector or the Mesh
