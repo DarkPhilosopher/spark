@@ -733,7 +733,8 @@ again to confirm it. The camera itself orbits *you*, not the middle of the
 board, so the world reads as a place you are standing in rather than a
 diorama seen from outside.
 
-Every button on screen — the movement pad, the top bar, the button drawer's
+Every button on screen — the two thumb-zone pads (movement at bottom-left,
+actions at bottom-right), the top bar, the button drawer's
 own bubbles — can be dragged, resized, and faded from a button editor built
 into the tab, and whole arrangements of them saved under a name and swapped
 between. A Backpack (a small file system) and a Properties panel (grid-lock

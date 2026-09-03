@@ -16,6 +16,36 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ### Added
 
+- **The 3D view's on-screen controls are two pads now, not one — a
+  thumb-zone split.** Previously ▲▼◀▶, ⟲, +, ●, ⤓, and ⤒ all shared a
+  single 3×3 block centred at the bottom of the screen. Now `#pad-move`
+  (▲▼◀▶, a plus shape) sits at the bottom-left corner and `#pad-actions`
+  (⟲ + ● ⤓⤒, the same corners-and-centre arrangement the combined pad
+  used to have) sits at the bottom-right — `#controls` switched from
+  `justify-content:center` to `space-between` to push them apart. Point
+  is reach, not just tidiness: each pad now lands directly under whichever
+  thumb is already resting near that side of the phone, instead of both
+  hands needing to meet in the middle for every control.
+
+  Both pads share one `.pad` CSS class (was `#pad`); which of the nine
+  grid cells each button occupies is now spelled out with
+  `grid-template-areas` per pad rather than relying on DOM order, since
+  each pad only fills 4 or 5 of its 9 cells and leaves the rest empty.
+  Every button kept its original `data-key`, so the button editor's saved
+  positions (keyed by that string) still match up with no migration.
+  `--pad` (the shared size variable) dropped from `min(94vw, 50vh, 460px)`
+  to `min(40vw, 46vh, 230px)` in portrait — under half its old share, since
+  two pads now split the width a single one used to have entirely to
+  itself; landscape's own override shrank from a 420px cap to 230px for
+  the same reason, keeping the 46vw share it already used.
+
+  Validated with `node --check` on the extracted script and a full
+  `html.parser` pass — this is a pure layout/markup change, no gameplay
+  logic touched, so `tests/check_engines.py` and the merge/deck/store
+  suites all stayed green as expected without needing new cases of their
+  own. Not seen on a real phone screen yet — the exact --pad numbers above
+  are a first pass, worth a look and a tweak on-device.
+
 - **Merge (🧬, in the button drawer): combine several separately-placed
   objects into one new placeable kind, in the 3D view.** Arm it, tap
   objects one at a time — each gets its own green ring — tap 🧬 again to

@@ -11,12 +11,15 @@
     --bg:#4a5058; --panel:#5b6169; --panel2:#666d76; --line:#838a94;
     --ink:#f2f4f6; --dim:#c7ccd3; --accent:#8ecae6; --bad:#d99a94;
     --good:#a8c9a0;
-    /* How big the pad is, as a share of this phone's own screen -- so it comes
-       out right on a small phone and a big one without either being measured.
-       Upright: half the height, unless the phone is narrow enough that the
-       width runs out first. Sideways below. The cap stops a tablet handing you
-       a pad the size of a dinner plate. */
-    --pad:min(94vw, 50vh, 460px);
+    /* How big each pad is, as a share of this phone's own screen -- so it
+       comes out right on a small phone and a big one without either being
+       measured. There are two pads side by side now (move + actions, see
+       .pad below), so this is under half of what a single combined pad
+       used to claim, not the old 94vw -- 40% of the width leaves genuine
+       room between the two thumb zones instead of them nearly touching in
+       the middle. Sideways this is overridden below. The cap stops a
+       tablet handing either one the size of a dinner plate. */
+    --pad:min(40vw, 46vh, 230px);
     --util:clamp(36px, 9vw, 48px); /* restart / centre / save / live: pressed rarely */
     /* The translucent panel colours that kept getting retyped as the same
        literal rgba() across pad/side/drawer/modals as each was added --
@@ -107,10 +110,14 @@
 
   /* Floats over the bottom of the world instead of claiming a strip of the
      page for itself -- pointer-events:none on the wrapper so a swipe in the
-     empty padding around the pad still reaches the canvas and turns the
-     camera; the pad and its buttons opt back in below. */
+     empty middle between the two pads still reaches the canvas and turns
+     the camera; the pads and their buttons opt back in below.
+     space-between (not centered) is the point of the split: one pad sits
+     at the left edge, the other at the right, so each lands under whichever
+     thumb is already resting near that side of the phone instead of both
+     controls sharing one block you have to reach into the middle for. */
   #controls{position:fixed;left:0;right:0;bottom:0;z-index:4;
-            display:flex;align-items:center;justify-content:center;
+            display:flex;align-items:flex-end;justify-content:space-between;
             padding:8px;padding-bottom:calc(8px + env(safe-area-inset-bottom));
             pointer-events:none}
   button{font:inherit;color:var(--ink);background:var(--panel2);
@@ -119,31 +126,58 @@
   button:active{filter:brightness(1.45)}
   button[disabled]{opacity:.4}
 
-  /* A square of side --pad, split three by three. Each key is therefore just
-     under a third of that, whatever size the screen turned out to be. Half
-     transparent and blurred, so it reads as floating over the environment
-     rather than a solid panel sitting beside it. */
-  #pad{display:grid;width:var(--pad);height:var(--pad);
+  /* Two thumb-zone pads instead of one combined block (see #controls above):
+     #pad-move (bottom-left) is just the four arrows in a plus, #pad-actions
+     (bottom-right) is the fire/utility buttons that used to sit in the
+     corners and centre of the old single pad -- same keys, same relative
+     positions, just carried by a grid of their own. Both are still a square
+     of side --pad, three cells by three (grid-template-areas below leaves
+     the unused cells empty rather than dropping to fewer columns, so a
+     button is never smaller, or the pad never narrower, than the old
+     combined one's per-key size was). Half transparent and blurred, so
+     each reads as floating over the environment rather than a solid panel
+     sitting beside it. */
+  .pad{display:grid;width:var(--pad);height:var(--pad);
        grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);
        gap:3%;pointer-events:auto}
-  #pad button{width:100%;height:100%;min-width:0;min-height:0;padding:0;
+  .pad button{width:100%;height:100%;min-width:0;min-height:0;padding:0;
               border-radius:18%;font-size:calc(var(--pad) * 0.115);
               background:rgba(102,109,118,.55);border-color:rgba(131,138,148,.6);
               backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
-  #pad .fire{background:rgba(126,164,186,.4);border-color:var(--accent);color:var(--accent);
+  .pad .fire{background:rgba(126,164,186,.4);border-color:var(--accent);color:var(--accent);
              font-size:calc(var(--pad) * 0.09)}
+  #pad-move{grid-template-areas:".    up    ."
+                                 "left .     right"
+                                 ".    down  ."}
+  #pad-move button[data-key="up"]{grid-area:up}
+  #pad-move button[data-key="left"]{grid-area:left}
+  #pad-move button[data-key="right"]{grid-area:right}
+  #pad-move button[data-key="down"]{grid-area:down}
+  #pad-actions{grid-template-areas:"e . f"
+                                    ". space ."
+                                    "s . w"}
+  #pad-actions button[data-key="e"]{grid-area:e}
+  #pad-actions button[data-key="f"]{grid-area:f}
+  #pad-actions button[data-key="space"]{grid-area:space}
+  #pad-actions button[data-key="s"]{grid-area:s}
+  #pad-actions button[data-key="w"]{grid-area:w}
 
-  /* Sideways there is width to spare and no height to spare, so the pad
-     tucks into the bottom-right corner instead of spreading across the
-     bottom -- it still floats over the world, which now fills the whole
-     screen in either orientation. */
+  /* Upright there are two of these side by side, so each gets less than
+     the old single pad's full share of the screen -- 40vw not 94vw --
+     while the 46vh floor and 230px cap stop it shrinking or growing past
+     a sensible thumb-zone size regardless of screen shape. Sideways there
+     is width to spare and no height to spare, so both pads shrink to a
+     landscape-appropriate size (same 46vw share the single pad used to
+     use, since now two share the width instead of one taking it all) and
+     the row's own height cap keeps neither one tall enough to reach up
+     into the top bar. Either way #controls above still puts one at each
+     bottom corner; only the size formula changes here. */
   @media (orientation:landscape){
     /* 100vh minus room for the top bar (title + a row of side buttons)
-       and the bottom safe area, so the pad can no longer grow tall enough
+       and the bottom safe area, so a pad can no longer grow tall enough
        to reach up and overlap the bar the way a flat vh share could. */
-    :root{--pad:min(46vw, calc(100vh - 150px), 420px)}
-    #controls{justify-content:flex-end;
-              padding-right:calc(8px + env(safe-area-inset-right))}
+    :root{--pad:min(46vw, calc(100vh - 150px), 230px)}
+    #controls{padding-right:calc(8px + env(safe-area-inset-right))}
   }
 
   /* Button Drawer: a row of round buttons that slides out from the left
@@ -464,12 +498,23 @@
 </div>
 
 <div id="controls">
-  <div id="pad">
-    <button data-key="e" data-editable class="fire" aria-label="flip shape">⟲</button><button data-key="up" data-editable aria-label="up">▲</button><button data-key="f" data-editable class="fire" aria-label="resize">+</button>
+  <!-- Split into two thumb zones rather than one combined block: movement
+       at bottom-left for the thumb that naturally rests there, actions at
+       bottom-right for the other -- see the CSS comment above .pad for why,
+       and why the four data-key values below are unchanged from the old
+       single #pad (so saved button-editor layouts keep matching by key). -->
+  <div id="pad-move" class="pad" aria-label="move">
+    <button data-key="up" data-editable aria-label="up">▲</button>
     <button data-key="left" data-editable aria-label="left">◀</button>
-    <button data-key="space" data-editable class="fire" aria-label="space">●</button>
     <button data-key="right" data-editable aria-label="right">▶</button>
-    <button data-key="s" data-editable class="fire" aria-label="fly down">⤓</button><button data-key="down" data-editable aria-label="down">▼</button><button data-key="w" data-editable class="fire" aria-label="fly up">⤒</button>
+    <button data-key="down" data-editable aria-label="down">▼</button>
+  </div>
+  <div id="pad-actions" class="pad" aria-label="actions">
+    <button data-key="e" data-editable class="fire" aria-label="flip shape">⟲</button>
+    <button data-key="f" data-editable class="fire" aria-label="resize">+</button>
+    <button data-key="space" data-editable class="fire" aria-label="space">●</button>
+    <button data-key="s" data-editable class="fire" aria-label="fly down">⤓</button>
+    <button data-key="w" data-editable class="fire" aria-label="fly up">⤒</button>
   </div>
 </div>
 
@@ -2323,7 +2368,7 @@ function bindCamera(canvas, rend, minDist, maxDist) {
 }
 
 function bindControls() {
-  for (const button of document.querySelectorAll("#pad button[data-key]")) {
+  for (const button of document.querySelectorAll(".pad button[data-key]")) {
     // Not while the button editor has this one -- a drag there must not
     // also move the character or fire an action.
     const press = e => {
