@@ -148,6 +148,10 @@ httpd.shutdown()
 
 for stray in ROOT.glob("games/perm_probe_*.json"):
     stray.unlink()
+# The stray file's own save (through the server, above) baked its name into
+# games/index.json -- deleting the file alone would leave that listing
+# stale, claiming a game that no longer exists.
+server.export_static()
 
 print("\n%d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)
