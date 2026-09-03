@@ -2035,7 +2035,12 @@ function drawGlyphs(things) {
   things.forEach((thing, i) => {
     const node = labelPool[i];
     const shot = thing.kind === "shot";
-    const top = (shot ? 0.4 : (thing.role === "player" ? 1.2 : 0.85)) + (thing.z || 0);
+    // A resized thing (any prop, not just a cone -- this predates cones)
+    // is taller or shorter than its base height, so the glyph floating
+    // over it should scale the same way its actual mesh does, or a big
+    // one ends up with its label sitting well below its own top.
+    const scale = shot ? 1 : (thing.size === undefined ? 100 : thing.size) / 100;
+    const top = (shot ? 0.4 : (thing.role === "player" ? 1.2 : 0.85) * scale) + (thing.z || 0);
     const at = renderer.project(thing.x + 0.5, top, thing.y + 0.5);
     if (!at) { node.style.display = "none"; return; }
     node.style.display = "";
@@ -3204,7 +3209,8 @@ function pickObjectAt(sx, sy) {
   let best = null, bestDist = 44;
   for (const t of world.things) {
     if (!t.alive || t === player) continue;
-    const top = (t.role === "player" ? 0.6 : 0.4) + (t.z || 0);
+    const tScale = (t.size === undefined ? 100 : t.size) / 100;
+    const top = (t.role === "player" ? 0.6 : 0.4) * tScale + (t.z || 0);
     const at = renderer.project(t.x + 0.5, top, t.y + 0.5);
     if (!at) continue;
     const d = Math.hypot(at[0] - sx, at[1] - sy);
@@ -3232,7 +3238,8 @@ function setupObjectPicking(canvas) {
 function drawSelection() {
   const el = $("#select-highlight");
   if (!inspectTarget || !inspectTarget.alive) { el.classList.remove("on"); return; }
-  const top = (inspectTarget.role === "player" ? 0.6 : 0.4) + (inspectTarget.z || 0);
+  const scale = (inspectTarget.size === undefined ? 100 : inspectTarget.size) / 100;
+  const top = (inspectTarget.role === "player" ? 0.6 : 0.4) * scale + (inspectTarget.z || 0);
   const at = renderer.project(inspectTarget.x + 0.5, top, inspectTarget.y + 0.5);
   if (!at) { el.classList.remove("on"); return; }
   el.classList.add("on");
