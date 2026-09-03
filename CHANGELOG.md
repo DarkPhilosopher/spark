@@ -14,6 +14,73 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ## Unreleased
 
+### Changed
+
+- **The 3D view's five modals — Backpack, Properties, Mesh Creator,
+  Build/palette, Object Inspector — are all one shared shape now: up to
+  six large buttons filling most of the screen, with a box off to the
+  side for whatever those buttons don't cover.** The same "six panel
+  buttons besides a box" formation the browser editor's own deck has
+  always used (see README's "How it sits on the screen"), reused here
+  since world3d.html is a separate file with nothing to import it from —
+  new shared CSS (`.mgrid`/`.mkeys`/`.mbox`, `.modal-titlebar`,
+  `.modal-back`) rather than five different bespoke layouts.
+
+  **Backpack** was a deliberate exception to the game's own gray/light-
+  blue theme, styled like Windows File Explorer (see CLAUDE.md's old
+  "design preference" note) — folded into the same shell and theme as
+  the rest now, on request, a real reversal of that note, not theme
+  drift rediscovered. Its four toolbar actions (up/new folder/new item/
+  delete) became the big buttons; the breadcrumb and file grid moved
+  into the box.
+
+  **Properties** turned grid-lock and minimap into toggle buttons and
+  the move-speed slider into ±1/±5 quick-jump buttons; the world clock
+  and an exact typed speed value live in the box.
+
+  **Build/palette** turns every placeable kind into a big button itself
+  (scrolling, the same "however many there are" idea README already
+  documents for the browser editor's own big lists — the tile palette,
+  there — not a new pattern); the search field that filters them moved
+  into the box, and 🧩 (open the Mesh Creator) became a small icon next
+  to the title.
+
+  **Object Inspector and Mesh Creator** both grew real sub-pages now,
+  reached from a `‹` back button next to the title (same idea as
+  index.html's own `#backkey`): Colour and Shape are each their own
+  scrolling page of swatches/shapes (one `choiceKeys()` helper shared by
+  all four of these — two Inspector pages, two Mesh Creator ones —
+  rather than writing the same picker four times), and the Inspector
+  further splits Resize/Stretch/Move into their own pages too, each with
+  a handful of quick-jump/nudge buttons (50-300% presets for resize, ±25
+  stretch nudges per axis, ±1 move nudges per axis) *alongside*, not
+  instead of, the exact sliders and typed number fields — those moved
+  into the box rather than being replaced, so no precision was lost
+  anywhere converting continuous controls into buttons. The Mesh
+  Creator's live preview canvas stays mounted across every page switch
+  rather than being torn down and rebuilt each time, since a WebGL
+  context is not cheap to recreate on every tap.
+
+  Fixed as a side effect of rewriting every modal's markup anyway:
+  `#mesh-titlebar` and `#mesh-body` used to be duplicate ids shared
+  across three different modals (Mesh Creator, Build, Object Inspector)
+  — invalid HTML, though harmless since nothing ever queried them by id.
+  Every modal has its own unique ids now.
+
+  Verified with `node --check` on the extracted script, a full
+  `html.parser` pass, and a new `tests/modal_pages.test.js` (29 checks)
+  driving the actual page-navigation, `choiceKeys()`, and quick-button
+  machinery against a stub DOM — not just the pure-function style
+  `mesh_merge.test.js` already had, since this changeset's risk is
+  mostly in the DOM/event wiring, not arithmetic. Caught one real bug in
+  the process — a test fixture missing `world.templates`, not app code,
+  but exactly the kind of thing that would have gone unnoticed without
+  actually exercising this code at all. Full existing suite (engines,
+  menu, deck, store, mesh-merge) stayed green. This is the largest
+  changeset this project has shipped without real eyes on a real screen
+  yet — worth a careful look on-device before building further on top of
+  it. See CLAUDE.md's task note for the full design rationale.
+
 ### Fixed
 
 - **The button drawer's bubble list could run off the bottom of the

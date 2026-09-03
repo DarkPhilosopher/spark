@@ -9,6 +9,50 @@ outcome) stays together.
 
 ## Tasks
 
+- [x] **(noted 2026-09-03):** "make each page before progression a 6
+  panel largest button to fit screen besides chat on side, same as
+  before" — the 3D view's five modals (Backpack, Properties, Mesh
+  Creator, Build/palette, Object Inspector) reformatted to match the
+  browser editor's own deck formation.
+  **How it went (2026-09-03):** confirmed with Gabe in two rounds this
+  meant world3d.html's modals (not index.html's deck, which already
+  works this way), and that it meant all five including Backpack —
+  overriding the "deliberate exception" note above, on purpose, at
+  Gabe's explicit request; see that note for the reversal. Built one
+  shared shell (`.mgrid`/`.mkeys`/`.mbox`, plus `.modal-titlebar` and a
+  `.modal-back` for sub-pages) reused by all five, matching index.html's
+  own 4x2-cells-of-8 ratio since there is nothing to import between the
+  two files. There is no live chat in world3d.html to put in "the box"
+  (it is offline single-player; LIVE mode only mirrors a running game, it
+  does not carry chat here) — read "the box" as *whatever isn't one of
+  the six buttons* instead: a live preview canvas, a part list, a file
+  grid, a search field, live readouts, exact typed values. Where a page
+  has more discrete choices than six buttons can hold (nineteen colours,
+  seven shapes, every placeable kind), those choices become the buttons
+  themselves, scrolling — the same pattern README already documents for
+  the browser editor's own big lists, not a new idea. Where a control is
+  genuinely continuous (resize/stretch/position, move speed, part
+  position/size), it stayed a real slider or typed field, relocated into
+  the box, with quick-jump buttons alongside for the common cases —
+  deliberately not lossy-replaced with discrete steps, since nothing
+  asked for that and it was avoidable. The Object Inspector and Mesh
+  Creator both grew real sub-pages (Colour, Shape, and for the Inspector
+  also Resize/Stretch/Move) reached from a `‹` back button next to the
+  title, sharing one `choiceKeys()` helper for the two colour pickers and
+  the two shape pickers rather than writing each twice. Also fixed, as a
+  side effect of touching every modal's markup anyway: `#mesh-titlebar`
+  and `#mesh-body` used to be duplicate ids across three different modals
+  (invalid HTML, though harmless since nothing ever queried them by id) —
+  every modal has its own ids now. Verified with `node --check`, a full
+  `html.parser` pass, and a new `tests/modal_pages.test.js` (29 checks)
+  driving the actual page-navigation/choiceKeys/quick-button machinery
+  against a stub DOM — caught one real bug this way (a test fixture
+  missing `world.templates`, not app code, but the kind of thing that
+  would have gone unnoticed without exercising the code at all) — plus
+  the full existing suite, all green. Not seen on a real screen — this is
+  the biggest changeset this project has shipped without on-device eyes
+  on it yet, worth a real look before building further on top of it.
+
 - [x] **(noted 2026-09-02):** a function to mesh multiple selected 3D
   objects into one combined 3D shape — multi-select several placed
   objects, merge them into a single mesh.
@@ -90,12 +134,17 @@ Gray and light blue, **not** the old dark-background-plus-neon-accent
 look. See the confirmed note just above for the exact locked values —
 this line is just the short version for a quick skim.
 
-**One deliberate exception (2026-09-02):** the Backpack (`#backpack-modal`
-in `world3d.html`) is explicitly styled like Windows File Explorer —
-white background, light gray toolbar, blue selection highlight — because
-Gabe asked for that look specifically. This is not theme drift and
-should not be "corrected" to gray/light-blue; it is its own thing on
-purpose. Everything else in the game still follows the locked palette.
+**Superseded (2026-09-02 → 2026-09-03):** the Backpack (`#backpack-modal`
+in `world3d.html`) used to be deliberately styled like Windows File
+Explorer — white background, light gray toolbar, blue selection
+highlight — because Gabe asked for that look specifically, and the note
+here used to say not to "correct" it. On 2026-09-03 Gabe explicitly asked
+for it to be folded into the same gray/light-blue shell and six-panel-
+buttons-plus-a-box formation as the other four modals (see the "each
+page before progression" task below) — a direct, deliberate reversal of
+the line above, not a rediscovery of theme drift, so this paragraph
+stays as a record of that rather than being deleted. Everything in the
+game now follows the locked palette; there is no exception left.
 
 This is Gabe's spark project, running live via `spark.py edit` at
 `127.0.0.1:8765` on his phone (real Termux, via a proot Ubuntu sandbox).

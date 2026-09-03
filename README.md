@@ -754,7 +754,21 @@ width/height/depth independently), cycle its shape, move it, duplicate it,
 or delete it, all without touching the game's JSON by hand. Tap several
 objects with 🧬 (Merge) armed and it combines all of them into one new
 placeable kind, at whichever geometry is left once any part sitting
-entirely inside another has been dropped. A
+entirely inside another has been dropped.
+
+**Backpack, Properties, Mesh Creator, Build, and the Object Inspector share
+one shape**: up to six large buttons filling most of the screen, a box off
+to the side for whatever those buttons don't cover — live readouts, a
+search field, a file grid, the Mesh Creator's own preview canvas — the
+same "six panel buttons besides a box" formation the browser editor's own
+deck uses above. Colour and shape pickers, and every kind Build can place,
+become the buttons themselves where there are more than six (scrolling,
+same idea as the tile palette); genuinely continuous controls (exact
+resize/stretch/position, move speed) stay real sliders and typed fields in
+the box, with quick-jump buttons alongside for the common cases, so
+nothing about the precision was lost moving them off a single long form.
+
+A
 world can also be marked "expanding," so its floor loads in around you as you
 wander instead of all at once, with new ground able to scatter things onto
 itself as it appears (`games/Game 008008.json` is a working example, with
@@ -855,6 +869,7 @@ Once `python3 spark.py install` has been run, every one of these works as plain
 | `node tests/store.test.js` | check the editor's save and load logic |
 | `node tests/deck.test.js` | check the deck's screens and what the box understands |
 | `node tests/mesh_merge.test.js` | check the 3D view's merge-objects-into-one-mesh geometry |
+| `node tests/modal_pages.test.js` | check the 3D view's modals: page navigation, colour/shape pickers, resize/stretch |
 | `python3 tests/check_docs.py` | check this README still matches the code |
 | `python3 tests/check_sync.py` | check the GitHub push/pull logic |
 | `python3 tests/check_permissions.py` | check guests cannot exceed their code |
@@ -960,6 +975,9 @@ inert, exactly as it would arriving any other way.
                                  digits, escape, and the fallback with no terminal at all
     tests/mesh_merge.test.js    checks the 3D view's merge-objects arithmetic: offsets,
                                  and dropping geometry that ends up fully hidden inside another part
+    tests/modal_pages.test.js   checks the 3D view's modals: page navigation, colour/shape
+                                 pickers, and that resize/stretch/move lost no precision moving
+                                 from sliders into buttons-plus-a-box
     tests/engine_trace.js       runs the JavaScript engine from a terminal, for that test
 
 Two files are **generated** — do not edit them by hand:

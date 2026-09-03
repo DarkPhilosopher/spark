@@ -356,6 +356,52 @@ of blocks, with each character's glyph floating over its own block.
 | **✎** | the button editor — select, drag, resize, and fade any button here, including the drawer's own |
 | **run here** / **go live** | switches between the running game and this tab's own engine |
 
+**Backpack, Properties, Mesh Creator, Build, and the Object Inspector are
+all the same shape now** — up to six large buttons filling most of the
+screen, with a box off to the side for whatever those buttons don't cover,
+the exact same "six panel buttons besides a box" formation the browser
+editor's own deck uses (see its own "How it sits on the screen" above).
+Backpack used to be a deliberate Windows-Explorer-styled exception to the
+game's own gray/light-blue look; folded into the same shell and theme as
+the rest on request, so nothing here stands apart from the rest by look
+any more, only the Backpack's icons-and-folders idea of what a button
+*does* stays its own thing. Where a screen has more to say than six
+buttons can hold — nineteen colours, seven shapes, every kind Build can
+place — those become the buttons themselves, scrolling, the same
+"however many there are" idea already used for the browser editor's own
+big lists (the tile palette, there). Continuous controls that a button
+grid genuinely cannot replace — the Mesh Creator's exact part
+position/size, the Inspector's exact resize/stretch/position, Properties'
+exact move speed, Build's search box, Backpack's file grid — live in the
+box instead, next to a handful of quick-jump buttons for the common
+cases, so nothing about the fine control here was lost, only relocated:
+- **Object Inspector** taps into Colour, Shape, Resize, Stretch, and Move
+  as their own pages (a `‹` appears next to the title to back out of
+  one), plus a Duplicate button on the top page; Delete stays a small
+  icon by the title, since it is rare and destructive rather than
+  something to tap into by accident. Resize offers 50/75/100/150/200/300%
+  quick buttons with the exact typed value still in the box; Stretch
+  offers ±25 nudges per axis with the same three sliders as before,
+  moved into the box; Move offers ±1 nudges per axis (±1 altitude too)
+  with the same typed x/y/z fields.
+- **Mesh Creator** taps into Part Colour and Part Shape as their own
+  pages, the same way; Add/Duplicate/Delete Part and Save as a new kind
+  are buttons on the top page. The live preview canvas stays visible on
+  every page rather than being rebuilt each time — it is its own WebGL
+  context, worth keeping alive rather than tearing down and recreating on
+  every tap. The part list, the exact dx/dy/dz/sx/sy/sz fields for
+  whichever part is selected, and loading/deleting a previously-saved
+  mesh live in the box.
+- **Build** turns every placeable kind into one big button itself
+  (scrolling, same as the tile palette); the search box that filters them
+  lives in the box, and 🧩 (open the Mesh Creator) moves next to the
+  title as a small icon.
+- **Backpack** turns Up/New folder/New item/Delete into the four big
+  buttons; the breadcrumb and the file grid live in the box.
+- **Properties** turns grid-lock and minimap into toggle buttons and move
+  speed into ±1/±5 quick-jump buttons; the world clock and the exact
+  typed speed live in the box.
+
 The **compass**, a meter across the top of the screen rather than a dial,
 scrolls sideways as the camera turns so the current heading always sits
 under the fixed centre marker — this world's own idea of "north," not a

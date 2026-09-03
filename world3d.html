@@ -321,78 +321,95 @@
   .layout-name{flex:1;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
   .layout-del{color:var(--bad);font-weight:700;padding:2px 8px;cursor:pointer}
 
-  /* Backpack -- styled like Windows File Explorer, deliberately not the
-     game's own gray/light-blue theme (see the HTML comment above it).
-     Plain light chrome, a classic toolbar row, a breadcrumb, a grid of
-     folder/file icons. */
-  #backpack-modal{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
-                  z-index:18;display:none;flex-direction:column;
-                  width:min(92vw,520px);height:min(64vh,440px);
-                  background:#fff;color:#1a1a1a;border:1px solid #b0b0b0;
-                  border-radius:6px;overflow:hidden;
-                  box-shadow:0 12px 40px rgba(0,0,0,.35);
-                  font:13px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
-  #backpack-modal.on{display:flex}
-  #backpack-titlebar{display:flex;align-items:center;gap:6px;
-                     background:#f3f3f3;border-bottom:1px solid #ddd;
-                     padding:6px 8px;flex:0 0 auto}
-  #backpack-title-icon{font-size:15px}
-  #backpack-title-text{font-weight:600;margin-right:auto}
-  #backpack-close{background:transparent;border:none;color:#333;
-                  font-size:13px;padding:4px 10px;border-radius:4px;
-                  min-height:28px;min-width:28px}
-  #backpack-close:active{background:#e81123;color:#fff}
-  #backpack-toolbar{display:flex;gap:4px;flex-wrap:wrap;
-                    background:#fafafa;border-bottom:1px solid #e5e5e5;
-                    padding:6px 8px;flex:0 0 auto}
-  #backpack-toolbar button{background:#fff;color:#1a1a1a;
-                           border:1px solid #d0d0d0;border-radius:4px;
-                           font-size:12px;padding:5px 10px;min-height:30px}
-  #backpack-toolbar button:active{background:#e8f0fe;border-color:#8ab4f8}
-  #backpack-toolbar button[disabled]{opacity:.4}
-  #backpack-path{background:#fff;border-bottom:1px solid #eee;
-                 padding:6px 10px;font-size:12px;color:#555;flex:0 0 auto}
-  .bp-crumb{cursor:pointer;color:#0066cc}
-  .bp-crumb:last-child{color:#555;cursor:default}
-  #backpack-grid{flex:1 1 auto;overflow-y:auto;touch-action:pan-y;
-                 display:grid;grid-template-columns:repeat(auto-fill,74px);
-                 gap:4px;padding:10px;align-content:start}
-  .bp-item{display:flex;flex-direction:column;align-items:center;gap:4px;
-           padding:8px 4px;border-radius:6px;cursor:pointer;
-           text-align:center}
-  .bp-item.on{background:#cde8ff}
-  .bp-icon{font-size:30px;line-height:1}
-  .bp-label{font-size:11px;color:#222;word-break:break-word;
-            max-width:70px;line-height:1.2}
-  .bp-empty{grid-column:1/-1;color:#888;font-size:12px;padding:20px;
-            text-align:center}
+  /* All five modals (Backpack, Properties, Mesh Creator, Build/palette,
+     Object Inspector) share one shell and one internal formation now: a
+     titlebar, then up to six large buttons filling most of the screen
+     with a box off to the side for whatever that page's buttons don't
+     cover -- live readouts, a search/typed field, a preview canvas, a
+     part list -- the same "six panel buttons besides a box" shape the
+     browser editor's own deck uses (see README's "How it sits on the
+     screen"), reused here rather than each modal inventing its own.
+     Backpack used to be a deliberate Windows-Explorer-styled exception
+     (see CHANGELOG); folded into the same shell and theme on request. */
+  #backpack-modal,#properties-modal,#mesh-modal,#palette-modal,#inspect-modal{
+      position:fixed;inset:6vh 6vw;z-index:17;display:none;flex-direction:column;
+      background:var(--modal-bg);border:1px solid var(--line);border-radius:12px;
+      overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.35);
+      backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+  #backpack-modal.on,#properties-modal.on,#mesh-modal.on,#palette-modal.on,
+  #inspect-modal.on{display:flex}
+  .modal-titlebar{display:flex;align-items:center;gap:8px;padding:12px 14px;
+                  font-weight:700;border-bottom:1px solid var(--line);flex:0 0 auto}
+  .modal-titlebar span{margin-right:auto;overflow:hidden;text-overflow:ellipsis;
+                       white-space:nowrap}
+  .modal-titlebar button{min-height:34px;padding:4px 12px}
+  .modal-titlebar button.danger{color:#ff9a94;border-color:var(--bad)}
+  /* Hidden by default -- shown only on a modal's own sub-page (see
+     showModalPage below), same job as index.html's own #backkey: pop one
+     level back up rather than closing the whole modal. */
+  .modal-back{display:none}
+  .modal-back.showing{display:inline-block}
 
-  /* Properties: near-fullscreen, but inset from every edge on purpose so
-     the world stays visible all the way round it -- in the game's own
-     gray/light-blue theme, unlike the Backpack's deliberate exception. */
-  #properties-modal{position:fixed;inset:6vh 6vw;z-index:17;display:none;
-                    flex-direction:column;background:var(--modal-bg);
-                    border:1px solid var(--line);border-radius:12px;
-                    overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.35);
-                    backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
-  #properties-modal.on{display:flex}
-  #properties-titlebar{display:flex;align-items:center;gap:8px;
-                       padding:12px 14px;font-weight:700;
-                       border-bottom:1px solid var(--line);flex:0 0 auto}
-  #properties-titlebar span{margin-right:auto}
-  #properties-titlebar button{min-height:34px;padding:4px 12px}
-  #properties-body{flex:1 1 auto;overflow-y:auto;touch-action:pan-y;padding:14px}
-  .prop-row{display:flex;align-items:center;justify-content:space-between;
-           gap:12px;padding:12px 4px;border-bottom:1px solid rgba(131,138,148,.35)}
-  .prop-label{font-size:14px;color:var(--dim)}
-  .prop-value{font:14px/1 ui-monospace,monospace;color:var(--ink)}
-  .prop-toggle{min-width:64px;min-height:34px;font-size:12px;padding:6px 10px}
-  .prop-toggle.on{background:var(--accent);color:var(--bg);border-color:var(--accent)}
-  #properties-body .row{display:flex;flex-wrap:wrap;gap:8px;width:100%}
-  #properties-body input[type=range]{flex:1}
-  #properties-body input[type=number]{flex:0 0 64px;width:64px;font:inherit;
-      color:var(--ink);background:var(--glass-input);border:1px solid var(--line);
+  /* The formation itself. Portrait: two columns of buttons on top, the
+     box spanning the full width underneath -- landscape: three columns of
+     buttons on the left, the box a full-height column on the right. Same
+     4x2-cells-of-8, six-for-buttons-two-for-the-box ratio as index.html's
+     own #deck/#keys, just re-expressed here since world3d.html is a
+     separate file with nothing to import it from. */
+  .mgrid{flex:1 1 auto;display:grid;gap:8px;padding:10px;min-height:0;
+        grid-template-columns:1fr 1fr;grid-template-rows:repeat(4,1fr)}
+  .mkeys{grid-column:1/-1;grid-row:1/4;display:grid;gap:8px;min-height:0;
+        grid-template-columns:1fr 1fr;grid-auto-rows:minmax(44px,1fr);
+        overflow-y:auto;touch-action:pan-y}
+  .mbox{grid-column:1/-1;grid-row:4/5;min-height:0;overflow-y:auto;touch-action:pan-y;
+       background:var(--glass-input);border:1px solid var(--line);
+       border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px}
+  @media (orientation:landscape){
+    .mgrid{grid-template-columns:repeat(4,1fr);grid-template-rows:1fr 1fr}
+    .mkeys{grid-column:1/4;grid-row:1/-1;grid-template-columns:repeat(3,1fr)}
+    .mbox{grid-column:4/5;grid-row:1/-1}
+  }
+  /* One button per cell, sized to the cell rather than its own text --
+     the same "largest that fits" idea as #pad/.pad above, just square
+     corners and a label instead of a glyph. */
+  .mkey{width:100%;height:100%;min-height:44px;padding:6px;
+       font-size:clamp(11px,3.4vmin,15px);line-height:1.25;white-space:normal;
+       background:var(--glass-btn);border-color:var(--line)}
+  .mkey small{display:block;font-size:.72em;font-weight:400;color:var(--dim);
+             margin-top:2px}
+  .mkey.on{border-color:var(--accent);color:var(--accent);
+          box-shadow:0 0 0 1px var(--accent) inset}
+  .mkey.danger{border-color:var(--bad);color:#ff9a94}
+  .mkey.empty{cursor:default;color:var(--dim);font-size:12px}
+
+  /* the box's own contents -- same look wherever it shows up */
+  .mbox .prop-row{display:flex;align-items:center;justify-content:space-between;
+       gap:12px;padding:6px 2px;border-bottom:1px solid rgba(131,138,148,.35)}
+  .mbox .prop-label{font-size:13px;color:var(--dim)}
+  .mbox .prop-value{font:14px/1 ui-monospace,monospace;color:var(--ink)}
+  .mbox input[type=number],.mbox input[type=text],.mbox select{
+      width:100%;min-width:0;font:inherit;color:var(--ink);
+      background:var(--glass-input);border:1px solid var(--line);
       border-radius:6px;padding:6px 8px;min-height:32px}
+  .mbox input[type=range]{width:100%}
+
+  /* Backpack's file grid and breadcrumb, now living in the box instead of
+     the whole modal -- same icons-and-labels idea, recoloured for the
+     game's own theme instead of the old white Explorer chrome. */
+  #backpack-path{font-size:12px;color:var(--dim)}
+  .bp-crumb{cursor:pointer;color:var(--accent)}
+  .bp-crumb:last-child{color:var(--dim);cursor:default}
+  #backpack-grid{flex:1 1 auto;min-height:0;overflow-y:auto;touch-action:pan-y;
+                 display:grid;grid-template-columns:repeat(auto-fill,66px);
+                 gap:6px;align-content:start}
+  .bp-item{display:flex;flex-direction:column;align-items:center;gap:4px;
+           padding:6px 4px;border-radius:6px;cursor:pointer;text-align:center}
+  .bp-item.on{background:rgba(142,202,230,.3);outline:1px solid var(--accent)}
+  .bp-icon{font-size:26px;line-height:1}
+  .bp-label{font-size:11px;color:var(--ink);word-break:break-word;
+            max-width:64px;line-height:1.2}
+  .bp-empty{grid-column:1/-1;color:var(--dim);font-size:12px;padding:16px;
+            text-align:center}
 
   /* Compass -- a meter across the top, not a dial: ticks scroll sideways
      as the camera turns (see drawCompass()), the current heading always
@@ -432,42 +449,30 @@
            display:flex;gap:8px;padding:6px}
   #quickbar .bubble{font-size:16px}
 
-  /* Mesh Creator, Build/palette, and the Object Inspector -- same near-
-     fullscreen, inset-from-every-edge shape as Properties, and the same
-     game colours (this trio is not the Backpack's deliberate exception). */
-  #mesh-modal,#palette-modal,#inspect-modal{position:fixed;inset:6vh 6vw;
-                             z-index:17;display:none;flex-direction:column;
-                             background:var(--modal-bg);
-                             border:1px solid var(--line);border-radius:12px;
-                             overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.35);
-                             backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
-  #mesh-modal.on,#palette-modal.on,#inspect-modal.on{display:flex}
-  #mesh-titlebar{display:flex;align-items:center;gap:8px;padding:12px 14px;
-                 font-weight:700;border-bottom:1px solid var(--line);flex:0 0 auto}
-  #mesh-titlebar span{margin-right:auto}
-  #mesh-titlebar button{min-height:34px;padding:4px 12px}
-  #mesh-preview-wrap{flex:0 0 auto;height:34vh;position:relative;
-                     border-bottom:1px solid var(--line)}
+  /* Mesh Creator's live preview -- now living inside its page's own box
+     (see the HTML) instead of a full-width strip above everything else,
+     since the box is where non-button content goes. Still the exact same
+     Renderer class/canvas as the main view underneath it. */
+  #mesh-preview-wrap{flex:0 0 132px;position:relative;border-radius:8px;
+                     overflow:hidden;border:1px solid var(--line)}
   #mesh-canvas{position:absolute;inset:0;width:100%;height:100%;
               display:block;touch-action:none}
-  #mesh-body{flex:1 1 auto;overflow-y:auto;touch-action:pan-y;
-            padding:12px 14px;display:flex;flex-direction:column;gap:8px}
-  #mesh-body .row{display:flex;flex-wrap:wrap;gap:8px}
-  #mesh-body label{display:flex;flex-direction:column;gap:4px;
-                   font-size:11px;color:var(--dim)}
-  #mesh-body input[type=number],#mesh-body input[type=text],#mesh-body select{
-      width:100%;min-width:0;flex:1;
-      font:inherit;color:var(--ink);background:var(--glass-input);
-      border:1px solid var(--line);border-radius:6px;padding:6px 8px;
-      min-height:32px}
-  #mesh-body button{flex:1;font-size:12px;padding:6px 10px;min-height:36px}
-  #mesh-part-list,#palette-list{display:flex;flex-direction:column;gap:4px;
-      max-height:148px;min-height:0;overflow-y:auto;touch-action:pan-y}
-  .mesh-part-row,.palette-item{font-size:12px;padding:8px 10px;
-      border-radius:8px;background:var(--glass-input);cursor:pointer;
+  #mesh-part-list{display:flex;flex-direction:column;gap:4px;
+      max-height:120px;min-height:0;overflow-y:auto;touch-action:pan-y}
+  .mesh-part-row{font-size:12px;padding:8px 10px;
+      border-radius:8px;background:var(--panel2);cursor:pointer;
       white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .mesh-part-row.on,.palette-item.on{background:var(--accent);
-      color:var(--bg);font-weight:700}
+  .mesh-part-row.on{background:var(--accent);color:var(--bg);font-weight:700}
+  /* Build/palette's list of placeable kinds is the page's button grid
+     itself now (#palette-list carries class="mkeys"), so each item is
+     styled to match .mkey exactly rather than the old compact text row. */
+  .palette-item{width:100%;height:100%;min-height:44px;box-sizing:border-box;
+      display:flex;align-items:center;justify-content:center;text-align:center;
+      padding:6px;border-radius:14px;font-size:clamp(11px,3.4vmin,15px);
+      line-height:1.25;cursor:pointer;background:var(--glass-btn);
+      border:1px solid var(--line);color:var(--ink)}
+  .palette-item.on{border-color:var(--accent);color:var(--accent);
+      box-shadow:0 0 0 1px var(--accent) inset}
 
   #veil{position:fixed;inset:0;z-index:9;display:none;place-items:center;
         background:rgba(58,63,70,.96);padding:24px;text-align:center}
@@ -597,47 +602,49 @@
      to whoever's using it -- New folder/New item/Delete work the same
      way in every folder you navigate into. -->
 <div id="backpack-modal">
-  <div id="backpack-titlebar">
-    <span id="backpack-title-icon">🎒</span>
-    <span id="backpack-title-text">Backpack</span>
+  <div class="modal-titlebar">
+    <span>🎒 Backpack</span>
     <button id="backpack-close" title="close">✕</button>
   </div>
-  <div id="backpack-toolbar">
-    <button id="bp-up" title="up one folder">⬆ Up</button>
-    <button id="bp-new-folder">📁 New folder</button>
-    <button id="bp-new-file">📄 New item</button>
-    <button id="bp-delete">🗑 Delete</button>
+  <div class="mgrid">
+    <div class="mkeys">
+      <button id="bp-up" class="mkey" title="up one folder">⬆<br>up</button>
+      <button id="bp-new-folder" class="mkey">📁<br>new folder</button>
+      <button id="bp-new-file" class="mkey">📄<br>new item</button>
+      <button id="bp-delete" class="mkey">🗑<br>delete</button>
+    </div>
+    <div class="mbox">
+      <div id="backpack-path"></div>
+      <div id="backpack-grid"></div>
+    </div>
   </div>
-  <div id="backpack-path"></div>
-  <div id="backpack-grid"></div>
 </div>
 
 <!-- Properties: near-fullscreen on purpose, but not edge to edge -- a
      visible margin of the world stays in view all the way round. -->
 <div id="properties-modal">
-  <div id="properties-titlebar">
+  <div class="modal-titlebar">
     <span>⚙ Properties</span>
     <button id="properties-close" title="close">✕</button>
   </div>
-  <div id="properties-body">
-    <div class="prop-row">
-      <span class="prop-label">Grid lock movement</span>
-      <button id="prop-gridlock-toggle" class="prop-toggle">OFF</button>
+  <div class="mgrid">
+    <div class="mkeys">
+      <button id="prop-gridlock-toggle" class="mkey">grid lock<br><small id="prop-gridlock-state">OFF</small></button>
+      <button id="prop-minimap-toggle" class="mkey">minimap<br><small id="prop-minimap-state">OFF</small></button>
+      <button id="prop-speed-dn5" class="mkey">speed −5</button>
+      <button id="prop-speed-up5" class="mkey">speed +5</button>
+      <button id="prop-speed-dn1" class="mkey">speed −1</button>
+      <button id="prop-speed-up1" class="mkey">speed +1</button>
     </div>
-    <div class="prop-row">
-      <span class="prop-label">World time</span>
-      <span id="prop-clock" class="prop-value">00:00:00</span>
-    </div>
-    <div class="prop-row" style="flex-direction:column;align-items:stretch;gap:8px">
-      <span class="prop-label">Move speed (ticks per second)</span>
-      <div class="row">
-        <input id="prop-speed" type="range" min="1" max="30" step="1" value="6">
-        <input id="prop-speed-num" type="number" min="1" max="30" step="1" value="6">
+    <div class="mbox">
+      <div class="prop-row">
+        <span class="prop-label">World time</span>
+        <span id="prop-clock" class="prop-value">00:00:00</span>
       </div>
-    </div>
-    <div class="prop-row">
-      <span class="prop-label">Minimap</span>
-      <button id="prop-minimap-toggle" class="prop-toggle">OFF</button>
+      <div class="prop-row">
+        <span class="prop-label">Move speed (ticks/sec)</span>
+        <input id="prop-speed-num" type="number" min="1" max="30" step="1" value="6" style="width:64px;flex:0 0 auto">
+      </div>
     </div>
   </div>
 </div>
@@ -664,43 +671,28 @@
      extra to keep working and shows exactly what will actually be
      placed. -->
 <div id="mesh-modal">
-  <div id="mesh-titlebar">
-    <span>🧩 Mesh Creator</span>
+  <div class="modal-titlebar">
+    <button class="modal-back" id="mesh-back" title="back">‹</button>
+    <span id="mesh-title">🧩 Mesh Creator</span>
     <button id="mesh-close" title="close">✕</button>
   </div>
+  <!-- The preview stays put across every page (including while picking a
+       part's colour or shape -- seeing it update live there is useful,
+       not just a leftover) rather than being torn down and rebuilt with
+       the rest of the box each time: it is its own WebGL context, not
+       cheap to recreate, and doing so would have to happen every single
+       page switch. -->
   <div id="mesh-preview-wrap"><canvas id="mesh-canvas"></canvas></div>
-  <div id="mesh-body">
-    <div class="row">
-      <select id="mesh-load-select"><option value="">— load an existing mesh to edit —</option></select>
-      <button id="mesh-load-btn">load</button>
-      <button id="mesh-delete-btn">🗑</button>
-    </div>
-    <div id="mesh-part-list"></div>
-    <div class="row">
-      <button id="mesh-add-part">+ add a part</button>
-      <button id="mesh-dup-part">⧉ duplicate part</button>
-    </div>
-    <div class="row">
-      <label style="flex:1">shape
-        <select id="mesh-part-shape"></select>
-      </label>
-      <label style="flex:1">color <select id="mesh-part-color"></select></label>
-    </div>
-    <div class="row">
-      <label style="flex:1">x <input id="mesh-part-dx" type="number" step="0.05" value="0"></label>
-      <label style="flex:1">y <input id="mesh-part-dy" type="number" step="0.05" value="0"></label>
-      <label style="flex:1">z <input id="mesh-part-dz" type="number" step="0.05" value="0"></label>
-    </div>
-    <div class="row">
-      <label style="flex:1">width <input id="mesh-part-sx" type="number" step="0.05" min="0.05" max="3" value="0.5"></label>
-      <label style="flex:1">height <input id="mesh-part-sy" type="number" step="0.05" min="0.05" max="3" value="0.5"></label>
-      <label style="flex:1">depth <input id="mesh-part-sz" type="number" step="0.05" min="0.05" max="3" value="0.5"></label>
-    </div>
-    <div class="row"><button id="mesh-delete-part">delete this part</button></div>
-    <div class="row">
-      <button id="mesh-new">clear / start over</button>
-      <button id="mesh-save">save as new kind…</button>
-    </div>
+  <!-- Same small-deck shape as the Object Inspector -- see MESH_PAGES/
+       renderMeshPage() below, which reuses choiceKeys() from there for
+       the colour and shape sub-pages rather than redefining them.
+       Everything else (the part list, the fine dx/dy/dz/sx/sy/sz fields,
+       loading/deleting a saved mesh) lives in the box on the top page --
+       unchanged from before, just relocated, so nothing about the
+       precision here was lost. -->
+  <div class="mgrid">
+    <div class="mkeys" id="mesh-keys"></div>
+    <div class="mbox" id="mesh-box"></div>
   </div>
 </div>
 
@@ -709,14 +701,20 @@
      Creator, and a Remove tool for taking placed objects back out. Local
      play only -- see setPaletteKind()'s own note. -->
 <div id="palette-modal">
-  <div id="mesh-titlebar">
+  <div class="modal-titlebar">
     <span>🎨 Build</span>
+    <button id="palette-mesh-creator" title="open the Mesh Creator">🧩</button>
     <button id="palette-close" title="close">✕</button>
   </div>
-  <div id="mesh-body">
-    <div class="row"><button id="palette-mesh-creator">🧩 open the Mesh Creator</button></div>
-    <div class="row"><input id="palette-search" type="text" placeholder="search…"></div>
-    <div id="palette-list"></div>
+  <div class="mgrid">
+    <!-- one big button per placeable kind -- same "however many there are,
+         scrolling in the same formation" idea README already documents for
+         the browser editor's own big lists (the 35-tile palette, there). -->
+    <div id="palette-list" class="mkeys"></div>
+    <div class="mbox">
+      <input id="palette-search" type="text" placeholder="search…">
+      <div id="palette-count" class="prop-value"></div>
+    </div>
   </div>
 </div>
 
@@ -726,39 +724,23 @@
      play only, same as Build mode: it writes straight into the live Thing
      instance, which only exists for the copy of the game in this tab. -->
 <div id="inspect-modal">
-  <div id="mesh-titlebar">
+  <div class="modal-titlebar">
+    <button class="modal-back" id="inspect-back" title="back">‹</button>
     <span id="inspect-title">🎯 Object</span>
+    <button id="inspect-delete" class="danger" title="delete this object">🗑</button>
     <button id="inspect-close" title="close">✕</button>
   </div>
-  <div id="mesh-body">
-    <div class="row">
-      <label style="flex:1">color <select id="inspect-color"></select></label>
-      <label style="flex:1">shape
-        <select id="inspect-shape"></select>
-      </label>
-    </div>
-    <div class="row">
-      <label style="flex:2">size (all three axes) <input id="inspect-size" type="range" min="20" max="300" step="1" value="100"></label>
-      <input id="inspect-size-num" type="number" step="1" min="20" max="300" value="100">
-    </div>
-    <!-- Stretch: each axis independent of size and of the other two --
-         see the `stretch` tile. Changing size (above) resets all three
-         back to matching it; these only take effect once moved. -->
-    <div class="row">
-      <label style="flex:1">width <input id="inspect-sx" type="range" min="20" max="300" step="1"></label>
-      <label style="flex:1">height <input id="inspect-sy" type="range" min="20" max="300" step="1"></label>
-      <label style="flex:1">depth <input id="inspect-sz" type="range" min="20" max="300" step="1"></label>
-    </div>
-    <div class="row"><button id="inspect-unstretch">reset stretch to size</button></div>
-    <div class="row">
-      <label style="flex:1">x <input id="inspect-x" type="number" step="1"></label>
-      <label style="flex:1">y <input id="inspect-y" type="number" step="1"></label>
-      <label style="flex:1">z (altitude) <input id="inspect-z" type="number" step="1" min="0" max="8"></label>
-    </div>
-    <div class="row">
-      <button id="inspect-duplicate">⧉ duplicate</button>
-      <button id="inspect-delete">🗑 delete this object</button>
-    </div>
+  <!-- A small deck of its own, same "up to six buttons plus a box" shape
+       as everything else -- see INSPECT_PAGES/renderInspectorPage() below.
+       Colour and shape are each their own page (a scrolling grid of
+       swatches/shapes, the "however many there are" idea README already
+       documents for big lists); resize/stretch/move keep the exact same
+       sliders and typed fields they always had, just relocated into the
+       box, with quick-jump buttons alongside for the common cases --
+       nothing about the fine control was lost. -->
+  <div class="mgrid">
+    <div class="mkeys" id="inspect-keys"></div>
+    <div class="mbox" id="inspect-box"></div>
   </div>
 </div>
 
@@ -3067,7 +3049,7 @@ function worldClockText() {
 }
 
 function syncGridLockDisplays() {
-  $("#prop-gridlock-toggle").textContent = gridLockOn ? "ON" : "OFF";
+  $("#prop-gridlock-state").textContent = gridLockOn ? "ON" : "OFF";
   $("#prop-gridlock-toggle").classList.toggle("on", gridLockOn);
   $("#edit-grid-on").checked = gridLockOn;
   updateGridOverlay();
@@ -3117,13 +3099,13 @@ function setupProperties() {
   if (loadEditorSettings().minimapOn) {
     minimapOn = true;
     $("#minimap").classList.add("on");
-    $("#prop-minimap-toggle").textContent = "ON";
+    $("#prop-minimap-state").textContent = "ON";
     $("#prop-minimap-toggle").classList.add("on");
   }
   $("#prop-minimap-toggle").onclick = () => {
     minimapOn = !minimapOn;
     $("#minimap").classList.toggle("on", minimapOn);
-    $("#prop-minimap-toggle").textContent = minimapOn ? "ON" : "OFF";
+    $("#prop-minimap-state").textContent = minimapOn ? "ON" : "OFF";
     $("#prop-minimap-toggle").classList.toggle("on", minimapOn);
     saveEditorSettings({minimapOn});
   };
@@ -3132,7 +3114,6 @@ function setupProperties() {
     $("#prop-clock").textContent = worldClockText();
     syncGridLockDisplays();
     const speed = (project && project.world && project.world.speed) || 6;
-    $("#prop-speed").value = speed;
     $("#prop-speed-num").value = speed;
     $("#properties-modal").classList.add("on");
   };
@@ -3142,14 +3123,20 @@ function setupProperties() {
     syncGridLockDisplays();
     saveEditorSettings({gridLockOn});
   };
-  $("#prop-speed").addEventListener("input", () => {
-    const v = setMoveSpeed($("#prop-speed").value);
-    $("#prop-speed-num").value = v;
-  });
+  // Stepped buttons instead of a slider -- four quick jumps (±1 for fine
+  // adjustment, ±5 to cross the 1-30 range fast) rather than one drag
+  // gesture; the number field alongside them still takes an exact typed
+  // value with no loss of precision either way.
   $("#prop-speed-num").addEventListener("input", () => {
-    const v = setMoveSpeed($("#prop-speed-num").value);
-    $("#prop-speed").value = v;
+    $("#prop-speed-num").value = setMoveSpeed($("#prop-speed-num").value);
   });
+  for (const [id, delta] of [["prop-speed-dn5", -5], ["prop-speed-up5", 5],
+                              ["prop-speed-dn1", -1], ["prop-speed-up1", 1]]) {
+    $("#" + id).onclick = () => {
+      const current = parseFloat($("#prop-speed-num").value) || 6;
+      $("#prop-speed-num").value = setMoveSpeed(current + delta);
+    };
+  }
   // Only bothers updating the DOM while the panel is actually open.
   setInterval(() => {
     if ($("#properties-modal").classList.contains("on")) {
@@ -3170,6 +3157,7 @@ let meshSelected = null;
 let meshRenderer = null;
 let meshLoopRunning = false;
 let meshEditingKind = null;   // set while editing an existing saved mesh, so save overwrites it by default
+let meshPage = "top";         // one of the keys of MESH_PAGES below
 
 function ensureMeshRenderer() {
   if (meshRenderer) return;
@@ -3188,180 +3176,235 @@ function meshFrame() {
   requestAnimationFrame(meshFrame);
 }
 
-function renderMeshPartList() {
-  const box = $("#mesh-part-list");
-  box.innerHTML = "";
-  if (!meshParts.length) {
-    const empty = document.createElement("div");
-    empty.className = "mesh-part-row";
-    empty.style.cursor = "default";
-    empty.textContent = "(no parts yet -- add one below)";
-    box.appendChild(empty);
-    return;
-  }
-  meshParts.forEach((p, i) => {
-    const row = document.createElement("div");
-    row.className = "mesh-part-row" + (i === meshSelected ? " on" : "");
-    row.textContent = (p.shape || "cube") + " (" + (p.color || "white") + ")";
-    row.onclick = () => selectMeshPart(i);
-    box.appendChild(row);
-  });
-}
-
-function selectMeshPart(i) {
-  meshSelected = i;
-  const p = meshParts[i];
-  if (!p) return;
-  $("#mesh-part-shape").value = p.shape || "cube";
-  $("#mesh-part-color").value = p.color || "white";
-  $("#mesh-part-dx").value = p.dx || 0;
-  $("#mesh-part-dy").value = p.dy || 0;
-  $("#mesh-part-dz").value = p.dz || 0;
-  $("#mesh-part-sx").value = p.sx || 0.5;
-  $("#mesh-part-sy").value = p.sy || 0.5;
-  $("#mesh-part-sz").value = p.sz || 0.5;
-  renderMeshPartList();
-}
-
-function applyMeshFieldsToSelected() {
-  if (meshSelected === null || !meshParts[meshSelected]) return;
-  const p = meshParts[meshSelected];
-  p.shape = $("#mesh-part-shape").value;
-  p.color = $("#mesh-part-color").value;
-  p.dx = parseFloat($("#mesh-part-dx").value) || 0;
-  p.dy = parseFloat($("#mesh-part-dy").value) || 0;
-  p.dz = parseFloat($("#mesh-part-dz").value) || 0;
-  p.sx = Math.max(0.05, parseFloat($("#mesh-part-sx").value) || 0.5);
-  p.sy = Math.max(0.05, parseFloat($("#mesh-part-sy").value) || 0.5);
-  p.sz = Math.max(0.05, parseFloat($("#mesh-part-sz").value) || 0.5);
-  renderMeshPartList();
-}
-
-function refreshMeshLoadSelect() {
-  const sel = $("#mesh-load-select");
-  sel.innerHTML = '<option value="">— load an existing mesh to edit —</option>';
-  if (!world) return;
-  const withParts = Object.keys(world.templates)
-    .filter(k => world.templates[k].parts && world.templates[k].parts.length)
-    .sort((a, b) => a.localeCompare(b));
-  for (const kind of withParts) {
-    const opt = document.createElement("option");
-    opt.value = kind; opt.textContent = kind;
-    sel.appendChild(opt);
-  }
-}
-
 function loadMeshForEditing(kind) {
   const template = world && world.templates[kind];
   if (!template || !template.parts) return;
   meshParts = JSON.parse(JSON.stringify(template.parts));
   meshEditingKind = kind;
   meshSelected = meshParts.length ? 0 : null;
-  renderMeshPartList();
-  if (meshSelected !== null) selectMeshPart(0);
   drawerToast('editing "' + kind + '"');
 }
 
-function openMeshCreator() {
-  ensureMeshRenderer();
-  renderMeshPartList();
-  refreshMeshLoadSelect();
-  $("#mesh-modal").classList.add("on");
-  if (!meshLoopRunning) { meshLoopRunning = true; meshFrame(); }
+function meshSaveAsKind() {
+  if (!meshParts.length) { window.alert("add at least one part first"); return; }
+  const existing = meshEditingKind && world && world.templates[meshEditingKind];
+  const name = (prompt("Save this mesh as a kind named:",
+                        meshEditingKind || "mymesh") || "").trim();
+  if (!name) return;
+  const safe = name.replace(/[^A-Za-z0-9_-]/g, "");
+  if (!safe) { window.alert("give it a name"); return; }
+  const glyphDefault = (existing && existing.glyph) || safe[0].toUpperCase();
+  const glyph = (prompt("One-letter glyph for it:", glyphDefault) || glyphDefault).slice(0, 1);
+  const template = {
+    kind: safe, glyph, color: meshParts[0].color || "white", health: 1,
+    count: 0, solid: true, role: "prop",
+    parts: JSON.parse(JSON.stringify(meshParts)), brain: [],
+  };
+  // both places a template can live: the project (so it round-trips
+  // through save/load) and the live world (so it is placeable this
+  // instant, with no restart needed).
+  if (project && project.characters) {
+    const idx = project.characters.findIndex(c => c.kind === safe);
+    if (idx >= 0) project.characters[idx] = template; else project.characters.push(template);
+  }
+  if (world) world.templates[safe] = template;
+  meshEditingKind = safe;
+  drawerToast('saved "' + safe + '" -- pick it in 🎨 Build');
+  $("#mesh-modal").classList.remove("on");
 }
 
-function setupMeshCreator() {
-  const colorSelect = $("#mesh-part-color");
-  for (const name of Object.keys(COLOR_RGB)) {
-    const opt = document.createElement("option");
-    opt.value = name; opt.textContent = name;
-    colorSelect.appendChild(opt);
+// The top page's box: the part list, the fine dx/dy/dz/sx/sy/sz fields
+// for whichever part is selected, and the rarer load/delete-a-saved-mesh
+// and clear-and-start-over actions -- everything that isn't one of the
+// six per-part shortcuts on the top page's own buttons.
+function buildMeshTopBox() {
+  const box = document.createElement("div");
+
+  const list = document.createElement("div");
+  list.id = "mesh-part-list";
+  if (!meshParts.length) {
+    const empty = document.createElement("div");
+    empty.className = "mesh-part-row";
+    empty.style.cursor = "default";
+    empty.textContent = "(no parts yet -- + add part above)";
+    list.appendChild(empty);
   }
-  const shapeSelect = $("#mesh-part-shape");
-  for (const name of SHAPES) {
-    const opt = document.createElement("option");
-    opt.value = name; opt.textContent = name;
-    shapeSelect.appendChild(opt);
+  meshParts.forEach((p, i) => {
+    const row = document.createElement("div");
+    row.className = "mesh-part-row" + (i === meshSelected ? " on" : "");
+    row.textContent = (p.shape || "cube") + " (" + (p.color || "white") + ")";
+    row.onclick = () => { meshSelected = i; renderMeshPage(); };
+    list.appendChild(row);
+  });
+  box.appendChild(list);
+
+  const p = meshSelected !== null ? meshParts[meshSelected] : null;
+  if (p) {
+    for (const [key, label, min, max] of [
+      ["dx", "x", null, null], ["dy", "y", null, null], ["dz", "z", null, null],
+      ["sx", "width", 0.05, 3], ["sy", "height", 0.05, 3], ["sz", "depth", 0.05, 3],
+    ]) {
+      const row = document.createElement("div");
+      row.className = "prop-row";
+      row.innerHTML = '<span class="prop-label">' + label + '</span>';
+      const num = document.createElement("input");
+      num.type = "number"; num.step = 0.05;
+      if (min !== null) { num.min = min; num.max = max; }
+      num.style.cssText = "width:72px;flex:0 0 auto";
+      num.value = p[key] === undefined ? (min !== null ? 0.5 : 0) : p[key];
+      // Live while typing, no page rebuild mid-edit -- same reasoning as
+      // the Inspector's own size/stretch fields.
+      num.addEventListener("input", () => {
+        const v = parseFloat(num.value);
+        p[key] = min !== null ? Math.max(min, Number.isFinite(v) ? v : 0.5)
+                               : (Number.isFinite(v) ? v : 0);
+      });
+      row.appendChild(num);
+      box.appendChild(row);
+    }
   }
 
-  $("#mesh-add-part").onclick = () => {
-    meshParts.push({shape: "cube", dx: 0, dy: 0, dz: 0, sx: 0.5, sy: 0.5, sz: 0.5, color: "white"});
-    selectMeshPart(meshParts.length - 1);
-  };
-  $("#mesh-delete-part").onclick = () => {
-    if (meshSelected === null) return;
-    meshParts.splice(meshSelected, 1);
-    meshSelected = meshParts.length ? Math.min(meshSelected, meshParts.length - 1) : null;
-    if (meshSelected !== null) selectMeshPart(meshSelected); else renderMeshPartList();
-  };
-  $("#mesh-new").onclick = () => {
-    if (meshParts.length && !confirm("Clear the current mesh and start a new one?")) return;
-    meshParts = []; meshSelected = null; meshEditingKind = null;
-    $("#mesh-load-select").value = "";
-    renderMeshPartList();
-  };
-  $("#mesh-load-btn").onclick = () => {
-    const kind = $("#mesh-load-select").value;
-    if (!kind) return;
-    if (meshParts.length && !confirm('Replace the current mesh with "' + kind + '"?')) {
-      $("#mesh-load-select").value = "";
-      return;
+  const loadRow = document.createElement("div");
+  loadRow.style.cssText = "display:flex;gap:6px;margin-top:8px";
+  const sel = document.createElement("select");
+  sel.style.flex = "1";
+  sel.innerHTML = '<option value="">— load an existing mesh —</option>';
+  if (world) {
+    const withParts = Object.keys(world.templates)
+      .filter(k => world.templates[k].parts && world.templates[k].parts.length)
+      .sort((a, b) => a.localeCompare(b));
+    for (const kind of withParts) {
+      const opt = document.createElement("option");
+      opt.value = kind; opt.textContent = kind;
+      sel.appendChild(opt);
     }
+  }
+  const loadBtn = document.createElement("button");
+  loadBtn.textContent = "load"; loadBtn.style.cssText = "flex:0 0 auto";
+  loadBtn.onclick = () => {
+    const kind = sel.value;
+    if (!kind) return;
+    if (meshParts.length && !confirm('Replace the current mesh with "' + kind + '"?')) return;
     loadMeshForEditing(kind);
+    renderMeshPage();
   };
-  $("#mesh-delete-btn").onclick = () => {
-    const kind = $("#mesh-load-select").value;
+  const delBtn = document.createElement("button");
+  delBtn.textContent = "🗑"; delBtn.style.cssText = "flex:0 0 auto";
+  delBtn.onclick = () => {
+    const kind = sel.value;
     if (!kind) { drawerToast("pick one from the list first"); return; }
     if (!confirm('Delete the saved mesh "' + kind + '"? This cannot be undone.')) return;
     if (world) delete world.templates[kind];
     if (project && project.characters) {
       project.characters = project.characters.filter(c => c.kind !== kind);
     }
-    if (meshEditingKind === kind) { meshEditingKind = null; }
-    refreshMeshLoadSelect();
+    if (meshEditingKind === kind) meshEditingKind = null;
     drawerToast('deleted "' + kind + '"');
+    renderMeshPage();
   };
-  $("#mesh-dup-part").onclick = () => {
-    if (meshSelected === null || !meshParts[meshSelected]) return;
-    const copy = JSON.parse(JSON.stringify(meshParts[meshSelected]));
-    copy.dx = (copy.dx || 0) + 0.3;
-    meshParts.splice(meshSelected + 1, 0, copy);
-    selectMeshPart(meshSelected + 1);
+  loadRow.append(sel, loadBtn, delBtn);
+  box.appendChild(loadRow);
+
+  const clearBtn = document.createElement("button");
+  clearBtn.textContent = "clear / start over";
+  clearBtn.style.cssText = "width:100%;margin-top:8px";
+  clearBtn.onclick = () => {
+    if (meshParts.length && !confirm("Clear the current mesh and start a new one?")) return;
+    meshParts = []; meshSelected = null; meshEditingKind = null;
+    renderMeshPage();
   };
-  for (const id of ["mesh-part-shape", "mesh-part-color", "mesh-part-dx", "mesh-part-dy",
-                     "mesh-part-dz", "mesh-part-sx", "mesh-part-sy", "mesh-part-sz"]) {
-    $("#" + id).addEventListener("input", applyMeshFieldsToSelected);
-    $("#" + id).addEventListener("change", applyMeshFieldsToSelected);
+  box.appendChild(clearBtn);
+
+  return box;
+}
+
+// Colour and shape are their own pages rather than fields in the box --
+// same choiceKeys() helper the Object Inspector uses, just pointed at
+// whichever part is currently selected instead of inspectTarget.
+function gotoMeshPage(page) {
+  if ((page === "color" || page === "shape") && meshSelected === null) {
+    if (!meshParts.length) { drawerToast("add a part first"); return; }
+    meshSelected = 0;
   }
+  meshPage = page;
+  renderMeshPage();
+}
 
-  $("#mesh-save").onclick = () => {
-    if (!meshParts.length) { window.alert("add at least one part first"); return; }
-    const existing = meshEditingKind && world && world.templates[meshEditingKind];
-    const name = (prompt("Save this mesh as a kind named:",
-                          meshEditingKind || "mymesh") || "").trim();
-    if (!name) return;
-    const safe = name.replace(/[^A-Za-z0-9_-]/g, "");
-    if (!safe) { window.alert("give it a name"); return; }
-    const glyphDefault = (existing && existing.glyph) || safe[0].toUpperCase();
-    const glyph = (prompt("One-letter glyph for it:", glyphDefault) || glyphDefault).slice(0, 1);
-    const template = {
-      kind: safe, glyph, color: meshParts[0].color || "white", health: 1,
-      count: 0, solid: true, role: "prop",
-      parts: JSON.parse(JSON.stringify(meshParts)), brain: [],
-    };
-    // both places a template can live: the project (so it round-trips
-    // through save/load) and the live world (so it is placeable this
-    // instant, with no restart needed).
-    if (project && project.characters) {
-      const idx = project.characters.findIndex(c => c.kind === safe);
-      if (idx >= 0) project.characters[idx] = template; else project.characters.push(template);
-    }
-    if (world) world.templates[safe] = template;
-    meshEditingKind = safe;
-    drawerToast('saved "' + safe + '" -- pick it in 🎨 Build');
-    $("#mesh-modal").classList.remove("on");
-  };
+const MESH_PAGES = {
+  top: {
+    title: () => "🧩 Mesh Creator" + (meshEditingKind ? " — " + meshEditingKind : ""),
+    keys: () => [
+      {label: "🎨<br>part colour", go: () => gotoMeshPage("color")},
+      {label: "⬡<br>part shape", go: () => gotoMeshPage("shape")},
+      {label: "+<br>add part", go: () => {
+        meshParts.push({shape: "cube", dx: 0, dy: 0, dz: 0, sx: 0.5, sy: 0.5, sz: 0.5, color: "white"});
+        meshSelected = meshParts.length - 1;
+        renderMeshPage();
+      }},
+      {label: "⧉<br>duplicate part", go: () => {
+        if (meshSelected === null || !meshParts[meshSelected]) return;
+        const copy = JSON.parse(JSON.stringify(meshParts[meshSelected]));
+        copy.dx = (copy.dx || 0) + 0.3;
+        meshParts.splice(meshSelected + 1, 0, copy);
+        meshSelected += 1;
+        renderMeshPage();
+      }},
+      {label: "🗑<br>delete part", go: () => {
+        if (meshSelected === null) return;
+        meshParts.splice(meshSelected, 1);
+        meshSelected = meshParts.length ? Math.min(meshSelected, meshParts.length - 1) : null;
+        renderMeshPage();
+      }},
+      {label: "💾<br>save as new kind", go: meshSaveAsKind},
+    ],
+    box: buildMeshTopBox,
+  },
+  color: {
+    title: () => "🎨 Part colour",
+    keys: () => choiceKeys(Object.keys(COLOR_RGB),
+      meshSelected !== null && meshParts[meshSelected] && meshParts[meshSelected].color,
+      name => { if (meshSelected !== null && meshParts[meshSelected]) meshParts[meshSelected].color = name; },
+      renderMeshPage),
+    box: buildMeshTopBox,
+  },
+  shape: {
+    title: () => "⬡ Part shape",
+    keys: () => choiceKeys(SHAPES,
+      meshSelected !== null && meshParts[meshSelected] && (meshParts[meshSelected].shape || "cube"),
+      name => { if (meshSelected !== null && meshParts[meshSelected]) meshParts[meshSelected].shape = name; },
+      renderMeshPage),
+    box: buildMeshTopBox,
+  },
+};
 
+function renderMeshPage() {
+  const def = MESH_PAGES[meshPage];
+  $("#mesh-title").textContent = def.title();
+  $("#mesh-back").classList.toggle("showing", meshPage !== "top");
+  const keys = $("#mesh-keys");
+  keys.innerHTML = "";
+  for (const k of def.keys()) {
+    const b = document.createElement("button");
+    b.className = "mkey" + (k.on ? " on" : "");
+    b.innerHTML = k.label;
+    b.onclick = k.go;
+    keys.appendChild(b);
+  }
+  const box = $("#mesh-box");
+  box.innerHTML = "";
+  box.appendChild(def.box());
+}
+
+function openMeshCreator() {
+  ensureMeshRenderer();
+  meshPage = "top";
+  renderMeshPage();
+  $("#mesh-modal").classList.add("on");
+  if (!meshLoopRunning) { meshLoopRunning = true; meshFrame(); }
+}
+
+function setupMeshCreator() {
+  $("#mesh-back").onclick = () => gotoMeshPage("top");
   $("#mesh-close").onclick = () => $("#mesh-modal").classList.remove("on");
 }
 
@@ -3380,6 +3423,7 @@ function renderPaletteList() {
   box.innerHTML = "";
   if (!world) {
     box.textContent = "Not available in LIVE mode -- switch to \"run here\" first.";
+    $("#palette-count").textContent = "";
     return;
   }
   const current = world.memory.palette_kind;
@@ -3388,6 +3432,7 @@ function renderPaletteList() {
     .filter(k => k !== "shot")
     .filter(k => !query || k.toLowerCase().includes(query))
     .sort((a, b) => a.localeCompare(b));
+  $("#palette-count").textContent = kinds.length + " kind" + (kinds.length === 1 ? "" : "s");
   if (!kinds.length) {
     const empty = document.createElement("div");
     empty.className = "palette-item";
@@ -3512,114 +3557,261 @@ function drawSelection() {
   el.style.top = at[1] + "px";
 }
 
+let inspectPage = "top";   // one of the keys of INSPECT_PAGES below
+
 function openInspector(pickedTarget) {
   if (!world) { drawerToast("not available in LIVE mode"); return; }
   const target = pickedTarget || findInspectTarget();
   if (!target) { drawerToast("touch something, or tap one in the world, first"); return; }
   inspectTarget = target;
-  $("#inspect-title").textContent = "🎯 " + target.kind + (target.ghost ? " (still being placed)" : "");
-  $("#inspect-color").value = target.color || "white";
-  $("#inspect-shape").value = target.shape || "cube";
-  const size = target.size === undefined ? 100 : target.size;
-  $("#inspect-size").value = size;
-  $("#inspect-size-num").value = size;
-  $("#inspect-sx").value = target.sx === undefined ? size : target.sx;
-  $("#inspect-sy").value = target.sy === undefined ? size : target.sy;
-  $("#inspect-sz").value = target.sz === undefined ? size : target.sz;
-  $("#inspect-x").value = target.x;
-  $("#inspect-y").value = target.y;
-  $("#inspect-z").value = target.z || 0;
+  inspectPage = "top";
+  renderInspectorPage();
   $("#inspect-modal").classList.add("on");
 }
 
-function applyInspectorSize(fromSlider) {
-  if (!inspectTarget || !inspectTarget.alive) return;
-  const raw = fromSlider ? $("#inspect-size").value : $("#inspect-size-num").value;
-  const v = Math.max(20, Math.min(300, parseFloat(raw) || 100));
-  $("#inspect-size").value = v;
-  $("#inspect-size-num").value = v;
-  inspectTarget.size = v;
-  // Uniform on purpose, same reasoning as the resize tile: dragging the
-  // overall size undoes any earlier per-axis stretch rather than leaving
-  // it stacked underneath a new size the three sliders would then disagree
-  // with.
-  inspectTarget.sx = inspectTarget.sy = inspectTarget.sz = undefined;
-  $("#inspect-sx").value = $("#inspect-sy").value = $("#inspect-sz").value = v;
+function gotoInspectPage(page) { inspectPage = page; renderInspectorPage(); }
+
+function duplicateInspectTarget() {
+  if (!inspectTarget || !inspectTarget.alive || !world) return;
+  const [nx, ny] = findFreeAdjacent(inspectTarget.x, inspectTarget.y);
+  const copy = world.spawn(inspectTarget.kind, nx, ny);
+  if (!copy) { drawerToast("no room to duplicate it here"); return; }
+  // the fresh copy starts from the template again -- carry over whatever
+  // this specific instance was actually customized to, not just what it
+  // was born with.
+  copy.color = inspectTarget.color;
+  copy.size = inspectTarget.size;
+  copy.sx = inspectTarget.sx; copy.sy = inspectTarget.sy; copy.sz = inspectTarget.sz;
+  copy.shape = inspectTarget.shape;
+  copy.z = inspectTarget.z;
+  drawerToast("duplicated");
 }
 
-function applyInspectorStretch(axis) {
+function setInspectSize(v) {
   if (!inspectTarget || !inspectTarget.alive) return;
-  const v = Math.max(20, Math.min(300, parseFloat($("#inspect-s" + axis).value) || 100));
-  $("#inspect-s" + axis).value = v;
-  inspectTarget["s" + axis] = v;
+  const clamped = Math.max(20, Math.min(300, Math.round(v) || 100));
+  inspectTarget.size = clamped;
+  // Uniform on purpose, same reasoning as the resize tile: setting the
+  // overall size undoes any earlier per-axis stretch rather than leaving
+  // it stacked underneath a new size the three would then disagree with.
+  inspectTarget.sx = inspectTarget.sy = inspectTarget.sz = undefined;
+}
+
+function nudgeInspectorStretch(axis, delta) {
+  if (!inspectTarget || !inspectTarget.alive) return;
+  const size = inspectTarget.size === undefined ? 100 : inspectTarget.size;
+  const current = inspectTarget["s" + axis] === undefined ? size : inspectTarget["s" + axis];
+  inspectTarget["s" + axis] = Math.max(20, Math.min(300, current + delta));
 }
 
 function resetInspectorStretch() {
   if (!inspectTarget || !inspectTarget.alive) return;
-  const size = inspectTarget.size === undefined ? 100 : inspectTarget.size;
   inspectTarget.sx = inspectTarget.sy = inspectTarget.sz = undefined;
-  $("#inspect-sx").value = $("#inspect-sy").value = $("#inspect-sz").value = size;
 }
 
-function applyInspectorPosition() {
+function nudgeInspectorPosition(axis, delta) {
   if (!inspectTarget || !inspectTarget.alive || !world) return;
-  let x = Math.round(parseFloat($("#inspect-x").value));
-  let y = Math.round(parseFloat($("#inspect-y").value));
-  if (!Number.isFinite(x)) x = inspectTarget.x;
-  if (!Number.isFinite(y)) y = inspectTarget.y;
-  if (!world.inBounds(x, y)) { drawerToast("that's outside the world"); return; }
-  inspectTarget.x = x;
-  inspectTarget.y = y;
-  const z = parseFloat($("#inspect-z").value);
-  inspectTarget.z = Number.isFinite(z) ? Math.max(0, Math.min(8, z)) : 0;
+  if (axis === "z") {
+    inspectTarget.z = Math.max(0, Math.min(8, (inspectTarget.z || 0) + delta));
+    return;
+  }
+  const nx = axis === "x" ? inspectTarget.x + delta : inspectTarget.x;
+  const ny = axis === "y" ? inspectTarget.y + delta : inspectTarget.y;
+  if (!world.inBounds(nx, ny)) { drawerToast("that's outside the world"); return; }
+  inspectTarget.x = nx;
+  inspectTarget.y = ny;
+}
+
+// One row of a live readout -- used by every page's box, not just the
+// top one, so wherever you are you can still see what the object is now.
+function propRow(label, value) {
+  const row = document.createElement("div");
+  row.className = "prop-row";
+  const l = document.createElement("span");
+  l.className = "prop-label"; l.textContent = label;
+  const v = document.createElement("span");
+  v.className = "prop-value"; v.textContent = value;
+  row.append(l, v);
+  return row;
+}
+
+function inspectSummaryBox() {
+  const box = document.createElement("div");
+  const t = inspectTarget;
+  if (!t) { box.textContent = "(nothing selected)"; return box; }
+  const size = t.size === undefined ? 100 : t.size;
+  box.append(
+    propRow("kind", t.kind + (t.ghost ? " (still being placed)" : "")),
+    propRow("colour", t.color || "white"),
+    propRow("shape", t.shape || "cube"),
+    propRow("size", size + "%"),
+    propRow("position", "(" + t.x + ", " + t.y + ", " + (t.z || 0) + ")"),
+  );
+  return box;
+}
+
+// A page of big buttons, one per name in `names` -- exactly the shape
+// every colour/shape picker needs (the Inspector's own, and the Mesh
+// Creator's per-part one below), just with different lists, a different
+// setter, and a different page to re-render, so it is written once and
+// reused rather than copied.
+function choiceKeys(names, current, apply, rerender) {
+  return names.map(name => ({
+    label: name,
+    on: name === current,
+    go: () => { apply(name); rerender(); },
+  }));
+}
+
+const INSPECT_PAGES = {
+  top: {
+    title: () => "🎯 " + (inspectTarget ? inspectTarget.kind : "Object"),
+    keys: () => [
+      {label: "🎨<br>colour", go: () => gotoInspectPage("color")},
+      {label: "⬡<br>shape", go: () => gotoInspectPage("shape")},
+      {label: "⛶<br>resize", go: () => gotoInspectPage("resize")},
+      {label: "↔<br>stretch", go: () => gotoInspectPage("stretch")},
+      {label: "📍<br>move", go: () => gotoInspectPage("move")},
+      {label: "⧉<br>duplicate", go: () => duplicateInspectTarget()},
+    ],
+    box: inspectSummaryBox,
+  },
+  color: {
+    title: () => "🎨 Colour",
+    keys: () => choiceKeys(Object.keys(COLOR_RGB), inspectTarget && inspectTarget.color,
+      name => { if (inspectTarget) inspectTarget.color = name; }, renderInspectorPage),
+    box: inspectSummaryBox,
+  },
+  shape: {
+    title: () => "⬡ Shape",
+    keys: () => choiceKeys(SHAPES, inspectTarget && (inspectTarget.shape || "cube"),
+      // no visible effect on a mesh-creator object (parts override shape
+      // entirely in the renderer), same as it always has -- shape only
+      // ever meant anything for a single-shape thing.
+      name => { if (inspectTarget) inspectTarget.shape = name; }, renderInspectorPage),
+    box: inspectSummaryBox,
+  },
+  resize: {
+    title: () => "⛶ Resize",
+    keys: () => [50, 75, 100, 150, 200, 300].map(v => ({
+      label: v + "%",
+      on: inspectTarget && (inspectTarget.size === undefined ? 100 : inspectTarget.size) === v,
+      go: () => { setInspectSize(v); renderInspectorPage(); },
+    })),
+    box: () => {
+      const box = inspectSummaryBox();
+      const row = document.createElement("div");
+      row.className = "prop-row";
+      row.innerHTML = '<span class="prop-label">exact size (20-300)</span>';
+      const num = document.createElement("input");
+      num.type = "number"; num.min = 20; num.max = 300; num.step = 1;
+      num.style.cssText = "width:64px;flex:0 0 auto";
+      num.value = inspectTarget ? (inspectTarget.size === undefined ? 100 : inspectTarget.size) : 100;
+      // Applies live but does not re-render the box -- a full rebuild
+      // would tear the input out from under the finger still typing in it.
+      num.addEventListener("input", () => setInspectSize(parseFloat(num.value)));
+      row.appendChild(num);
+      box.appendChild(row);
+      return box;
+    },
+  },
+  stretch: {
+    title: () => "↔ Stretch",
+    keys: () => [
+      {label: "width −25", go: () => { nudgeInspectorStretch("x", -25); renderInspectorPage(); }},
+      {label: "width +25", go: () => { nudgeInspectorStretch("x", 25); renderInspectorPage(); }},
+      {label: "height −25", go: () => { nudgeInspectorStretch("y", -25); renderInspectorPage(); }},
+      {label: "height +25", go: () => { nudgeInspectorStretch("y", 25); renderInspectorPage(); }},
+      {label: "depth −25", go: () => { nudgeInspectorStretch("z", -25); renderInspectorPage(); }},
+      {label: "depth +25", go: () => { nudgeInspectorStretch("z", 25); renderInspectorPage(); }},
+    ],
+    box: () => {
+      const box = inspectSummaryBox();
+      const t = inspectTarget, size = t ? (t.size === undefined ? 100 : t.size) : 100;
+      for (const [axis, label] of [["x", "width"], ["y", "height"], ["z", "depth"]]) {
+        const row = document.createElement("div");
+        row.className = "prop-row";
+        row.innerHTML = '<span class="prop-label">' + label + '</span>';
+        const slider = document.createElement("input");
+        slider.type = "range"; slider.min = 20; slider.max = 300; slider.step = 1;
+        slider.value = t ? (t["s" + axis] === undefined ? size : t["s" + axis]) : size;
+        // Live while dragging, no rebuild mid-drag, same reasoning as the
+        // resize field above.
+        slider.addEventListener("input", () => {
+          if (t) t["s" + axis] = Math.max(20, Math.min(300, parseFloat(slider.value) || size));
+        });
+        row.appendChild(slider);
+        box.appendChild(row);
+      }
+      const reset = document.createElement("button");
+      reset.textContent = "reset stretch to size";
+      reset.style.cssText = "width:100%;margin-top:4px";
+      reset.onclick = () => { resetInspectorStretch(); renderInspectorPage(); };
+      box.appendChild(reset);
+      return box;
+    },
+  },
+  move: {
+    title: () => "📍 Move",
+    keys: () => [
+      {label: "x −1", go: () => { nudgeInspectorPosition("x", -1); renderInspectorPage(); }},
+      {label: "x +1", go: () => { nudgeInspectorPosition("x", 1); renderInspectorPage(); }},
+      {label: "y −1", go: () => { nudgeInspectorPosition("y", -1); renderInspectorPage(); }},
+      {label: "y +1", go: () => { nudgeInspectorPosition("y", 1); renderInspectorPage(); }},
+      {label: "altitude −1", go: () => { nudgeInspectorPosition("z", -1); renderInspectorPage(); }},
+      {label: "altitude +1", go: () => { nudgeInspectorPosition("z", 1); renderInspectorPage(); }},
+    ],
+    box: () => {
+      const box = inspectSummaryBox();
+      const t = inspectTarget;
+      for (const [axis, label, extra] of [["x", "x", {}], ["y", "y", {}],
+                                           ["z", "altitude", {min: 0, max: 8}]]) {
+        const row = document.createElement("div");
+        row.className = "prop-row";
+        row.innerHTML = '<span class="prop-label">exact ' + label + '</span>';
+        const num = document.createElement("input");
+        num.type = "number"; num.step = 1;
+        if (extra.min !== undefined) num.min = extra.min;
+        if (extra.max !== undefined) num.max = extra.max;
+        num.style.cssText = "width:64px;flex:0 0 auto";
+        num.value = t ? (axis === "z" ? (t.z || 0) : t[axis]) : 0;
+        num.addEventListener("change", () => {
+          if (!t || !world) return;
+          const v = parseFloat(num.value);
+          if (!Number.isFinite(v)) return;
+          if (axis === "z") { t.z = Math.max(0, Math.min(8, v)); return; }
+          const nx = axis === "x" ? Math.round(v) : t.x, ny = axis === "y" ? Math.round(v) : t.y;
+          if (!world.inBounds(nx, ny)) { drawerToast("that's outside the world"); num.value = t[axis]; return; }
+          t.x = nx; t.y = ny;
+        });
+        row.appendChild(num);
+        box.appendChild(row);
+      }
+      return box;
+    },
+  },
+};
+
+function renderInspectorPage() {
+  const def = INSPECT_PAGES[inspectPage];
+  $("#inspect-title").textContent = def.title();
+  $("#inspect-back").classList.toggle("showing", inspectPage !== "top");
+  const keys = $("#inspect-keys");
+  keys.innerHTML = "";
+  for (const k of def.keys()) {
+    const b = document.createElement("button");
+    b.className = "mkey" + (k.on ? " on" : "");
+    b.innerHTML = k.label;
+    b.onclick = k.go;
+    keys.appendChild(b);
+  }
+  const box = $("#inspect-box");
+  box.innerHTML = "";
+  box.appendChild(def.box());
 }
 
 function setupInspector() {
-  const colorSelect = $("#inspect-color");
-  for (const name of Object.keys(COLOR_RGB)) {
-    const opt = document.createElement("option");
-    opt.value = name; opt.textContent = name;
-    colorSelect.appendChild(opt);
-  }
-  const shapeSelect = $("#inspect-shape");
-  for (const name of SHAPES) {
-    const opt = document.createElement("option");
-    opt.value = name; opt.textContent = name;
-    shapeSelect.appendChild(opt);
-  }
-  colorSelect.addEventListener("change", () => {
-    if (inspectTarget && inspectTarget.alive) inspectTarget.color = colorSelect.value;
-  });
-  $("#inspect-shape").addEventListener("change", () => {
-    // has no visible effect on a mesh-creator object (parts override
-    // shape entirely in the renderer), same as it always has -- shape
-    // only ever meant anything for a single-shape thing.
-    if (inspectTarget && inspectTarget.alive) inspectTarget.shape = $("#inspect-shape").value;
-  });
-  $("#inspect-size").addEventListener("input", () => applyInspectorSize(true));
-  $("#inspect-size-num").addEventListener("input", () => applyInspectorSize(false));
-  for (const axis of ["x", "y", "z"])
-    $("#inspect-s" + axis).addEventListener("input", () => applyInspectorStretch(axis));
-  $("#inspect-unstretch").onclick = resetInspectorStretch;
-  for (const id of ["inspect-x", "inspect-y", "inspect-z"]) {
-    $("#" + id).addEventListener("input", applyInspectorPosition);
-    $("#" + id).addEventListener("change", applyInspectorPosition);
-  }
-  $("#inspect-duplicate").onclick = () => {
-    if (!inspectTarget || !inspectTarget.alive || !world) return;
-    const [nx, ny] = findFreeAdjacent(inspectTarget.x, inspectTarget.y);
-    const copy = world.spawn(inspectTarget.kind, nx, ny);
-    if (!copy) { drawerToast("no room to duplicate it here"); return; }
-    // the fresh copy starts from the template again -- carry over whatever
-    // this specific instance was actually customized to, not just what it
-    // was born with.
-    copy.color = inspectTarget.color;
-    copy.size = inspectTarget.size;
-    copy.sx = inspectTarget.sx; copy.sy = inspectTarget.sy; copy.sz = inspectTarget.sz;
-    copy.shape = inspectTarget.shape;
-    copy.z = inspectTarget.z;
-    drawerToast("duplicated");
-  };
+  $("#inspect-back").onclick = () => gotoInspectPage("top");
   $("#inspect-delete").onclick = () => {
     if (!inspectTarget) return;
     if (!confirm('Delete this ' + inspectTarget.kind + '? This cannot be undone.')) return;
