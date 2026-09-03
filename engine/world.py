@@ -10,7 +10,21 @@ from . import tiles
 COLORS = {
     "white": 37, "red": 31, "green": 32, "yellow": 33,
     "blue": 34, "magenta": 35, "cyan": 36, "grey": 90, "pink": 95,
+    # Sixteen ANSI codes only go so far -- past here, each is the nearest
+    # basic/bright terminal colour to the real RGB world3d.html draws (see
+    # its COLOR_RGB/COLOR_CSS), several sharing a code with an existing
+    # name. The terminal's own render() was always an approximation; only
+    # the 3D view and the browser editor's swatches show the real colour.
+    "orange": 33, "purple": 35, "brown": 33, "black": 30, "lime": 92,
+    "teal": 96, "navy": 34, "maroon": 31, "gold": 93, "silver": 97,
 }
+
+# Every shape a character can be. Only world3d.html actually draws these
+# (see its own matching SHAPES and the push*() functions each name is
+# backed by) -- kept here too, in the same order, so the `shape` tile
+# cycles through an identical sequence in both engines even though only
+# one of them can show the result.
+SHAPES = ["cube", "sphere", "cone", "cylinder", "pyramid", "wedge", "octahedron"]
 
 
 class Thing:
@@ -24,8 +38,15 @@ class Thing:
         self.health = template.get("health", 1)
         self.solid = template.get("solid", False)
         self.role = template.get("role", "prop")
-        self.shape = template.get("shape", "cube")   # "cube" | "sphere"
+        self.shape = template.get("shape", "cube")   # one of SHAPES, above
         self.size = template.get("size", 100)        # percent; 100 = normal
+        # Per-axis overrides, percent like size -- None means "use size",
+        # the same on all three axes, which is how everything behaves
+        # until something explicitly stretches just one of them (see the
+        # `stretch` tile). Only world3d.html actually draws the result.
+        self.sx = template.get("sx", None)
+        self.sy = template.get("sy", None)
+        self.sz = template.get("sz", None)
         self.z = template.get("z", 0)                # altitude; 0 = ground
         self.full = template.get("full", False)      # fills its whole grid cell
         self.ghost = template.get("ghost", False)     # placed but not confirmed yet

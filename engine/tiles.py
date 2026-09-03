@@ -657,22 +657,53 @@ def a_spawn(obj, world, a, it):
     world.spawn_somewhere(a["kind"])
 
 
-@action("shape", "flip {target}'s shape between cube and sphere",
+# Same list, same order, as world.SHAPES and world3d.html's own SHAPES --
+# not imported from world.py to avoid a circular import (world.py already
+# imports this module), so this one is kept in sync by hand instead.
+_SHAPES = ["cube", "sphere", "cone", "cylinder", "pyramid", "wedge", "octahedron"]
+
+
+@action("shape", "cycle {target}'s shape: cube, sphere, cone, and onward",
         Param("target", "Flip whom?", "choice", ["it", "self"], "it"))
 def a_shape(obj, world, a, it):
     victim = obj if a["target"] == "self" else it
     if victim is not None:
-        victim.shape = "cube" if getattr(victim, "shape", "cube") == "sphere" else "sphere"
+        current = getattr(victim, "shape", "cube") or "cube"
+        at = _SHAPES.index(current) if current in _SHAPES else -1
+        victim.shape = _SHAPES[(at + 1) % len(_SHAPES)]
 
 
 @action("resize", "change {target}'s size by {amount}",
         Param("target", "Resize whom?", "choice", ["it", "self"], "it"),
         Param("amount", "By how much? (percent points, can be negative)", "int", [], 25))
 def a_resize(obj, world, a, it):
+    """Uniform on purpose: any earlier `stretch` (below) is exactly the
+    kind of thing "resize the whole object" should undo, not leave stacked
+    underneath a new overall size."""
     victim = obj if a["target"] == "self" else it
     if victim is not None:
         size = getattr(victim, "size", 100) + a["amount"]
         victim.size = max(40, min(220, size))
+        victim.sx = victim.sy = victim.sz = None
+
+
+@action("stretch", "stretch {target}'s {axis} by {amount}, independent of the others",
+        Param("target", "Stretch whom?", "choice", ["it", "self"], "it"),
+        Param("axis", "Which one?", "choice", ["x", "y", "z"], "x"),
+        Param("amount", "By how much? (percent points, can be negative)", "int", [], 25))
+def a_stretch(obj, world, a, it):
+    """Independent of resize: only one axis moves, the other two keep
+    whatever they already were (size, or an earlier stretch of their
+    own)."""
+    victim = obj if a["target"] == "self" else it
+    if victim is None:
+        return
+    field = "s" + (a["axis"] if a["axis"] in ("x", "y", "z") else "x")
+    base = getattr(victim, "size", 100)
+    current = getattr(victim, field, None)
+    if current is None:
+        current = base
+    setattr(victim, field, max(40, min(220, current + a["amount"])))
 
 
 @action("fly", "fly {dir}",

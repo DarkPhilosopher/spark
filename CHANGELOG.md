@@ -16,6 +16,57 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ### Added
 
+- **Four new shapes, ten new colours, and a second way to resize —
+  stretching one axis at a time instead of only uniformly.**
+
+  **Shapes**, cube/sphere/cone joined by **cylinder, pyramid, wedge, and
+  octahedron** — four more low-poly, flat-shaded `push*()` functions in
+  world3d.html, same hand-computed-normal approach as the existing cone and
+  sphere. The pyramid's base lines up with a cube's own footprint on
+  purpose (a `SIDES=4` cone would put its corners at the box's edge
+  midpoints instead, a diamond, not a square); the wedge is a ramp or a
+  mono-pitch roof, full height at one end tapering to nothing at the
+  other; the octahedron is a gem, two four-sided pyramids base to base.
+  The `shape` tile now **cycles** through all seven instead of only
+  flipping cube ↔ sphere (`engine/world.py` and world3d.html both carry
+  the same `SHAPES` list, in the same order, so it cycles identically in
+  either engine even though only the 3D view can show the result). Both
+  the Mesh Creator and the Object Inspector's shape pickers are now built
+  from that one list too, so a shape added there only needs adding once.
+
+  **Colours**, nine joined by ten more: orange, purple, brown, black,
+  lime, teal, navy, maroon, gold, silver. Real, distinct RGB in
+  world3d.html's `COLOR_RGB`/`COLOR_CSS`; the terminal's `COLORS` (ANSI
+  has only sixteen codes to work with) gives several of them the nearest
+  existing code rather than a colour of their own — the terminal's
+  render() was always an approximation, only the 3D view and the editor's
+  own swatches show the real thing.
+
+  **Stretching**, alongside the existing uniform `resize`: a new
+  `stretch` tile changes width, height, or depth on its own, leaving the
+  other two exactly where they were. Backed by three new optional fields
+  on `Thing` — `sx`/`sy`/`sz`, percent like `size`, `None`/`undefined`
+  meaning "use size" until something stretches that axis specifically
+  (carried on both engines' `Thing`, same as `parts`, even though only
+  world3d.html draws the result). `resize` (and the Inspector's own size
+  slider) clear all three back to matching the new size — deliberately:
+  the whole object changing size is exactly the moment an earlier
+  one-axis stretch should stop applying, not stack silently underneath a
+  new baseline. A round shape (sphere, octahedron) still defaults its
+  height to match its own width, staying round when unstretched, unless
+  `sy` is set explicitly — which is exactly how you'd deliberately turn
+  one into an ellipsoid or a squashed gem.
+
+  **Controls**: the Object Inspector gained three sliders — width,
+  height, depth — wired straight to `sx`/`sy`/`sz`, plus a "reset stretch
+  to size" button. Duplicating an object now carries its stretch over
+  too, the same as it already did for colour, shape, and size.
+
+  Verified computationally rather than by eye (no headless WebGL here to
+  render an actual frame): every new `push*()` function's output checked
+  for the right vertex stride, whole triangles, finite numbers throughout,
+  and unit-length normals, with real (if arbitrary) box dimensions.
+
 - **Fixed a real corruption bug in the big-picture menu**, caught by
   deliberately testing the app's largest menu (the tile picker, up to 40
   options) against MANUAL.md's own stated minimum terminal size (20 rows).

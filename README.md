@@ -21,7 +21,7 @@ is a list of rows. Every row reads the same way:
     WHEN something is true   DO something
 
 That is the whole idea, and it is the idea Kodu and Project Spark used. Fourteen
-WHEN tiles crossed with twenty-six DO tiles is three hundred and sixty-four
+WHEN tiles crossed with twenty-seven DO tiles is three hundred and seventy-eight
 different sentences, and rows can hold more than one tile each, so the real
 number is much larger. One of those tiles is **your own**: fold any row up under
 a name and it joins the palette like the rest.
@@ -283,8 +283,9 @@ who arrived before you started a game — they are connected and waiting.
 | placeholder `<who>` has `<face>` `<test>` `<n>` | open `<object>` at `<target>` |
 | placeholder `<who>` is named "`<text>`" | name `<who>` is "`<text>`" |
 | the tile called "`<name>`" — one of your own | the tile called "`<name>`" — one of your own |
-| | flip `<target>`'s shape between cube and sphere |
+| | cycle `<target>`'s shape — cube, sphere, cone, and onward |
 | | change `<target>`'s size by `<amount>` |
+| | stretch `<target>`'s `<axis>` by `<amount>`, independent of the others |
 | | fly `<direction>` — only while flying, see the tile below |
 | | switch between walking and flying |
 | | add a new `<kind>`, see-through until placed again to confirm it |
@@ -719,12 +720,18 @@ There is a **▶ 3D** button at the top of the browser editor. It opens a second
 tab where the same world stands up off the page: every character becomes a
 block on a board you can turn with one finger and pinch to zoom. The glyph you
 chose sits on top of its block, so a `@` is still a `@`, and the colours are the
-ones you picked. A character can be a sphere instead of a block, can be
-resized, and can fly (a toggle switches it between walking, grounded, and
-flying, free to change altitude) — and a new tile lets you place a full-size
-object where you stand, see-through until you press it again to confirm it.
-The camera itself orbits *you*, not the middle of the board, so the world
-reads as a place you are standing in rather than a diorama seen from outside.
+ones you picked, from a palette of nineteen (**colour `<name>`**, in the DO
+tiles). A character can be one of seven shapes — cube, sphere, cone,
+cylinder, pyramid, wedge, or octahedron — cycled by the `shape` tile, and
+can be resized: uniformly (`resize`) or one axis at a time (`stretch` —
+width, height, and depth independent of each other and of the object's
+overall size, for a squashed, stretched, or elongated look no uniform
+resize can reach). It can also fly (a toggle switches it between walking,
+grounded, and flying, free to change altitude) — and a new tile lets you
+place a full-size object where you stand, see-through until you press it
+again to confirm it. The camera itself orbits *you*, not the middle of the
+board, so the world reads as a place you are standing in rather than a
+diorama seen from outside.
 
 Every button on screen — the movement pad, the top bar, the button drawer's
 own bubbles — can be dragged, resized, and faded from a button editor built
@@ -738,8 +745,9 @@ Build mode turns the tab into a level editor: pick a kind from a searchable
 palette and place it where you stand, or design an entirely new multi-part
 shape from scratch in the Mesh Creator and it joins the palette alongside
 everything the game already defines. Tapping anything already in the world
-opens the Object Inspector — recolour it, resize it, flip its shape, move it,
-duplicate it, or delete it, all without touching the game's JSON by hand. A
+opens the Object Inspector — recolour it, resize it (uniformly, or stretch
+width/height/depth independently), cycle its shape, move it, duplicate it,
+or delete it, all without touching the game's JSON by hand. A
 world can also be marked "expanding," so its floor loads in around you as you
 wander instead of all at once, with new ground able to scatter things onto
 itself as it appears (`games/Game 008008.json` is a working example, with

@@ -337,15 +337,15 @@ of blocks, with each character's glyph floating over its own block.
 | **scroll wheel** | the same, with a mouse |
 | ▲ ▼ ◀ ▶ | the direction keys, for your character |
 | ● (space) | usually shoot |
-| ⟲ (`e`) | flip the touched object's shape, cube ↔ sphere |
-| + (`f`) | resize the touched object |
+| ⟲ (`e`) | cycle the touched object's shape — cube, sphere, cone, cylinder, pyramid, wedge, octahedron |
+| + (`f`) | resize the touched object (uniformly — see 🎯 below for width/height/depth apart) |
 | ⤒ (`w`) | fly up — only while flying, see `d` below |
 | ⤓ (`s`) | fly down — only while flying |
 | ▦ (`a`) | add a 3D object where you stand, see-through until pressed again to confirm it |
 | `d` | toggle walking (grounded, `w`/`s` do nothing) ↔ flying |
 | 🗑 | arm removal — the *next* object touched is deleted, not whatever was already selected; drawer bubbles marked `locked` (the built-in ones) can never be picked this way |
 | 🎨 | Build mode: a searchable, alphabetical palette of every kind the game defines, to place where you stand — or open the Mesh Creator to design a new multi-part shape and add it to that palette. Local play only |
-| 🎯 | the Object Inspector: recolour, resize, flip the shape of, relocate, duplicate, or delete whatever you're touching (or a pending ghost from ▦, before it's even confirmed). **Tap anything in the world to select it directly**, without touching it on the ground first — a glowing ring marks the current selection. Local play only |
+| 🎯 | the Object Inspector: recolour (nineteen colours), cycle the shape (seven of them), resize uniformly or stretch width/height/depth independently ("reset stretch to size" undoes just the stretch), relocate, duplicate, or delete whatever you're touching (or a pending ghost from ▦, before it's even confirmed). **Tap anything in the world to select it directly**, without touching it on the ground first — a glowing ring marks the current selection. Local play only |
 | **restart** | starts the game again from the beginning (local play only) |
 | **recentre** | puts the camera back where it started |
 | **save** / **save as new** | quick-saves back to the file this world came from, or always asks for a new name |

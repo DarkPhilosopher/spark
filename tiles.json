@@ -382,7 +382,7 @@
     },
     {
       "id": "shape",
-      "label": "flip {target}'s shape between cube and sphere",
+      "label": "cycle {target}'s shape: cube, sphere, cone, and onward",
       "params": [
         {
           "name": "target",
@@ -409,6 +409,40 @@
             "self"
           ],
           "default": "it"
+        },
+        {
+          "name": "amount",
+          "prompt": "By how much? (percent points, can be negative)",
+          "kind": "int",
+          "choices": [],
+          "default": 25
+        }
+      ]
+    },
+    {
+      "id": "stretch",
+      "label": "stretch {target}'s {axis} by {amount}, independent of the others",
+      "params": [
+        {
+          "name": "target",
+          "prompt": "Stretch whom?",
+          "kind": "choice",
+          "choices": [
+            "it",
+            "self"
+          ],
+          "default": "it"
+        },
+        {
+          "name": "axis",
+          "prompt": "Which one?",
+          "kind": "choice",
+          "choices": [
+            "x",
+            "y",
+            "z"
+          ],
+          "default": "x"
         },
         {
           "name": "amount",
@@ -705,7 +739,17 @@
     "magenta",
     "cyan",
     "grey",
-    "pink"
+    "pink",
+    "orange",
+    "purple",
+    "brown",
+    "black",
+    "lime",
+    "teal",
+    "navy",
+    "maroon",
+    "gold",
+    "silver"
   ],
   "directions": [
     "up",

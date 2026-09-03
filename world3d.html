@@ -604,7 +604,7 @@
     </div>
     <div class="row">
       <label style="flex:1">shape
-        <select id="mesh-part-shape"><option value="cube">cube</option><option value="sphere">sphere</option><option value="cone">cone</option></select>
+        <select id="mesh-part-shape"></select>
       </label>
       <label style="flex:1">color <select id="mesh-part-color"></select></label>
     </div>
@@ -656,13 +656,22 @@
     <div class="row">
       <label style="flex:1">color <select id="inspect-color"></select></label>
       <label style="flex:1">shape
-        <select id="inspect-shape"><option value="cube">cube</option><option value="sphere">sphere</option><option value="cone">cone</option></select>
+        <select id="inspect-shape"></select>
       </label>
     </div>
     <div class="row">
-      <label style="flex:2">size <input id="inspect-size" type="range" min="20" max="300" step="1" value="100"></label>
+      <label style="flex:2">size (all three axes) <input id="inspect-size" type="range" min="20" max="300" step="1" value="100"></label>
       <input id="inspect-size-num" type="number" step="1" min="20" max="300" value="100">
     </div>
+    <!-- Stretch: each axis independent of size and of the other two --
+         see the `stretch` tile. Changing size (above) resets all three
+         back to matching it; these only take effect once moved. -->
+    <div class="row">
+      <label style="flex:1">width <input id="inspect-sx" type="range" min="20" max="300" step="1"></label>
+      <label style="flex:1">height <input id="inspect-sy" type="range" min="20" max="300" step="1"></label>
+      <label style="flex:1">depth <input id="inspect-sz" type="range" min="20" max="300" step="1"></label>
+    </div>
+    <div class="row"><button id="inspect-unstretch">reset stretch to size</button></div>
     <div class="row">
       <label style="flex:1">x <input id="inspect-x" type="number" step="1"></label>
       <label style="flex:1">y <input id="inspect-y" type="number" step="1"></label>
@@ -931,8 +940,12 @@ class Thing {
     this.health = template.health === undefined ? 1 : template.health;
     this.solid = !!template.solid;
     this.role = template.role || "prop";
-    this.shape = template.shape || "cube";   // "cube" | "sphere"
+    this.shape = template.shape || "cube";   // one of SHAPES, defined below
     this.size = template.size === undefined ? 100 : template.size; // percent
+    // Per-axis overrides, percent like size -- undefined means "use size",
+    // the same on all three axes, until something explicitly stretches
+    // just one of them (see the `stretch` tile, and buildThings() below).
+    this.sx = template.sx; this.sy = template.sy; this.sz = template.sz;
     this.z = template.z === undefined ? 0 : template.z; // altitude, 0 = ground
     this.full = !!template.full;     // fills its whole grid cell
     this.ghost = !!template.ghost;   // placed but not confirmed yet
@@ -1033,14 +1046,31 @@ const ACTIONS = {
   spawn: (obj, world, a) => { world.spawnSomewhere(a.kind); },
   shape: (obj, world, a, it) => {
     const victim = a.target === "self" ? obj : it;
-    if (victim) victim.shape = victim.shape === "sphere" ? "cube" : "sphere";
+    if (victim) {
+      const at = SHAPES.indexOf(victim.shape || "cube");
+      victim.shape = SHAPES[(at + 1) % SHAPES.length];
+    }
   },
   resize: (obj, world, a, it) => {
     const victim = a.target === "self" ? obj : it;
     if (victim) {
       const size = (victim.size === undefined ? 100 : victim.size) + num(a.amount, 25);
       victim.size = Math.max(40, Math.min(220, size));
+      // Uniform on purpose: any earlier stretch (see below) is exactly the
+      // kind of thing "resize the whole object" should undo, not leave
+      // stacked underneath a new overall size.
+      victim.sx = victim.sy = victim.sz = undefined;
     }
+  },
+  // Independent of resize: only one axis moves, the other two keep
+  // whatever they already were (size, or an earlier stretch of their own).
+  stretch: (obj, world, a, it) => {
+    const victim = a.target === "self" ? obj : it;
+    if (!victim) return;
+    const field = "s" + (a.axis === "y" || a.axis === "z" ? a.axis : "x");
+    const base = victim.size === undefined ? 100 : victim.size;
+    const current = victim[field] === undefined ? base : victim[field];
+    victim[field] = Math.max(40, Math.min(220, current + num(a.amount, 25)));
   },
   fly: (obj, world, a) => {
     if (!obj.flying) return;   // walking mode -- grounded, fly buttons do nothing
@@ -1312,11 +1342,17 @@ const COLOR_RGB = {
   white: [0.91, 0.92, 0.93], red: [0.82, 0.33, 0.31], green: [0.36, 0.85, 0.50],
   yellow: [0.88, 0.75, 0.29], blue: [0.29, 0.53, 0.78], magenta: [0.73, 0.41, 0.78],
   cyan: [0.30, 0.82, 0.88], grey: [0.55, 0.58, 0.63], pink: [0.93, 0.55, 0.68],
+  orange: [0.95, 0.55, 0.15], purple: [0.58, 0.35, 0.75], brown: [0.55, 0.38, 0.24],
+  black: [0.10, 0.10, 0.12], lime: [0.65, 0.90, 0.25], teal: [0.20, 0.65, 0.62],
+  navy: [0.14, 0.20, 0.45], maroon: [0.45, 0.14, 0.18], gold: [0.85, 0.70, 0.20],
+  silver: [0.75, 0.77, 0.80],
 };
 const COLOR_CSS = {
   white: "#e8eaed", red: "#d0554f", green: "#5dd97f", yellow: "#e0c04a",
   blue: "#4a86c7", magenta: "#b968c7", cyan: "#4dd0e1", grey: "#8b93a1",
-  pink: "#ed8cae",
+  pink: "#ed8cae", orange: "#f28c26", purple: "#9459bf", brown: "#8c613d",
+  black: "#1a1a1f", lime: "#a6e640", teal: "#33a69e", navy: "#243373",
+  maroon: "#73242e", gold: "#d9b333", silver: "#bfc4cc",
 };
 
 // -- the smallest amount of matrix maths that will do ----------------------
@@ -1469,6 +1505,126 @@ function pushCone(out, x, y, z, sx, sy, sz, rgb, alpha = 1) {
   }
 }
 
+/* A low-poly cylinder: the same rim-of-points trick as pushCone, but with a
+ * second rim at the top instead of tapering to a point, and both ends
+ * capped. */
+function pushCylinder(out, x, y, z, sx, sy, sz, rgb, alpha = 1) {
+  const SIDES = 10;
+  const cx = x + sx / 2, cz = z + sz / 2;
+  const rx = sx / 2, rz = sz / 2;
+  const bottom = [cx, y, cz], top = [cx, y + sy, cz];
+  const lo = [], hi = [];
+  for (let i = 0; i <= SIDES; i++) {
+    const a = (i / SIDES) * Math.PI * 2;
+    lo.push([cx + Math.cos(a) * rx, y, cz + Math.sin(a) * rz]);
+    hi.push([cx + Math.cos(a) * rx, y + sy, cz + Math.sin(a) * rz]);
+  }
+  const face = (a, b, c) => {
+    const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
+    const vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+    let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    const len = Math.hypot(nx, ny, nz) || 1;
+    nx /= len; ny /= len; nz /= len;
+    for (const p of [a, b, c])
+      out.push(p[0], p[1], p[2], nx, ny, nz, rgb[0], rgb[1], rgb[2], alpha);
+  };
+  for (let i = 0; i < SIDES; i++) {
+    face(lo[i], lo[i + 1], hi[i + 1]);     // the side, split in two
+    face(lo[i], hi[i + 1], hi[i]);
+    face(bottom, lo[i + 1], lo[i]);        // the bottom cap
+    face(top, hi[i], hi[i + 1]);           // the top cap
+  }
+}
+
+/* A square pyramid: the box's own four corners as the base -- unlike a
+ * SIDES=4 cone (whose base would be a diamond, points at the box's edge
+ * midpoints, not its corners), this one's footprint lines up exactly with
+ * a cube's, so a building made of both sits flush. */
+function pushPyramid(out, x, y, z, sx, sy, sz, rgb, alpha = 1) {
+  const apex = [x + sx / 2, y + sy, z + sz / 2];
+  const base = [[x, y, z], [x + sx, y, z], [x + sx, y, z + sz], [x, y, z + sz]];
+  const face = (a, b, c) => {
+    const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
+    const vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+    let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    const len = Math.hypot(nx, ny, nz) || 1;
+    nx /= len; ny /= len; nz /= len;
+    for (const p of [a, b, c])
+      out.push(p[0], p[1], p[2], nx, ny, nz, rgb[0], rgb[1], rgb[2], alpha);
+  };
+  for (let i = 0; i < 4; i++) face(base[i], base[(i + 1) % 4], apex);
+  face(base[0], base[2], base[1]);   // the base, two triangles
+  face(base[0], base[3], base[2]);
+}
+
+/* A wedge (a ramp, or a mono-pitch roof): full height at z, sloping down to
+ * nothing at z+sz. Eight triangles: the sloped face, the tall back face,
+ * the flat bottom, and a triangle closing each open side. */
+function pushWedge(out, x, y, z, sx, sy, sz, rgb, alpha = 1) {
+  const p = (dx, dy, dz) => [x + dx * sx, y + dy * sy, z + dz * sz];
+  const face = (a, b, c) => {
+    const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
+    const vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+    let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    const len = Math.hypot(nx, ny, nz) || 1;
+    nx /= len; ny /= len; nz /= len;
+    for (const pt of [a, b, c])
+      out.push(pt[0], pt[1], pt[2], nx, ny, nz, rgb[0], rgb[1], rgb[2], alpha);
+  };
+  const bl = p(0, 0, 0), br = p(1, 0, 0), fl = p(0, 0, 1), fr = p(1, 0, 1);
+  const tl = p(0, 1, 0), tr = p(1, 1, 0);
+  face(bl, br, fr); face(bl, fr, fl);      // bottom
+  face(bl, tl, tr); face(bl, tr, br);      // the tall back face
+  face(tl, fl, fr); face(tl, fr, tr);      // the slope
+  face(bl, fl, tl);                        // left end
+  face(br, tr, fr);                        // right end
+}
+
+/* An octahedron (a gem/diamond): two four-sided pyramids base to base at
+ * the box's mid-height, points at the very top and bottom. */
+function pushOctahedron(out, x, y, z, sx, sy, sz, rgb, alpha = 1) {
+  const cx = x + sx / 2, cz = z + sz / 2, midY = y + sy / 2;
+  const top = [cx, y + sy, cz], bottom = [cx, y, cz];
+  const belt = [[cx, midY, z], [x + sx, midY, cz], [cx, midY, z + sz], [x, midY, cz]];
+  const face = (a, b, c) => {
+    const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
+    const vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+    let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    const len = Math.hypot(nx, ny, nz) || 1;
+    nx /= len; ny /= len; nz /= len;
+    for (const p of [a, b, c])
+      out.push(p[0], p[1], p[2], nx, ny, nz, rgb[0], rgb[1], rgb[2], alpha);
+  };
+  for (let i = 0; i < 4; i++) {
+    face(belt[i], belt[(i + 1) % 4], top);
+    face(belt[(i + 1) % 4], belt[i], bottom);
+  }
+}
+
+// Every shape a character or a mesh part can be, and where its geometry
+// comes from -- one place to add to when a new push*() joins the others
+// above. cube stays the default for anything unrecognised (an older save,
+// a typo in someone's own tile), the same as before this list existed.
+const SHAPES = ["cube", "sphere", "cone", "cylinder", "pyramid", "wedge", "octahedron"];
+
+// Which shapes read their own height from `size` alone, round and compact
+// like a sphere, rather than the taller/shorter role-based height every
+// other shape uses -- a squashed gem reads wrong the way a squashed cone
+// or cylinder still reads fine as a shorter cone or cylinder.
+const ROUND_HEIGHT_SHAPES = new Set(["sphere", "octahedron"]);
+
+function pushShape(shape, out, x, y, z, sx, sy, sz, rgb, alpha) {
+  switch (shape) {
+    case "sphere": return pushSphere(out, x, y, z, sx, sy, sz, rgb, alpha);
+    case "cone": return pushCone(out, x, y, z, sx, sy, sz, rgb, alpha);
+    case "cylinder": return pushCylinder(out, x, y, z, sx, sy, sz, rgb, alpha);
+    case "pyramid": return pushPyramid(out, x, y, z, sx, sy, sz, rgb, alpha);
+    case "wedge": return pushWedge(out, x, y, z, sx, sy, sz, rgb, alpha);
+    case "octahedron": return pushOctahedron(out, x, y, z, sx, sy, sz, rgb, alpha);
+    default: return pushBox(out, x, y, z, sx, sy, sz, rgb, undefined, alpha);
+  }
+}
+
 class Renderer {
   constructor(canvas) {
     this.canvas = canvas;
@@ -1609,28 +1765,37 @@ class Renderer {
           const px = cx + (part.dx || 0) - sx / 2;
           const py = baseY + (part.dz || 0);
           const pz = cz + (part.dy || 0) - sz / 2;
-          if (part.shape === "sphere") pushSphere(data, px, py, pz, sx, sy, sz, prgb, alpha);
-          else if (part.shape === "cone") pushCone(data, px, py, pz, sx, sy, sz, prgb, alpha);
-          else pushBox(data, px, py, pz, sx, sy, sz, prgb, undefined, alpha);
+          pushShape(part.shape || "cube", data, px, py, pz, sx, sy, sz, prgb, alpha);
         }
         continue;
       }
       const shot = thing.kind === "shot";
-      const scale = shot ? 1 : (thing.size === undefined ? 100 : thing.size) / 100;
       const shape = thing.shape || "cube";
-      const sphere = shape === "sphere";
+      const round = ROUND_HEIGHT_SHAPES.has(shape);
       const tall = thing.role === "player" ? 1.15 : (thing.solid ? 1.0 : 0.75);
       // "full" fills its whole grid cell edge to edge and floor to ceiling --
       // for placed/buildable objects, not the smaller action-demo props.
-      const size = thing.full ? 1.0 : (shot ? 0.34 : 0.86) * scale;
-      const height = shot ? 0.34 : (sphere ? size : (thing.full ? 1.0 : tall * scale));
-      const inset = (1 - size) / 2;
+      const baseSize = thing.full ? 1.0 : (shot ? 0.34 : 0.86);
+      const baseScale = thing.size === undefined ? 100 : thing.size;
+      // sx/sz stretch width/depth independently of height; unset (the
+      // common case) just falls back to the same uniform `size` this
+      // always used. See the `stretch` tile, and Thing's constructor above.
+      const scaleX = shot ? 1 : (thing.sx === undefined ? baseScale : thing.sx) / 100;
+      const scaleZ = shot ? 1 : (thing.sz === undefined ? baseScale : thing.sz) / 100;
+      const sizeX = baseSize * scaleX, sizeZ = baseSize * scaleZ;
+      // Height: sy overrides win outright; otherwise a round shape matches
+      // its own (stretched) width so an unstretched sphere/gem stays
+      // round rather than getting squashed by the role-based height every
+      // other shape uses, and everything else keeps that role-based height.
+      const height = shot ? 0.34 : thing.full ? 1.0
+        : thing.sy !== undefined ? tall * (thing.sy / 100)
+        : round ? sizeX
+        : tall * (baseScale / 100);
+      const insetX = (1 - sizeX) / 2, insetZ = (1 - sizeZ) / 2;
       // still being placed -- see-through until pressed again to confirm it
       const alpha = thing.ghost ? 0.45 : 1;
-      const x = thing.x + inset, y = thing.z || 0, z = thing.y + inset;
-      if (sphere) pushSphere(data, x, y, z, size, height, size, rgb, alpha);
-      else if (shape === "cone") pushCone(data, x, y, z, size, height, size, rgb, alpha);
-      else pushBox(data, x, y, z, size, height, size, rgb, undefined, alpha);
+      const x = thing.x + insetX, y = thing.z || 0, z = thing.y + insetZ;
+      pushShape(shape, data, x, y, z, sizeX, height, sizeZ, rgb, alpha);
     }
     const gl = this.gl;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.thingBuf);
@@ -3020,6 +3185,12 @@ function setupMeshCreator() {
     opt.value = name; opt.textContent = name;
     colorSelect.appendChild(opt);
   }
+  const shapeSelect = $("#mesh-part-shape");
+  for (const name of SHAPES) {
+    const opt = document.createElement("option");
+    opt.value = name; opt.textContent = name;
+    shapeSelect.appendChild(opt);
+  }
 
   $("#mesh-add-part").onclick = () => {
     meshParts.push({shape: "cube", dx: 0, dy: 0, dz: 0, sx: 0.5, sy: 0.5, sz: 0.5, color: "white"});
@@ -3258,6 +3429,9 @@ function openInspector(pickedTarget) {
   const size = target.size === undefined ? 100 : target.size;
   $("#inspect-size").value = size;
   $("#inspect-size-num").value = size;
+  $("#inspect-sx").value = target.sx === undefined ? size : target.sx;
+  $("#inspect-sy").value = target.sy === undefined ? size : target.sy;
+  $("#inspect-sz").value = target.sz === undefined ? size : target.sz;
   $("#inspect-x").value = target.x;
   $("#inspect-y").value = target.y;
   $("#inspect-z").value = target.z || 0;
@@ -3271,6 +3445,26 @@ function applyInspectorSize(fromSlider) {
   $("#inspect-size").value = v;
   $("#inspect-size-num").value = v;
   inspectTarget.size = v;
+  // Uniform on purpose, same reasoning as the resize tile: dragging the
+  // overall size undoes any earlier per-axis stretch rather than leaving
+  // it stacked underneath a new size the three sliders would then disagree
+  // with.
+  inspectTarget.sx = inspectTarget.sy = inspectTarget.sz = undefined;
+  $("#inspect-sx").value = $("#inspect-sy").value = $("#inspect-sz").value = v;
+}
+
+function applyInspectorStretch(axis) {
+  if (!inspectTarget || !inspectTarget.alive) return;
+  const v = Math.max(20, Math.min(300, parseFloat($("#inspect-s" + axis).value) || 100));
+  $("#inspect-s" + axis).value = v;
+  inspectTarget["s" + axis] = v;
+}
+
+function resetInspectorStretch() {
+  if (!inspectTarget || !inspectTarget.alive) return;
+  const size = inspectTarget.size === undefined ? 100 : inspectTarget.size;
+  inspectTarget.sx = inspectTarget.sy = inspectTarget.sz = undefined;
+  $("#inspect-sx").value = $("#inspect-sy").value = $("#inspect-sz").value = size;
 }
 
 function applyInspectorPosition() {
@@ -3293,6 +3487,12 @@ function setupInspector() {
     opt.value = name; opt.textContent = name;
     colorSelect.appendChild(opt);
   }
+  const shapeSelect = $("#inspect-shape");
+  for (const name of SHAPES) {
+    const opt = document.createElement("option");
+    opt.value = name; opt.textContent = name;
+    shapeSelect.appendChild(opt);
+  }
   colorSelect.addEventListener("change", () => {
     if (inspectTarget && inspectTarget.alive) inspectTarget.color = colorSelect.value;
   });
@@ -3304,6 +3504,9 @@ function setupInspector() {
   });
   $("#inspect-size").addEventListener("input", () => applyInspectorSize(true));
   $("#inspect-size-num").addEventListener("input", () => applyInspectorSize(false));
+  for (const axis of ["x", "y", "z"])
+    $("#inspect-s" + axis).addEventListener("input", () => applyInspectorStretch(axis));
+  $("#inspect-unstretch").onclick = resetInspectorStretch;
   for (const id of ["inspect-x", "inspect-y", "inspect-z"]) {
     $("#" + id).addEventListener("input", applyInspectorPosition);
     $("#" + id).addEventListener("change", applyInspectorPosition);
@@ -3318,6 +3521,7 @@ function setupInspector() {
     // was born with.
     copy.color = inspectTarget.color;
     copy.size = inspectTarget.size;
+    copy.sx = inspectTarget.sx; copy.sy = inspectTarget.sy; copy.sz = inspectTarget.sz;
     copy.shape = inspectTarget.shape;
     copy.z = inspectTarget.z;
     drawerToast("duplicated");
