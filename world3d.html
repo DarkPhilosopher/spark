@@ -596,7 +596,7 @@
     </div>
     <div class="row">
       <label style="flex:1">shape
-        <select id="mesh-part-shape"><option value="cube">cube</option><option value="sphere">sphere</option></select>
+        <select id="mesh-part-shape"><option value="cube">cube</option><option value="sphere">sphere</option><option value="cone">cone</option></select>
       </label>
       <label style="flex:1">color <select id="mesh-part-color"></select></label>
     </div>
@@ -648,7 +648,7 @@
     <div class="row">
       <label style="flex:1">color <select id="inspect-color"></select></label>
       <label style="flex:1">shape
-        <select id="inspect-shape"><option value="cube">cube</option><option value="sphere">sphere</option></select>
+        <select id="inspect-shape"><option value="cube">cube</option><option value="sphere">sphere</option><option value="cone">cone</option></select>
       </label>
     </div>
     <div class="row">
@@ -1278,11 +1278,12 @@ const MIN_DIST = 4, MAX_DIST = 900;
 const COLOR_RGB = {
   white: [0.91, 0.92, 0.93], red: [0.82, 0.33, 0.31], green: [0.36, 0.85, 0.50],
   yellow: [0.88, 0.75, 0.29], blue: [0.29, 0.53, 0.78], magenta: [0.73, 0.41, 0.78],
-  cyan: [0.30, 0.82, 0.88], grey: [0.55, 0.58, 0.63],
+  cyan: [0.30, 0.82, 0.88], grey: [0.55, 0.58, 0.63], pink: [0.93, 0.55, 0.68],
 };
 const COLOR_CSS = {
   white: "#e8eaed", red: "#d0554f", green: "#5dd97f", yellow: "#e0c04a",
   blue: "#4a86c7", magenta: "#b968c7", cyan: "#4dd0e1", grey: "#8b93a1",
+  pink: "#ed8cae",
 };
 
 // -- the smallest amount of matrix maths that will do ----------------------
@@ -1406,6 +1407,35 @@ function pushSphere(out, x, y, z, sx, sy, sz, rgb, alpha = 1) {
   }
 }
 
+/* A low-poly cone inscribed the same way pushBox/pushSphere are: a circular
+ * base at the bottom of the box, tapering to a point at the top. Same flat-
+ * face-normal approach as pushSphere, for the same faceted look. */
+function pushCone(out, x, y, z, sx, sy, sz, rgb, alpha = 1) {
+  const SIDES = 10;
+  const cx = x + sx / 2, cz = z + sz / 2;
+  const rx = sx / 2, rz = sz / 2;
+  const apex = [cx, y + sy, cz];
+  const bottom = [cx, y, cz];
+  const rim = [];
+  for (let i = 0; i <= SIDES; i++) {
+    const a = (i / SIDES) * Math.PI * 2;
+    rim.push([cx + Math.cos(a) * rx, y, cz + Math.sin(a) * rz]);
+  }
+  const face = (a, b, c) => {
+    const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
+    const vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+    let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    const len = Math.hypot(nx, ny, nz) || 1;
+    nx /= len; ny /= len; nz /= len;
+    for (const p of [a, b, c])
+      out.push(p[0], p[1], p[2], nx, ny, nz, rgb[0], rgb[1], rgb[2], alpha);
+  };
+  for (let i = 0; i < SIDES; i++) {
+    face(rim[i], rim[i + 1], apex);        // the slope
+    face(bottom, rim[i + 1], rim[i]);      // the base cap
+  }
+}
+
 class Renderer {
   constructor(canvas) {
     this.canvas = canvas;
@@ -1488,28 +1518,44 @@ class Renderer {
   /* The board only changes when the game does, so it is built once and kept.
      Gray + light blue, not the old near-black -- see ~/spark/CLAUDE.md
      "design preference". */
-  buildFloor(width, height) {
+  /* cx/cy, when given, build only a window around that point instead of
+     the whole board -- "loads more baseplate the further you go" for a
+     game whose world is set to `expanding` (see frame()'s periodic
+     rebuild and startLocal()/startLive()'s initial call). Every other
+     game never passes them, so this behaves exactly as it always has for
+     everything except a game that explicitly opts in. */
+  buildFloor(width, height, cx, cy) {
     const data = [];
-    for (let y = 0; y < height; y++)
-      for (let x = 0; x < width; x++) {
+    const windowed = cx !== undefined;
+    const RADIUS = 26;
+    const x0 = windowed ? Math.max(0, Math.floor(cx - RADIUS)) : 0;
+    const x1 = windowed ? Math.min(width, Math.ceil(cx + RADIUS)) : width;
+    const y0 = windowed ? Math.max(0, Math.floor(cy - RADIUS)) : 0;
+    const y1 = windowed ? Math.min(height, Math.ceil(cy + RADIUS)) : height;
+    for (let y = y0; y < y1; y++)
+      for (let x = x0; x < x1; x++) {
         const dark = (x + y) % 2 === 0;
         const shade = dark ? [0.42, 0.46, 0.52] : [0.50, 0.54, 0.60];
         pushBox(data, x, -0.35, y, 1, 0.35, 1, shade, [FACES[0]]);
       }
-    // a low wall around the edge, so you can see where the world stops
+    // a low wall, only where the current window actually reaches a true
+    // edge of the board -- never floating in the middle of a huge one,
+    // only ever where the world genuinely stops.
     const rim = [0.58, 0.63, 0.70];
-    pushBox(data, -0.4, -0.35, -0.4, width + 0.8, 0.35, 0.4, rim);
-    pushBox(data, -0.4, -0.35, height, width + 0.8, 0.35, 0.4, rim);
-    pushBox(data, -0.4, -0.35, 0, 0.4, 0.35, height, rim);
-    pushBox(data, width, -0.35, 0, 0.4, 0.35, height, rim);
+    if (y0 <= 0) pushBox(data, x0 - 0.4, -0.35, -0.4, (x1 - x0) + 0.8, 0.35, 0.4, rim);
+    if (y1 >= height) pushBox(data, x0 - 0.4, -0.35, height, (x1 - x0) + 0.8, 0.35, 0.4, rim);
+    if (x0 <= 0) pushBox(data, -0.4, -0.35, y0, 0.4, 0.35, (y1 - y0), rim);
+    if (x1 >= width) pushBox(data, width, -0.35, y0, 0.4, 0.35, (y1 - y0), rim);
 
     const gl = this.gl;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.floorBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.DYNAMIC_DRAW);
     this.floorCount = data.length / 10;
-    this.centre = [width / 2, 0, height / 2];
     this.board = [width, height];
-    this.frameBoard();
+    if (!windowed) {
+      this.centre = [width / 2, 0, height / 2];
+      this.frameBoard();
+    }
   }
 
   /* Characters change every tick, so their mesh is thrown away and remade. */
@@ -1531,13 +1577,15 @@ class Renderer {
           const py = baseY + (part.dz || 0);
           const pz = cz + (part.dy || 0) - sz / 2;
           if (part.shape === "sphere") pushSphere(data, px, py, pz, sx, sy, sz, prgb, alpha);
+          else if (part.shape === "cone") pushCone(data, px, py, pz, sx, sy, sz, prgb, alpha);
           else pushBox(data, px, py, pz, sx, sy, sz, prgb, undefined, alpha);
         }
         continue;
       }
       const shot = thing.kind === "shot";
       const scale = shot ? 1 : (thing.size === undefined ? 100 : thing.size) / 100;
-      const sphere = thing.shape === "sphere";
+      const shape = thing.shape || "cube";
+      const sphere = shape === "sphere";
       const tall = thing.role === "player" ? 1.15 : (thing.solid ? 1.0 : 0.75);
       // "full" fills its whole grid cell edge to edge and floor to ceiling --
       // for placed/buildable objects, not the smaller action-demo props.
@@ -1548,6 +1596,7 @@ class Renderer {
       const alpha = thing.ghost ? 0.45 : 1;
       const x = thing.x + inset, y = thing.z || 0, z = thing.y + inset;
       if (sphere) pushSphere(data, x, y, z, size, height, size, rgb, alpha);
+      else if (shape === "cone") pushCone(data, x, y, z, size, height, size, rgb, alpha);
       else pushBox(data, x, y, z, size, height, size, rgb, undefined, alpha);
     }
     const gl = this.gl;
@@ -1649,6 +1698,9 @@ let renderer = null;
 let world = null;             // the local engine's world, when running locally
 let project = null;           // the game data
 let lastSaveName = null;      // the file "save" quick-saves back over
+let floorCenter = null;       // [x, y] the floor was last built around -- only used by an "expanding" world
+const FLOOR_REBUILD_DIST = 12;   // how far you can wander before more baseplate loads in
+const scatteredChunks = new Set();   // chunk keys already auto-populated, "expanding" worlds only
 let live = false;             // are we mirroring a real server?
 let liveSnapshot = null;
 let forcedLocal = false;      // the user pressed "run here"
@@ -1732,7 +1784,17 @@ function startLocal() {
   // any one game -- carry it over rather than losing it on every restart.
   const remembered = loadEditorSettings().paletteKind;
   if (remembered && world.templates[remembered]) world.memory.palette_kind = remembered;
-  renderer.buildFloor(world.width, world.height);
+  if (project.world && project.world.expanding) {
+    scatteredChunks.clear();   // a fresh world -- forget what was already scattered
+    const player = world.things.find(t => t.role === "player");
+    floorCenter = player ? [player.x, player.y] : [world.width / 2, world.height / 2];
+    renderer.buildFloor(world.width, world.height, floorCenter[0], floorCenter[1]);
+    renderer.centre = [floorCenter[0], 0, floorCenter[1]];
+    renderer.frameBoard();
+  } else {
+    floorCenter = null;
+    renderer.buildFloor(world.width, world.height);
+  }
   setSource("local", "RUNNING HERE");
   $("#mode").textContent = forcedLocal ? "go live" : "reload";
   if (stepTimer) clearInterval(stepTimer);
@@ -1799,6 +1861,50 @@ function currentHud() {
           status: world.status, name: project.name};
 }
 
+// -- an "expanding" world: more baseplate loads in the further you go ------
+//
+// Local play only, same reasoning as the palette/inspector: this rebuilds
+// renderer.buildFloor() around wherever the player currently is, which
+// only exists for the copy of the game running in this browser tab. Opt-in
+// per game via project.world.expanding -- every other game never calls
+// this at all (maybeExpandFloor returns immediately), so nothing here can
+// affect a game that doesn't ask for it.
+const SCATTER_CHUNK = 10;   // cells per side of one "already decorated" region
+
+function maybeExpandFloor(me) {
+  if (!me || !world || live || !project.world || !project.world.expanding) return;
+  if (floorCenter && Math.hypot(me.x - floorCenter[0], me.y - floorCenter[1]) < FLOOR_REBUILD_DIST) return;
+  floorCenter = [me.x, me.y];
+  renderer.buildFloor(world.width, world.height, me.x, me.y);
+  scatterNewChunks(me.x, me.y);
+}
+
+// Any character template with `autoScatter: true` gets a chance to appear
+// once per newly-revealed chunk, at a random empty cell in it -- generic,
+// not specific to any one kind, so it's "cones are pink and autoScatter"
+// that makes cones appear, not special-cased cone logic here.
+function scatterNewChunks(cx, cy) {
+  const reach = Math.ceil(26 / SCATTER_CHUNK) + 1;
+  const baseX = Math.floor(cx / SCATTER_CHUNK), baseY = Math.floor(cy / SCATTER_CHUNK);
+  for (let dcy = -reach; dcy <= reach; dcy++) {
+    for (let dcx = -reach; dcx <= reach; dcx++) {
+      const key = (baseX + dcx) + "," + (baseY + dcy);
+      if (scatteredChunks.has(key)) continue;
+      scatteredChunks.add(key);
+      for (const kind of Object.keys(world.templates)) {
+        const tpl = world.templates[kind];
+        if (!tpl.autoScatter) continue;
+        if (Math.random() > (tpl.scatterChance === undefined ? 0.3 : tpl.scatterChance)) continue;
+        const x = (baseX + dcx) * SCATTER_CHUNK + Math.floor(Math.random() * SCATTER_CHUNK);
+        const y = (baseY + dcy) * SCATTER_CHUNK + Math.floor(Math.random() * SCATTER_CHUNK);
+        if (!world.inBounds(x, y)) continue;
+        if (world.things.some(o => o.alive && o.x === x && o.y === y)) continue;
+        world.spawn(kind, x, y);
+      }
+    }
+  }
+}
+
 // -- the frame -------------------------------------------------------------
 const labelPool = [];
 
@@ -1813,6 +1919,7 @@ function frame() {
     renderer.centre[1] = 0.9 + (me.z || 0);
     renderer.centre[2] = me.y + 0.5;
   }
+  maybeExpandFloor(me);
   renderer.buildThings(things);
   renderer.draw();
   drawGlyphs(things);
@@ -2371,8 +2478,11 @@ function buildSaveProject() {
     .map(kind => ({...world.templates[kind], kind, count: counts[kind] || 0}));
   return {
     name: (project && project.name) || "barren",
-    world: {width: world.width, height: world.height, wrap: world.wrap,
-            speed: (project && project.world && project.world.speed) || 6},
+    // spread the original world settings first, so a custom field like
+    // `expanding` survives a save/reload -- then override with whatever
+    // is actually live right now.
+    world: {...(project && project.world), width: world.width, height: world.height,
+            wrap: world.wrap, speed: (project && project.world && project.world.speed) || 6},
     characters,
     tiles: (project && project.tiles) || [],
   };

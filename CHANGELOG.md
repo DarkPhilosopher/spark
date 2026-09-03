@@ -16,6 +16,44 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ### Added
 
+- **`games/Game 008008.json`** — a 200×200 "expanding" world: the floor
+  loads in around wherever you are, in a moving window, instead of the
+  whole board being built at once, and it generates 2-block-tall pink
+  cones as new ground reveals itself. Two new general capabilities, not
+  special-cased to this one game:
+
+  - `world.expanding: true` on any game's world settings switches its
+    floor to windowed loading — `Renderer.buildFloor()` takes an optional
+    centre now, and re-centres on the player once they wander far enough
+    (`frame()`'s `maybeExpandFloor()`). Every other game never passes a
+    centre, so this changes nothing for anything that doesn't opt in.
+  - `autoScatter: true` (+ optional `scatterChance`, default 0.3) on any
+    character template gives it a chance to appear once per newly-loaded
+    region, at a random empty cell in it. Which kind gets scattered is
+    just data — Game 008008 makes it cones by putting the flag on the
+    cone template, nothing about scattering itself knows what a cone is.
+
+  Local play only, same reasoning as Build mode/the Inspector: it works
+  by rebuilding the live `Renderer`'s own floor buffer, which only exists
+  for the browser tab actually running the 3D view.
+
+  **New shape: cone.** A third option next to cube/sphere everywhere
+  shape already appeared — `pushCone()` (a low-poly cone, same flat-face-
+  normal approach as the sphere), the Mesh Creator's part shape, and the
+  Inspector's shape selector all got it.
+
+  **New colour: pink**, added to `COLORS` in `engine/world.py` (which
+  `tiles.json`'s colour list is generated from) and mirrored in
+  `world3d.html`'s `COLOR_RGB`/`COLOR_CSS` — the usual two-engine pairing,
+  even though this one's just a name and two numbers.
+
+  **A real bug caught building this:** `buildSaveProject()` was
+  reconstructing `world: {...}` from only `width`/`height`/`wrap`/`speed`
+  — any *other* field on a world's settings, `expanding` very much
+  included, silently vanished the moment you saved. Fixed by spreading
+  the original settings first and overriding just the four that can
+  actually change live.
+
 - **Mesh Creator and Build mode.** The Mesh Creator (🧩) builds a custom
   shape out of several cube/sphere parts, each with its own offset, size,
   and colour, previewed live in a second WebGL view (the same `Renderer`

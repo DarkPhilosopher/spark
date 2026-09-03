@@ -1,0 +1,120 @@
+{
+  "name": "Game 008008",
+  "world": {
+    "width": 200,
+    "height": 200,
+    "wrap": false,
+    "speed": 6,
+    "expanding": true
+  },
+  "characters": [
+    {
+      "kind": "hero",
+      "glyph": "@",
+      "color": "cyan",
+      "health": 3,
+      "count": 1,
+      "solid": false,
+      "role": "player",
+      "shape": "sphere",
+      "brain": [
+        {
+          "when": [{"tile": "key", "args": {"key": "up"}}],
+          "do": [{"tile": "move", "args": {"dir": "up"}}]
+        },
+        {
+          "when": [{"tile": "key", "args": {"key": "down"}}],
+          "do": [{"tile": "move", "args": {"dir": "down"}}]
+        },
+        {
+          "when": [{"tile": "key", "args": {"key": "left"}}],
+          "do": [{"tile": "move", "args": {"dir": "left"}}]
+        },
+        {
+          "when": [{"tile": "key", "args": {"key": "right"}}],
+          "do": [{"tile": "move", "args": {"dir": "right"}}]
+        },
+        {
+          "when": [{"tile": "key", "args": {"key": "space"}}],
+          "do": [{"tile": "spawn", "args": {"kind": "cube"}}]
+        },
+        {
+          "when": [
+            {"tile": "key", "args": {"key": "e"}},
+            {"tile": "touch", "args": {"kind": "cube"}}
+          ],
+          "do": [{"tile": "shape", "args": {"target": "it"}}]
+        },
+        {
+          "when": [
+            {"tile": "key", "args": {"key": "f"}},
+            {"tile": "touch", "args": {"kind": "cube"}}
+          ],
+          "do": [{"tile": "resize", "args": {"target": "it", "amount": 25}}]
+        },
+        {
+          "when": [{"tile": "key", "args": {"key": "w"}}],
+          "do": [{"tile": "fly", "args": {"dir": "up"}}]
+        },
+        {
+          "when": [{"tile": "key", "args": {"key": "s"}}],
+          "do": [{"tile": "fly", "args": {"dir": "down"}}]
+        },
+        {
+          "when": [{"tile": "key", "args": {"key": "a"}}],
+          "do": [{"tile": "place", "args": {"kind": "block"}}]
+        },
+        {
+          "when": [{"tile": "key", "args": {"key": "d"}}],
+          "do": [{"tile": "toggle_flight", "args": {}}]
+        },
+        {
+          "when": [
+            {"tile": "key", "args": {"key": "remove"}},
+            {"tile": "touch", "args": {"kind": "anything"}}
+          ],
+          "do": [{"tile": "vanish", "args": {"target": "it"}}]
+        }
+      ]
+    },
+    {
+      "kind": "cube",
+      "glyph": "c",
+      "color": "yellow",
+      "health": 1,
+      "count": 0,
+      "solid": true,
+      "role": "prop",
+      "shape": "cube",
+      "size": 100,
+      "brain": []
+    },
+    {
+      "kind": "block",
+      "glyph": "▦",
+      "color": "blue",
+      "health": 1,
+      "count": 0,
+      "solid": false,
+      "role": "prop",
+      "shape": "cube",
+      "full": true,
+      "brain": []
+    },
+    {
+      "kind": "cone",
+      "glyph": "^",
+      "color": "pink",
+      "health": 1,
+      "count": 0,
+      "solid": true,
+      "role": "prop",
+      "shape": "cone",
+      "size": 200,
+      "autoScatter": true,
+      "scatterChance": 0.35,
+      "brain": []
+    }
+  ],
+  "tiles": []
+}
