@@ -41,6 +41,16 @@
          font:700 15px/1 ui-monospace,monospace;
          text-shadow:0 1px 3px #000,0 0 6px #000;white-space:pre}
 
+  /* Ring around whichever object the Inspector currently has -- tap any
+     object in the world to pick it (see setupObjectPicking()), or it
+     follows whatever the touch-based inspect found. Projected the same
+     way a glyph is, so it tracks the object exactly as the camera moves. */
+  #select-highlight{position:absolute;top:0;left:0;width:46px;height:46px;
+      margin:-23px 0 0 -23px;border-radius:50%;pointer-events:none;
+      border:3px solid var(--accent);box-shadow:0 0 12px var(--accent);
+      display:none}
+  #select-highlight.on{display:block}
+
   /* top bar: the name and badge, then the buttons you press rarely */
   #bar{position:absolute;top:0;left:0;right:0;z-index:4;display:flex;
        flex-direction:column;gap:6px;padding:8px;
@@ -304,6 +314,11 @@
   .prop-value{font:14px/1 ui-monospace,monospace;color:var(--ink)}
   .prop-toggle{min-width:64px;min-height:34px;font-size:12px;padding:6px 10px}
   .prop-toggle.on{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+  #properties-body .row{display:flex;flex-wrap:wrap;gap:8px;width:100%}
+  #properties-body input[type=range]{flex:1}
+  #properties-body input[type=number]{flex:0 0 64px;width:64px;font:inherit;
+      color:var(--ink);background:rgba(102,109,118,.5);border:1px solid var(--line);
+      border-radius:6px;padding:6px 8px;min-height:32px}
 
   /* Compass -- a meter across the top, not a dial: ticks scroll sideways
      as the camera turns (see drawCompass()), the current heading always
@@ -357,7 +372,8 @@
   #mesh-body .row{display:flex;flex-wrap:wrap;gap:8px}
   #mesh-body label{display:flex;flex-direction:column;gap:4px;
                    font-size:11px;color:var(--dim)}
-  #mesh-body input[type=number],#mesh-body select{width:100%;min-width:0;
+  #mesh-body input[type=number],#mesh-body input[type=text],#mesh-body select{
+      width:100%;min-width:0;flex:1;
       font:inherit;color:var(--ink);background:rgba(102,109,118,.5);
       border:1px solid var(--line);border-radius:6px;padding:6px 8px;
       min-height:32px}
@@ -391,6 +407,7 @@
 <div id="stage">
   <canvas id="gl"></canvas>
   <div id="labels"></div>
+  <div id="select-highlight"></div>
 
   <div id="bar">
     <div class="barrow">
@@ -516,6 +533,13 @@
       <span class="prop-label">World time</span>
       <span id="prop-clock" class="prop-value">00:00:00</span>
     </div>
+    <div class="prop-row" style="flex-direction:column;align-items:stretch;gap:8px">
+      <span class="prop-label">Move speed (ticks per second)</span>
+      <div class="row">
+        <input id="prop-speed" type="range" min="1" max="30" step="1" value="6">
+        <input id="prop-speed-num" type="number" min="1" max="30" step="1" value="6">
+      </div>
+    </div>
   </div>
 </div>
 
@@ -579,6 +603,7 @@
   </div>
   <div id="mesh-body">
     <div class="row"><button id="palette-mesh-creator">🧩 open the Mesh Creator</button></div>
+    <div class="row"><input id="palette-search" type="text" placeholder="search…"></div>
     <div id="palette-list"></div>
   </div>
 </div>
@@ -1755,6 +1780,7 @@ function frame() {
   drawGlyphs(things);
   drawHud();
   drawCompass();
+  drawSelection();
   requestAnimationFrame(frame);
 }
 
@@ -2528,11 +2554,28 @@ function syncGridLockDisplays() {
   updateGridOverlay();
 }
 
+// Ticks per second -- the same number startLocal() already reads out of
+// project.world.speed, just changeable while the game is running instead
+// of only at the moment it (re)starts.
+function setMoveSpeed(newSpeed) {
+  const speed = Math.max(1, Math.min(30, Math.round(newSpeed) || 6));
+  project.world = project.world || {};
+  project.world.speed = speed;
+  if (world && !live && stepTimer) {
+    clearInterval(stepTimer);
+    stepTimer = setInterval(localStep, 1000 / speed);
+  }
+  return speed;
+}
+
 function setupProperties() {
   $("#properties-toggle").onclick = () => {
     if (editingButtons) return;   // the button editor owns taps for now
     $("#prop-clock").textContent = worldClockText();
     syncGridLockDisplays();
+    const speed = (project && project.world && project.world.speed) || 6;
+    $("#prop-speed").value = speed;
+    $("#prop-speed-num").value = speed;
     $("#properties-modal").classList.add("on");
   };
   $("#properties-close").onclick = () => $("#properties-modal").classList.remove("on");
@@ -2540,6 +2583,14 @@ function setupProperties() {
     gridLockOn = !gridLockOn;
     syncGridLockDisplays();
   };
+  $("#prop-speed").addEventListener("input", () => {
+    const v = setMoveSpeed($("#prop-speed").value);
+    $("#prop-speed-num").value = v;
+  });
+  $("#prop-speed-num").addEventListener("input", () => {
+    const v = setMoveSpeed($("#prop-speed-num").value);
+    $("#prop-speed").value = v;
+  });
   // Only bothers updating the DOM while the panel is actually open.
   setInterval(() => {
     if ($("#properties-modal").classList.contains("on")) {
@@ -2707,12 +2758,16 @@ function renderPaletteList() {
     return;
   }
   const current = world.memory.palette_kind;
-  const kinds = Object.keys(world.templates).filter(k => k !== "shot");
+  const query = ($("#palette-search").value || "").trim().toLowerCase();
+  const kinds = Object.keys(world.templates)
+    .filter(k => k !== "shot")
+    .filter(k => !query || k.toLowerCase().includes(query))
+    .sort((a, b) => a.localeCompare(b));
   if (!kinds.length) {
     const empty = document.createElement("div");
     empty.className = "palette-item";
     empty.style.cursor = "default";
-    empty.textContent = "(nothing to place yet)";
+    empty.textContent = query ? "(nothing matches \"" + query + "\")" : "(nothing to place yet)";
     box.appendChild(empty);
     return;
   }
@@ -2740,6 +2795,7 @@ function setupPalette() {
     $("#palette-modal").classList.remove("on");
     openMeshCreator();
   };
+  $("#palette-search").addEventListener("input", renderPaletteList);
 }
 
 /* ---------------------------------------------------------------------
@@ -2766,10 +2822,57 @@ function findInspectTarget() {
     Math.max(Math.abs(t.x - player.x), Math.abs(t.y - player.y)) <= 1) || null;
 }
 
-function openInspector() {
+/* Tap any object in the 3D view to pick it -- projects every thing to
+ * screen space the exact same way a glyph label already is, and takes
+ * whichever one lands closest to the tap, within a comfortable fingertip
+ * radius. A cheap stand-in for real ray-casting that costs nothing extra:
+ * the projection math already runs every frame for the glyphs anyway. */
+function pickObjectAt(sx, sy) {
+  if (!world) return;
+  const player = findPlayer();
+  let best = null, bestDist = 44;
+  for (const t of world.things) {
+    if (!t.alive || t === player) continue;
+    const top = (t.role === "player" ? 0.6 : 0.4) + (t.z || 0);
+    const at = renderer.project(t.x + 0.5, top, t.y + 0.5);
+    if (!at) continue;
+    const d = Math.hypot(at[0] - sx, at[1] - sy);
+    if (d < bestDist) { bestDist = d; best = t; }
+  }
+  if (best) openInspector(best);
+}
+
+// A tap selects; a drag (used for turning the camera) must not also
+// select whatever the drag happened to end on top of.
+function setupObjectPicking(canvas) {
+  let downX = 0, downY = 0, downT = 0;
+  canvas.addEventListener("pointerdown", e => {
+    downX = e.clientX; downY = e.clientY; downT = Date.now();
+  });
+  canvas.addEventListener("pointerup", e => {
+    const moved = Math.hypot(e.clientX - downX, e.clientY - downY);
+    if (moved > 12 || Date.now() - downT > 500) return;   // a drag, not a tap
+    pickObjectAt(e.clientX, e.clientY);
+  });
+}
+
+// Ring around whichever object the Inspector currently has, wherever it
+// is now -- tracked every frame the same way a glyph label is.
+function drawSelection() {
+  const el = $("#select-highlight");
+  if (!inspectTarget || !inspectTarget.alive) { el.classList.remove("on"); return; }
+  const top = (inspectTarget.role === "player" ? 0.6 : 0.4) + (inspectTarget.z || 0);
+  const at = renderer.project(inspectTarget.x + 0.5, top, inspectTarget.y + 0.5);
+  if (!at) { el.classList.remove("on"); return; }
+  el.classList.add("on");
+  el.style.left = at[0] + "px";
+  el.style.top = at[1] + "px";
+}
+
+function openInspector(pickedTarget) {
   if (!world) { drawerToast("not available in LIVE mode"); return; }
-  const target = findInspectTarget();
-  if (!target) { drawerToast("touch something, or start placing one, first"); return; }
+  const target = pickedTarget || findInspectTarget();
+  if (!target) { drawerToast("touch something, or tap one in the world, first"); return; }
   inspectTarget = target;
   $("#inspect-title").textContent = "🎯 " + target.kind + (target.ghost ? " (still being placed)" : "");
   $("#inspect-color").value = target.color || "white";
@@ -3008,6 +3111,7 @@ window.addEventListener("unhandledrejection",
   if (snap) startLive(snap); else startLocal();
 
   bindCamera($("#gl"));
+  setupObjectPicking($("#gl"));
   bindControls();
   makeDrawer({edge: "left", buttons: [
     // press once for a see-through preview where you stand, press again
