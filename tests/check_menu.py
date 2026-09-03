@@ -12,11 +12,15 @@ terminal app would, and separately confirms the classic fallback over plain
 pipes.
 """
 
+import fcntl
 import os
 import pty
+import re
 import select
+import struct
 import subprocess
 import sys
+import termios
 import time
 from pathlib import Path
 
@@ -43,8 +47,11 @@ UP, DOWN, ENTER, ESCAPE = b"\x1b[A", b"\x1b[B", b"\r", b"\x1b"
 class Session:
     """One child process, talking to us over a real pseudo-terminal."""
 
-    def __init__(self, code):
+    def __init__(self, code, rows=None, cols=None):
         self.master, slave = pty.openpty()
+        if rows and cols:
+            fcntl.ioctl(slave, termios.TIOCSWINSZ,
+                        struct.pack("HHHH", rows, cols, 0, 0))
         self.proc = subprocess.Popen(
             [sys.executable, "-c", code], cwd=str(ROOT),
             stdin=slave, stdout=slave, stderr=slave, close_fds=True)
@@ -201,6 +208,46 @@ bye = s.drain(0.5)
 check("escape at the title screen quits cleanly", "bye" in bye, bye)
 s.close()
 check("...and the process actually exited", s.proc.returncode == 0, s.proc.returncode)
+
+# -- a long menu on a short terminal: the tile picker's worst case ---------
+#
+# Regression case: the first render used to print every option at once, no
+# matter how many there were or how short the terminal was. On a terminal
+# at MANUAL.md's stated minimum (20 rows), a 40-option menu overflowed it
+# before a single key was even pressed -- and once a terminal has scrolled,
+# cursor-up cannot get back above row 1, so every redraw after that wrote
+# over the wrong lines. Fixed by windowing the list to what actually fits
+# (see _window_size in builder.py); this is what would have caught it.
+
+print("\na long menu on a short terminal scrolls a window, not the terminal")
+big_probe = (
+    "import sys; sys.path.insert(0, %r)\n"
+    "from engine import builder\n"
+    "opts = ['item %%02d' %% i for i in range(40)]\n"
+    "r = builder.menu(opts)\n"
+    "print('RESULT=' + repr(r))\n"
+) % str(ROOT)
+s = Session(big_probe, rows=20, cols=34)
+first = s.drain(0.5)
+check("the first render alone fits inside a 20-row terminal",
+      len(first.splitlines()) <= 20, len(first.splitlines()))
+
+# Walk down through every option, including wrapping past the end twice --
+# if the window ever drifted out of sync with what was actually on screen,
+# the cursor-up amounts below would stop agreeing with each other.
+for _ in range(85):
+    s.send(UP if _ % 7 == 0 else DOWN, wait=0.02)
+redraws = s.drain(0.6)
+ups = set(re.findall(r"\x1b\[(\d+)A", redraws))
+check("every redraw moves the cursor up by the same, constant amount",
+      len(ups) == 1, ups)
+
+s.send(ENTER)
+final = s.drain(0.4)
+s.close()
+m = re.search(r"RESULT=(\d+|None)", final)
+check("...and the option actually landed on is still picked correctly",
+      m is not None, final[-80:])
 
 print("\n%d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

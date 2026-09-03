@@ -183,21 +183,52 @@ _UNSUPPORTED = object()   # sentinel: this terminal can't do it, use _classic_me
 HILITE, RESET, DIM = "\033[1;36m", "\033[0m", "\033[2m"
 
 
-def _render_menu(options, selected, allow_back, back_label, first):
+def _window_size(total):
+    """How many item rows to show at once, leaving room for our own footer
+    and some headroom for whatever the caller already printed above (a
+    header, a line of game info) -- without this, a long menu (the tile
+    picker offers up to 40) would overflow a short terminal on its very
+    first render, before a single key is even pressed. Once that happens
+    the cursor-up redraw below cannot work: a terminal will not scroll
+    back up past what it has already discarded, so cursor-up hits the top
+    row and every redraw after that overwrites the wrong lines.
+
+    MANUAL.md documents 20 rows as the minimum this needs to run in at
+    all; this is sized to fit a plain header (4 lines) plus our own footer
+    (2 lines) inside that with the tile picker specifically in mind, since
+    it is by far the longest menu in the app. A screen with a taller
+    header than that gets a little less headroom, not a broken redraw --
+    the window still shrinks to fit whatever is actually left."""
+    rows = shutil.get_terminal_size(fallback=(80, 24)).lines
+    return max(3, min(total, rows - 6))
+
+
+def _render_menu(options, selected, allow_back, back_label, first, window):
     """Prints the list the first time; every call after that rewrites it in
     place, moving the cursor back up over exactly what it printed rather
     than clearing the whole screen -- whatever the caller already printed
-    above (the header, a line of game info) stays put untouched."""
+    above (the header, a line of game info) stays put untouched.
+
+    Shows at most `window` items, scrolled so the selected one is always
+    in view -- centred where there is room to centre it, otherwise pinned
+    to whichever end it is closest to. `window` is fixed for the whole
+    menu (see _window_size), so every redraw moves the cursor up by
+    exactly what the previous one printed, never more or less."""
     items = list(options) + ([back_label] if allow_back else [])
+    total = len(items)
+    offset = max(0, min(selected - window // 2, total - window))
+    visible = items[offset:offset + window]
     if not first:
-        sys.stdout.write("\033[%dA" % (len(items) + 2))   # +2: blank line, footer
-    for i, label in enumerate(items):
-        arrow = HILITE + " > " + RESET if i == selected else "   "
-        text = (HILITE + label + RESET) if i == selected else label
+        sys.stdout.write("\033[%dA" % (window + 2))   # +2: blank line, footer
+    for i, label in enumerate(visible):
+        real_i = offset + i
+        arrow = HILITE + " > " + RESET if real_i == selected else "   "
+        text = (HILITE + label + RESET) if real_i == selected else label
         sys.stdout.write("%s%s\033[K\n" % (arrow, text))
     sys.stdout.write("\033[K\n")
+    scrolled = " (%d/%d)" % (selected + 1, total) if total > window else ""
     sys.stdout.write(DIM + " ↑↓ move . enter pick . 1-9 jump . "
-                      "b browser . w who's here" + RESET + "\033[K\n")
+                      "b browser . w who's here" + scrolled + RESET + "\033[K\n")
     sys.stdout.flush()
 
 
@@ -211,11 +242,12 @@ def _big_menu(options, prompt, allow_back, back_label):
         return _UNSUPPORTED
     n = len(options)
     total = n + (1 if allow_back else 0)
+    window = _window_size(total)
     selected = 0
     first = True
     try:
         while True:
-            _render_menu(options, selected, allow_back, back_label, first)
+            _render_menu(options, selected, allow_back, back_label, first, window)
             first = False
             with runner.Keyboard() as kb:
                 if kb.saved is None:

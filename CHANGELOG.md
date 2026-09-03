@@ -16,6 +16,21 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ### Added
 
+- **Fixed a real corruption bug in the big-picture menu**, caught by
+  deliberately testing the app's largest menu (the tile picker, up to 40
+  options) against MANUAL.md's own stated minimum terminal size (20 rows).
+  It used to print every option at once regardless of how many there were
+  or how short the terminal was; once that first render alone overflowed
+  the screen, cursor-up could never get back above row 1 (a terminal will
+  not scroll back into content it has already discarded), so every redraw
+  after that wrote over the wrong lines. `menu()` now shows only as many
+  options as actually fit, scrolled so the highlighted one stays in view,
+  with a `(N/40)` counter in the footer when it's scrolled at all — fixed
+  window size for the whole menu, so the cursor math this all depends on
+  never drifts. `tests/check_menu.py` gained a permanent regression case
+  for exactly this: a 40-option menu on a 20-row pty, wrapping past both
+  ends twice, checking every redraw moves the cursor by the same amount.
+
 - **Three small follow-ups to the big-picture menu, from auditing it right
   after building it:**
 
