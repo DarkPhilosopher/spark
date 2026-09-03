@@ -1899,8 +1899,33 @@ function scatterNewChunks(cx, cy) {
         const y = (baseY + dcy) * SCATTER_CHUNK + Math.floor(Math.random() * SCATTER_CHUNK);
         if (!world.inBounds(x, y)) continue;
         if (world.things.some(o => o.alive && o.x === x && o.y === y)) continue;
-        world.spawn(kind, x, y);
+        const spawned = world.spawn(kind, x, y);
+        if (spawned) spawned.scattered = true;   // marks it as forgettable, see unloadFarChunks
       }
+    }
+  }
+  unloadFarChunks(cx, cy);
+}
+
+// Without this, every step outward adds more auto-scattered things to
+// simulate and render, forever, with nothing ever taken back off the
+// list -- a long exploring session would slowly grind to a halt. Forget
+// chunks (and remove what they scattered) once they're well behind you;
+// wandering back re-scatters them fresh, same as they'd never loaded.
+const SCATTER_UNLOAD_DIST = 60;
+
+function unloadFarChunks(cx, cy) {
+  const baseX = Math.floor(cx / SCATTER_CHUNK), baseY = Math.floor(cy / SCATTER_CHUNK);
+  const reachChunks = Math.ceil(SCATTER_UNLOAD_DIST / SCATTER_CHUNK);
+  for (const key of scatteredChunks) {
+    const [kx, ky] = key.split(",").map(Number);
+    if (Math.max(Math.abs(kx - baseX), Math.abs(ky - baseY)) > reachChunks) {
+      scatteredChunks.delete(key);
+    }
+  }
+  for (const t of world.things) {
+    if (t.scattered && t.alive && Math.hypot(t.x - cx, t.y - cy) > SCATTER_UNLOAD_DIST) {
+      world.remove(t);
     }
   }
 }
