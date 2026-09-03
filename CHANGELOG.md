@@ -16,6 +16,19 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ### Added
 
+- **The 3D view shows what's in touch range.** A "near: ..." line joins
+  score/health/tick in the HUD whenever anything is within the same
+  range-1 reach the `touch` sensor itself uses — so what's listed there
+  and what a `WHEN I am touching {kind}` row can actually see always
+  agree. Local play only, same reasoning as Build mode: it reads
+  `world.things` directly, which only exists for the tab's own copy of
+  the game.
+
+- **Pink cones are iron ore, in `games/Game 008008.json`.** A `WHEN I am
+  touching cone DO` row — score +5, the cone vanishes, "mined iron ore!"
+  — the same WHEN/DO shape the apple-pickup rule in Game 001 already
+  uses, not a new mechanic invented for this one game.
+
 - **`games/Game 008008.json`** — a 200×200 "expanding" world: the floor
   loads in around wherever you are, in a moving window, instead of the
   whole board being built at once, and it generates 2-block-tall pink

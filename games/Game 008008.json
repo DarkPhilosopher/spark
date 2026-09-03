@@ -74,6 +74,14 @@
             {"tile": "touch", "args": {"kind": "anything"}}
           ],
           "do": [{"tile": "vanish", "args": {"target": "it"}}]
+        },
+        {
+          "when": [{"tile": "touch", "args": {"kind": "cone"}}],
+          "do": [
+            {"tile": "score", "args": {"amount": 5}},
+            {"tile": "vanish", "args": {"target": "it"}},
+            {"tile": "say", "args": {"text": "mined iron ore!"}}
+          ]
         }
       ]
     },

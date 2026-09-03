@@ -2021,11 +2021,32 @@ function drawHud() {
   const bits = ["score <b>" + hud.score + "</b>", "tick <b>" + hud.tick + "</b>"];
   if (hud.health !== null && hud.health !== undefined)
     bits.splice(1, 0, "health <b>" + hud.health + "</b>");
+  const nearby = nearbyList();
+  if (nearby) bits.push(nearby);
   $("#hud").innerHTML = bits.join("<br>");
   $("#title").textContent = hud.name || "Spark 3D";
   $("#say").textContent = hud.status
     ? (hud.status === "win" ? "YOU WON" : "YOU LOST")
     : (hud.message || "");
+}
+
+// What's within touch range right now -- the same range-1 reach the touch
+// sensor itself uses, so "can I interact with it" and "is it listed here"
+// always agree. Local play only: world.things only exists for the copy of
+// the game running in this tab.
+function nearbyList() {
+  if (!world) return "";
+  const player = world.things.find(t => t.role === "player");
+  if (!player) return "";
+  const counts = {};
+  for (const t of world.things) {
+    if (!t.alive || t === player) continue;
+    if (Math.max(Math.abs(t.x - player.x), Math.abs(t.y - player.y)) > 1) continue;
+    counts[t.kind] = (counts[t.kind] || 0) + 1;
+  }
+  const names = Object.keys(counts).sort();
+  if (!names.length) return "";
+  return "near <b>" + names.map(k => k + (counts[k] > 1 ? " ×" + counts[k] : "")).join(", ") + "</b>";
 }
 
 // -- touch: one finger turns the camera, two pinch it ----------------------
