@@ -340,6 +340,15 @@
                   background:var(--accent);transform:translateX(-50%);
                   pointer-events:none}
 
+  /* Bottom-left, clear of the drawer's own thin tab strip at the very
+     edge, and clear of the pad regardless of orientation (portrait:
+     centred; landscape: pushed to the right). Off by default. */
+  #minimap{position:fixed;bottom:calc(8px + env(safe-area-inset-bottom));
+           left:60px;z-index:4;width:110px;height:110px;
+           border-radius:8px;border:1px solid var(--line);
+           background:rgba(74,80,88,.7);display:none;pointer-events:none}
+  #minimap.on{display:block}
+
   /* Quickbar -- a fixed row of plain bubble slots, always visible, no tab
      to open first. Reuses the drawer's own .bubble look for consistency,
      but is not a drawer: nothing here slides. 245px clears the HUD (which
@@ -540,6 +549,10 @@
         <input id="prop-speed-num" type="number" min="1" max="30" step="1" value="6">
       </div>
     </div>
+    <div class="prop-row">
+      <span class="prop-label">Minimap</span>
+      <button id="prop-minimap-toggle" class="prop-toggle">OFF</button>
+    </div>
   </div>
 </div>
 
@@ -552,6 +565,11 @@
   <div id="compass-tape"></div>
   <div id="compass-marker"></div>
 </div>
+
+<!-- Minimap: off by default (toggle in Properties) -- one more
+     always-on corner widget was the wrong call given how crowded the
+     top of the screen already got once this session; opt-in instead. -->
+<canvas id="minimap" width="110" height="110"></canvas>
 
 <!-- Mesh Creator: build a custom multi-part shape (a cube here, a sphere
      there, each offset and sized on its own) and save it as a new,
@@ -569,9 +587,13 @@
     <div class="row">
       <select id="mesh-load-select"><option value="">— load an existing mesh to edit —</option></select>
       <button id="mesh-load-btn">load</button>
+      <button id="mesh-delete-btn">🗑</button>
     </div>
     <div id="mesh-part-list"></div>
-    <div class="row"><button id="mesh-add-part">+ add a part</button></div>
+    <div class="row">
+      <button id="mesh-add-part">+ add a part</button>
+      <button id="mesh-dup-part">⧉ duplicate part</button>
+    </div>
     <div class="row">
       <label style="flex:1">shape
         <select id="mesh-part-shape"><option value="cube">cube</option><option value="sphere">sphere</option></select>
@@ -638,7 +660,10 @@
       <label style="flex:1">y <input id="inspect-y" type="number" step="1"></label>
       <label style="flex:1">z (altitude) <input id="inspect-z" type="number" step="1" min="0" max="8"></label>
     </div>
-    <div class="row"><button id="inspect-delete">🗑 delete this object</button></div>
+    <div class="row">
+      <button id="inspect-duplicate">⧉ duplicate</button>
+      <button id="inspect-delete">🗑 delete this object</button>
+    </div>
   </div>
 </div>
 
@@ -1702,6 +1727,11 @@ function startLocal() {
   live = false;
   liveSnapshot = null;
   world = new World(project, null);
+  // world.memory starts empty every time a World is constructed, but which
+  // kind Build mode has selected is a per-viewer preference, not part of
+  // any one game -- carry it over rather than losing it on every restart.
+  const remembered = loadEditorSettings().paletteKind;
+  if (remembered && world.templates[remembered]) world.memory.palette_kind = remembered;
   renderer.buildFloor(world.width, world.height);
   setSource("local", "RUNNING HERE");
   $("#mode").textContent = forcedLocal ? "go live" : "reload";
@@ -1789,6 +1819,7 @@ function frame() {
   drawHud();
   drawCompass();
   drawSelection();
+  drawMinimap();
   requestAnimationFrame(frame);
 }
 
@@ -2081,6 +2112,22 @@ let gridLockOn = false;       // dragging (and "go to x%, y%") snap to a grid
 const currentGridSize = () => Math.max(0.5, parseFloat($("#edit-grid-size").value) || 5);
 const snapVal = v => gridLockOn ? Math.round(v / currentGridSize()) * currentGridSize() : v;
 
+// Editor preferences that used to reset on every reload -- grid lock, its
+// size, move speed, and which kind Build mode has selected. None of this
+// is game data, so it lives in localStorage next to buttonLayout/the
+// Backpack, not in the saved world file.
+const EDITOR_SETTINGS_KEY = "spark3d-editor-settings";
+function loadEditorSettings() {
+  try { return JSON.parse(localStorage.getItem(EDITOR_SETTINGS_KEY) || "{}"); }
+  catch (err) { return {}; }
+}
+function saveEditorSettings(patch) {
+  const cur = loadEditorSettings();
+  Object.assign(cur, patch);
+  try { localStorage.setItem(EDITOR_SETTINGS_KEY, JSON.stringify(cur)); }
+  catch (err) { /* private mode or storage full -- just won't stick */ }
+}
+
 function updateGridOverlay() {
   const overlay = $("#edit-grid-overlay");
   overlay.classList.toggle("on", editingButtons && gridLockOn);
@@ -2283,11 +2330,24 @@ function setupButtonEditor() {
     else selectEditable(null);
   };
 
+  // Restored once, here, rather than at the top-level -- the elements
+  // themselves need to exist first, and this runs after they're in the DOM.
+  const savedSettings = loadEditorSettings();
+  if (savedSettings.gridSize) $("#edit-grid-size").value = savedSettings.gridSize;
+  if (savedSettings.gridLockOn) {
+    gridLockOn = true;
+    $("#edit-grid-on").checked = true;
+  }
+
   $("#edit-grid-on").addEventListener("change", () => {
     gridLockOn = $("#edit-grid-on").checked;
     syncGridLockDisplays();   // keeps the Properties toggle matching too
+    saveEditorSettings({gridLockOn});
   });
-  $("#edit-grid-size").addEventListener("input", updateGridOverlay);
+  $("#edit-grid-size").addEventListener("input", () => {
+    updateGridOverlay();
+    saveEditorSettings({gridSize: currentGridSize()});
+  });
 
   $("#edit-save-layout").onclick = () => {
     const name = (prompt("Save the current button layout as:", "layout 1") || "").trim();
@@ -2565,6 +2625,11 @@ function syncGridLockDisplays() {
 // Ticks per second -- the same number startLocal() already reads out of
 // project.world.speed, just changeable while the game is running instead
 // of only at the moment it (re)starts.
+// Not persisted to localStorage on purpose: this is project.world.speed,
+// which already is game data -- it round-trips through the normal save/
+// load a world already goes through. A separate remembered copy here
+// would silently override whatever pace a *different* game was authored
+// for the next time one loaded.
 function setMoveSpeed(newSpeed) {
   const speed = Math.max(1, Math.min(30, Math.round(newSpeed) || 6));
   project.world = project.world || {};
@@ -2576,7 +2641,41 @@ function setMoveSpeed(newSpeed) {
   return speed;
 }
 
+let minimapOn = false;
+
+// A 2D canvas, not a third WebGL context -- it only ever needs flat dots
+// on a flat square, so the far simpler 2D API is the right tool, not more
+// of the same machinery the two 3D views already use.
+function drawMinimap() {
+  if (!minimapOn || !world) return;
+  const canvas = $("#minimap");
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+  const sx = w / Math.max(1, world.width), sy = h / Math.max(1, world.height);
+  for (const t of world.things) {
+    if (!t.alive) continue;
+    ctx.fillStyle = COLOR_CSS[t.color] || COLOR_CSS.white;
+    ctx.beginPath();
+    ctx.arc((t.x + 0.5) * sx, (t.y + 0.5) * sy, t.role === "player" ? 4 : 2.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
 function setupProperties() {
+  if (loadEditorSettings().minimapOn) {
+    minimapOn = true;
+    $("#minimap").classList.add("on");
+    $("#prop-minimap-toggle").textContent = "ON";
+    $("#prop-minimap-toggle").classList.add("on");
+  }
+  $("#prop-minimap-toggle").onclick = () => {
+    minimapOn = !minimapOn;
+    $("#minimap").classList.toggle("on", minimapOn);
+    $("#prop-minimap-toggle").textContent = minimapOn ? "ON" : "OFF";
+    $("#prop-minimap-toggle").classList.toggle("on", minimapOn);
+    saveEditorSettings({minimapOn});
+  };
   $("#properties-toggle").onclick = () => {
     if (editingButtons) return;   // the button editor owns taps for now
     $("#prop-clock").textContent = worldClockText();
@@ -2590,6 +2689,7 @@ function setupProperties() {
   $("#prop-gridlock-toggle").onclick = () => {
     gridLockOn = !gridLockOn;
     syncGridLockDisplays();
+    saveEditorSettings({gridLockOn});
   };
   $("#prop-speed").addEventListener("input", () => {
     const v = setMoveSpeed($("#prop-speed").value);
@@ -2752,6 +2852,25 @@ function setupMeshCreator() {
     }
     loadMeshForEditing(kind);
   };
+  $("#mesh-delete-btn").onclick = () => {
+    const kind = $("#mesh-load-select").value;
+    if (!kind) { drawerToast("pick one from the list first"); return; }
+    if (!confirm('Delete the saved mesh "' + kind + '"? This cannot be undone.')) return;
+    if (world) delete world.templates[kind];
+    if (project && project.characters) {
+      project.characters = project.characters.filter(c => c.kind !== kind);
+    }
+    if (meshEditingKind === kind) { meshEditingKind = null; }
+    refreshMeshLoadSelect();
+    drawerToast('deleted "' + kind + '"');
+  };
+  $("#mesh-dup-part").onclick = () => {
+    if (meshSelected === null || !meshParts[meshSelected]) return;
+    const copy = JSON.parse(JSON.stringify(meshParts[meshSelected]));
+    copy.dx = (copy.dx || 0) + 0.3;
+    meshParts.splice(meshSelected + 1, 0, copy);
+    selectMeshPart(meshSelected + 1);
+  };
   for (const id of ["mesh-part-shape", "mesh-part-color", "mesh-part-dx", "mesh-part-dy",
                      "mesh-part-dz", "mesh-part-sx", "mesh-part-sy", "mesh-part-sz"]) {
     $("#" + id).addEventListener("input", applyMeshFieldsToSelected);
@@ -2826,6 +2945,7 @@ function renderPaletteList() {
     row.textContent = kind;
     row.onclick = () => {
       world.memory.palette_kind = kind;
+      saveEditorSettings({paletteKind: kind});
       drawerToast('now placing "' + kind + '"');
       renderPaletteList();
     };
@@ -2869,6 +2989,19 @@ function findInspectTarget() {
   if (ghost) return ghost;
   return world.things.find(t => t.alive && t !== player &&
     Math.max(Math.abs(t.x - player.x), Math.abs(t.y - player.y)) <= 1) || null;
+}
+
+// The first open, in-bounds neighbour of (x, y) -- used to duplicate an
+// object right next to the original instead of dropping it somewhere
+// random across the board.
+function findFreeAdjacent(x, y) {
+  const offsets = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]];
+  for (const [dx, dy] of offsets) {
+    const nx = x + dx, ny = y + dy;
+    if (!world.inBounds(nx, ny)) continue;
+    if (!world.things.some(t => t.alive && t.solid && t.x === nx && t.y === ny)) return [nx, ny];
+  }
+  return [x, y];
 }
 
 /* Tap any object in the 3D view to pick it -- projects every thing to
@@ -2979,6 +3112,20 @@ function setupInspector() {
     $("#" + id).addEventListener("input", applyInspectorPosition);
     $("#" + id).addEventListener("change", applyInspectorPosition);
   }
+  $("#inspect-duplicate").onclick = () => {
+    if (!inspectTarget || !inspectTarget.alive || !world) return;
+    const [nx, ny] = findFreeAdjacent(inspectTarget.x, inspectTarget.y);
+    const copy = world.spawn(inspectTarget.kind, nx, ny);
+    if (!copy) { drawerToast("no room to duplicate it here"); return; }
+    // the fresh copy starts from the template again -- carry over whatever
+    // this specific instance was actually customized to, not just what it
+    // was born with.
+    copy.color = inspectTarget.color;
+    copy.size = inspectTarget.size;
+    copy.shape = inspectTarget.shape;
+    copy.z = inspectTarget.z;
+    drawerToast("duplicated");
+  };
   $("#inspect-delete").onclick = () => {
     if (!inspectTarget) return;
     if (!confirm('Delete this ' + inspectTarget.kind + '? This cannot be undone.')) return;
