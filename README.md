@@ -702,8 +702,26 @@ Every button on screen — the movement pad, the top bar, the button drawer's
 own bubbles — can be dragged, resized, and faded from a button editor built
 into the tab, and whole arrangements of them saved under a name and swapped
 between. A Backpack (a small file system) and a Properties panel (grid-lock
-status, a clock driven by the world's own time) live in the top bar too. The
-full control reference, key by key, is in [MANUAL.md](MANUAL.md#controls-the-3d-view).
+status, move speed, an opt-in minimap, and a clock driven by the world's own
+time) live in the top bar too, and a heading meter tracks which way the
+camera is facing across the top of the screen.
+
+Build mode turns the tab into a level editor: pick a kind from a searchable
+palette and place it where you stand, or design an entirely new multi-part
+shape from scratch in the Mesh Creator and it joins the palette alongside
+everything the game already defines. Tapping anything already in the world
+opens the Object Inspector — recolour it, resize it, flip its shape, move it,
+duplicate it, or delete it, all without touching the game's JSON by hand. A
+world can also be marked "expanding," so its floor loads in around you as you
+wander instead of all at once, with new ground able to scatter things onto
+itself as it appears (`games/Game 008008.json` is a working example, with
+pink stone-sized cones standing in for an ore you mine by walking into it).
+Build mode, the Inspector, and expanding worlds all only work in the local,
+in-browser engine (`RUNNING HERE`, below) — they edit the live JavaScript
+world directly, which has no meaning for a game somebody else is hosting.
+
+The full control reference, key by key, is in
+[MANUAL.md](MANUAL.md#controls-the-3d-view).
 
 Nothing is downloaded to make that happen. The 3D is drawn with WebGL, which is
 already in the phone's browser, and no library is fetched from anywhere -- a

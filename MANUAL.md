@@ -308,14 +308,28 @@ of blocks, with each character's glyph floating over its own block.
 | ⤓ (`s`) | fly down — only while flying |
 | ▦ (`a`) | add a 3D object where you stand, see-through until pressed again to confirm it |
 | `d` | toggle walking (grounded, `w`/`s` do nothing) ↔ flying |
+| 🗑 | arm removal — the *next* object touched is deleted, not whatever was already selected; drawer bubbles marked `locked` (the built-in ones) can never be picked this way |
+| 🎨 | Build mode: a searchable, alphabetical palette of every kind the game defines, to place where you stand — or open the Mesh Creator to design a new multi-part shape and add it to that palette. Local play only |
+| 🎯 | the Object Inspector: recolour, resize, flip the shape of, relocate, duplicate, or delete whatever you're touching (or a pending ghost from ▦, before it's even confirmed). **Tap anything in the world to select it directly**, without touching it on the ground first — a glowing ring marks the current selection. Local play only |
 | **restart** | starts the game again from the beginning (local play only) |
 | **recentre** | puts the camera back where it started |
 | **save** / **save as new** | quick-saves back to the file this world came from, or always asks for a new name |
 | **⛶** | fullscreen |
 | **🎒** | Backpack, a small virtual file system |
-| **⚙** | Properties — grid-lock status and a clock, both driven by the world itself |
+| **⚙** | Properties — grid-lock status, move speed, an opt-in minimap, and a clock, all driven by the world itself |
 | **✎** | the button editor — select, drag, resize, and fade any button here, including the drawer's own |
 | **run here** / **go live** | switches between the running game and this tab's own engine |
+
+The **compass**, a meter across the top of the screen rather than a dial,
+scrolls sideways as the camera turns so the current heading always sits
+under the fixed centre marker — this world's own idea of "north," not a
+real one. The **quickbar** is seven empty, always-visible bubble slots with
+no drawer to open first, there to have something assigned to them later.
+
+"Local play only" above means the feature edits the live JavaScript world
+directly, in this tab's own copy of the game — it has no effect, and does
+not appear to make sense, while watching a `LIVE` server-hosted game (see
+the badge table below), since there is no local copy to edit.
 
 **The world always fills the whole screen** — the top bar, the pad, the
 button drawer, the compass, and the quickbar all float over it as

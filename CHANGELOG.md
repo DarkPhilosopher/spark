@@ -16,6 +16,29 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ### Added
 
+- **Resized objects now scale their glyph label, selection ring, and tap
+  target with them.** All three used to sit at a fixed, role-based
+  height, so an object made taller through the Inspector or the Mesh
+  Creator had its name floating well below where it visually stood, its
+  selection ring sitting inside it instead of around it, and a tap near
+  its actual top missing it entirely. `drawGlyphs()`, `drawSelection()`,
+  and `pickObjectAt()` now all multiply that base height by the object's
+  own `size / 100` before placing anything.
+
+- **Housekeeping pass, no behaviour change:** four small blocks of CSS
+  (translucent input backgrounds, button backgrounds, overlay text, and
+  modal backgrounds) that were repeated 5, 3, 2, and 2 times respectively
+  as literal `rgba(...)` values are now `--glass-input`, `--glass-btn`,
+  `--overlay-text`, and `--modal-bg` custom properties on `:root`, used
+  everywhere via `var(...)`. Caught and fixed before syncing: a first,
+  purely mechanical find-and-replace pass had rewritten the `:root`
+  definitions themselves into self-referencing `--glass-input:
+  var(--glass-input);`, which is invalid CSS — the definitions keep their
+  literal values, only the call sites use `var()`. Also added a table of
+  contents comment at the top of the `<script>` block, since it has grown
+  large enough that finding a given piece by scrolling is no longer
+  practical.
+
 - **The 3D view shows what's in touch range.** A "near: ..." line joins
   score/health/tick in the HUD whenever anything is within the same
   range-1 reach the `touch` sensor itself uses — so what's listed there
@@ -148,15 +171,55 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 - **Properties** (⚙, top bar): a near-fullscreen panel (a margin of the
   world stays visible all round it, not edge to edge) listing whether
   grid-lock movement is on — the same toggle as the button editor's, in
-  sync either direction — and a clock derived from the world's own tick
-  count and speed, not a real one.
+  sync either direction — a clock derived from the world's own tick
+  count and speed, not a real one, a **move speed** slider (ticks per
+  second, 1–30, takes effect immediately rather than only on restart —
+  restarts the tick timer at the new rate), and an opt-in **minimap**
+  toggle.
 
-- **A compass**, fixed at the top centre of the screen: which way the
-  camera is facing, this world's own idea of "north," not a real
-  heading.
+- **The Object Inspector** (🎯, in the button drawer): colour, resize,
+  relocate (x/y/altitude), flip shape, duplicate, or delete whatever
+  you're touching — or your pending ghost, if you have one, so a newly
+  spawned object can be set up before it is even confirmed. Duplicate
+  copies the object's *current* state (post-edit colour/size/shape), not
+  just what its template started as, placed at the nearest open
+  neighbouring cell. Delete asks first.
+
+  **Tap any object in the 3D view to select it, too** — not just touch
+  it on the ground. Projects every thing to screen space the same way a
+  glyph label already is and picks whichever lands closest to the tap,
+  within a fingertip-sized radius; a glowing ring then tracks the
+  selected object continuously, every frame, wherever it is. A short
+  drag (for turning the camera) is told apart from a tap by distance and
+  time, so swiping to look around never accidentally selects something.
+
+  Local play only, same reasoning as Build mode: it edits the live JS
+  `Thing` object directly, which only exists for the copy of the game
+  running in this tab.
+
+- **A compass, as a meter across the top of the screen** — ticks scroll
+  sideways as the camera turns, the current heading sits under a fixed
+  centre marker, same idea as a flight HUD, not a rotating dial. Built
+  once, spanning eight full turns each direction, so ordinary swiping
+  never scrolls it out of ticks.
 
 - **A quickbar**: seven empty, always-visible bubble slots, no drawer
   tab to open first — there to have something assigned to them later.
+
+- **Editor preferences survive a reload**: grid-lock on/off, its grid
+  size, which kind Build mode has selected, and the minimap toggle are
+  now kept in `localStorage`. Move speed is deliberately *not* included
+  — that is `project.world.speed`, real game data that already
+  round-trips through a normal save/load; a remembered copy here would
+  silently override whatever pace a *different* game was authored for
+  the next time one loaded.
+
+- **Build mode's palette lists alphabetically and has a search box** —
+  useful once there are more than a couple of custom meshes in it. The
+  Mesh Creator can also **load an existing saved mesh back in to edit**
+  (a picker at the top; saving then defaults to overwriting the same
+  one), **duplicate the selected part**, and **delete a saved mesh**
+  entirely, not just create and edit one.
 
 - **The button drawer's × now arms removal instead of acting
   immediately** — the next bubble tapped is the one removed, not
