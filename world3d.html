@@ -60,17 +60,21 @@
      short words for the ones whose meaning an icon would blur (save/new) or
      that already carry their own dynamic label (mode) -- kept small and
      wrapping instead of running off the edge of a narrow phone. */
-  #side{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
-  #side button{font-size:12px;padding:8px 12px;border-radius:11px;
+  #side,#side-tools{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+  #side-tools{margin-top:6px}
+  #side button,#side-tools button{font-size:12px;padding:8px 12px;border-radius:11px;
                min-height:var(--util);min-width:0;
                background:rgba(102,109,118,.6);backdrop-filter:blur(6px);
                -webkit-backdrop-filter:blur(6px)}
 
-  #hud{position:absolute;top:calc(104px + env(safe-area-inset-top));left:8px;z-index:4;
+  /* 160px, not the 104px this used to be -- the top bar grew a second
+     row of buttons (#side-tools) and this has to clear both rows plus
+     the title, on the shortest phone this runs on, not just a tall one. */
+  #hud{position:absolute;top:calc(160px + env(safe-area-inset-top));left:8px;z-index:4;
        font:12px/1.7 ui-monospace,monospace;color:var(--dim);
        background:rgba(74,80,88,.85);border-radius:10px;padding:6px 10px}
   #hud b{color:var(--ink)}
-  #say{position:absolute;top:calc(104px + env(safe-area-inset-top));right:8px;z-index:4;
+  #say{position:absolute;top:calc(160px + env(safe-area-inset-top));right:8px;z-index:4;
        max-width:52vw;text-align:right;color:var(--accent);font-size:13px;
        background:rgba(74,80,88,.85);border-radius:10px;padding:6px 10px}
   #say:empty{display:none}
@@ -128,7 +132,7 @@
      HUD, above where a portrait pad's top edge lands -- is clear in both
      orientations (landscape keeps the whole left half free of the pad,
      which sits on the right there, regardless of height). */
-  .drawer[data-edge="left"]{top:calc(190px + env(safe-area-inset-top));left:0;
+  .drawer[data-edge="left"]{top:calc(250px + env(safe-area-inset-top));left:0;
                              flex-direction:row;
                              transform:translate(calc(-100% + var(--util)), 0)}
   .drawer[data-edge="left"].open{transform:translate(0, 0)}
@@ -322,8 +326,9 @@
 
   /* Quickbar -- a fixed row of plain bubble slots, always visible, no tab
      to open first. Reuses the drawer's own .bubble look for consistency,
-     but is not a drawer: nothing here slides. */
-  #quickbar{position:fixed;top:calc(150px + env(safe-area-inset-top));
+     but is not a drawer: nothing here slides. 245px clears the HUD (which
+     itself starts at 160px, now that the top bar has two button rows). */
+  #quickbar{position:fixed;top:calc(245px + env(safe-area-inset-top));
            left:50%;transform:translateX(-50%);z-index:4;
            display:flex;gap:8px;padding:6px}
   #quickbar .bubble{font-size:16px}
@@ -391,13 +396,19 @@
       <div id="title">Spark 3D</div>
       <div class="badge" id="source">…</div>
     </div>
+    <!-- split on purpose, not just wherever flex-wrap happens to break --
+         pressed often, above pressed rarely, so the row you actually
+         reach for stays short and predictable regardless of screen
+         width. -->
     <div id="side">
       <button id="restart" data-editable title="restart">↺</button>
       <button id="recentre" data-editable title="recentre camera">⌖</button>
-      <button id="save" data-editable title="save">save</button>
-      <button id="save-as" data-editable title="save as a new 3d world file">new</button>
       <button id="fullscreen" data-editable title="fullscreen">⛶</button>
       <button id="mode" data-editable>…</button>
+    </div>
+    <div id="side-tools">
+      <button id="save" data-editable title="save">save</button>
+      <button id="save-as" data-editable title="save as a new 3d world file">new</button>
       <button id="backpack-toggle" data-editable title="backpack">🎒</button>
       <button id="properties-toggle" data-editable title="properties">⚙</button>
       <button id="edit-toggle" title="edit buttons: select, drag, resize, fade">✎</button>
