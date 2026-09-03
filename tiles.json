@@ -381,6 +381,79 @@
       ]
     },
     {
+      "id": "shape",
+      "label": "flip {target}'s shape between cube and sphere",
+      "params": [
+        {
+          "name": "target",
+          "prompt": "Flip whom?",
+          "kind": "choice",
+          "choices": [
+            "it",
+            "self"
+          ],
+          "default": "it"
+        }
+      ]
+    },
+    {
+      "id": "resize",
+      "label": "change {target}'s size by {amount}",
+      "params": [
+        {
+          "name": "target",
+          "prompt": "Resize whom?",
+          "kind": "choice",
+          "choices": [
+            "it",
+            "self"
+          ],
+          "default": "it"
+        },
+        {
+          "name": "amount",
+          "prompt": "By how much? (percent points, can be negative)",
+          "kind": "int",
+          "choices": [],
+          "default": 25
+        }
+      ]
+    },
+    {
+      "id": "fly",
+      "label": "fly {dir}",
+      "params": [
+        {
+          "name": "dir",
+          "prompt": "Which way?",
+          "kind": "choice",
+          "choices": [
+            "up",
+            "down"
+          ],
+          "default": "up"
+        }
+      ]
+    },
+    {
+      "id": "toggle_flight",
+      "label": "switch between walking and flying",
+      "params": []
+    },
+    {
+      "id": "place",
+      "label": "add a new {kind}, see-through until placed again to confirm it",
+      "params": [
+        {
+          "name": "kind",
+          "prompt": "Add what?",
+          "kind": "kind",
+          "choices": [],
+          "default": "block"
+        }
+      ]
+    },
+    {
       "id": "remember",
       "label": "remember {name} is {value}",
       "params": [
@@ -631,7 +704,8 @@
     "blue",
     "magenta",
     "cyan",
-    "grey"
+    "grey",
+    "pink"
   ],
   "directions": [
     "up",

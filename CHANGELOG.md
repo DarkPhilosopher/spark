@@ -16,6 +16,224 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ### Added
 
+- **Resized objects now scale their glyph label, selection ring, and tap
+  target with them.** All three used to sit at a fixed, role-based
+  height, so an object made taller through the Inspector or the Mesh
+  Creator had its name floating well below where it visually stood, its
+  selection ring sitting inside it instead of around it, and a tap near
+  its actual top missing it entirely. `drawGlyphs()`, `drawSelection()`,
+  and `pickObjectAt()` now all multiply that base height by the object's
+  own `size / 100` before placing anything.
+
+- **Housekeeping pass, no behaviour change:** four small blocks of CSS
+  (translucent input backgrounds, button backgrounds, overlay text, and
+  modal backgrounds) that were repeated 5, 3, 2, and 2 times respectively
+  as literal `rgba(...)` values are now `--glass-input`, `--glass-btn`,
+  `--overlay-text`, and `--modal-bg` custom properties on `:root`, used
+  everywhere via `var(...)`. Caught and fixed before syncing: a first,
+  purely mechanical find-and-replace pass had rewritten the `:root`
+  definitions themselves into self-referencing `--glass-input:
+  var(--glass-input);`, which is invalid CSS — the definitions keep their
+  literal values, only the call sites use `var()`. Also added a table of
+  contents comment at the top of the `<script>` block, since it has grown
+  large enough that finding a given piece by scrolling is no longer
+  practical.
+
+- **The 3D view shows what's in touch range.** A "near: ..." line joins
+  score/health/tick in the HUD whenever anything is within the same
+  range-1 reach the `touch` sensor itself uses — so what's listed there
+  and what a `WHEN I am touching {kind}` row can actually see always
+  agree. Local play only, same reasoning as Build mode: it reads
+  `world.things` directly, which only exists for the tab's own copy of
+  the game.
+
+- **Pink cones are iron ore, in `games/Game 008008.json`.** A `WHEN I am
+  touching cone DO` row — score +5, the cone vanishes, "mined iron ore!"
+  — the same WHEN/DO shape the apple-pickup rule in Game 001 already
+  uses, not a new mechanic invented for this one game.
+
+- **`games/Game 008008.json`** — a 200×200 "expanding" world: the floor
+  loads in around wherever you are, in a moving window, instead of the
+  whole board being built at once, and it generates 2-block-tall pink
+  cones as new ground reveals itself. Two new general capabilities, not
+  special-cased to this one game:
+
+  - `world.expanding: true` on any game's world settings switches its
+    floor to windowed loading — `Renderer.buildFloor()` takes an optional
+    centre now, and re-centres on the player once they wander far enough
+    (`frame()`'s `maybeExpandFloor()`). Every other game never passes a
+    centre, so this changes nothing for anything that doesn't opt in.
+  - `autoScatter: true` (+ optional `scatterChance`, default 0.3) on any
+    character template gives it a chance to appear once per newly-loaded
+    region, at a random empty cell in it. Which kind gets scattered is
+    just data — Game 008008 makes it cones by putting the flag on the
+    cone template, nothing about scattering itself knows what a cone is.
+
+  Local play only, same reasoning as Build mode/the Inspector: it works
+  by rebuilding the live `Renderer`'s own floor buffer, which only exists
+  for the browser tab actually running the 3D view.
+
+  **New shape: cone.** A third option next to cube/sphere everywhere
+  shape already appeared — `pushCone()` (a low-poly cone, same flat-face-
+  normal approach as the sphere), the Mesh Creator's part shape, and the
+  Inspector's shape selector all got it.
+
+  **New colour: pink**, added to `COLORS` in `engine/world.py` (which
+  `tiles.json`'s colour list is generated from) and mirrored in
+  `world3d.html`'s `COLOR_RGB`/`COLOR_CSS` — the usual two-engine pairing,
+  even though this one's just a name and two numbers.
+
+  **A real bug caught building this:** `buildSaveProject()` was
+  reconstructing `world: {...}` from only `width`/`height`/`wrap`/`speed`
+  — any *other* field on a world's settings, `expanding` very much
+  included, silently vanished the moment you saved. Fixed by spreading
+  the original settings first and overriding just the four that can
+  actually change live.
+
+  **A second one, caught right after:** nothing ever removed a scattered
+  object once it existed, or forgot a chunk once it had scattered one —
+  a long exploring session would just keep adding more things to
+  simulate and render, forever. Fixed the same day: chunks (and whatever
+  they scattered) more than 60 cells behind the player are now forgotten
+  and removed; wandering back in re-scatters that ground fresh, same as
+  it had never loaded.
+
+- **Mesh Creator and Build mode.** The Mesh Creator (🧩) builds a custom
+  shape out of several cube/sphere parts, each with its own offset, size,
+  and colour, previewed live in a second WebGL view (the same `Renderer`
+  the main 3D view uses — what you see is exactly what gets placed, not
+  an approximation), and saves it as a new, immediately placeable kind.
+  Build mode (🎨, in the button drawer) is a palette of every kind that
+  exists — built in and anything just saved from the Mesh Creator — pick
+  one to make the place tile (`a`) add that instead. A new 🗑 drawer
+  bubble removes whatever placed object you're touching (`vanish`, on a
+  new virtual `"remove"` key that no physical keyboard key sends).
+
+  **Why the palette is local-play only.** It works by writing straight
+  into the running JS `World` object's memory, which only exists for the
+  copy of the game in this browser tab — a `LIVE` game mirrored from a
+  real Termux server has no such object here to write into. The `place`
+  tile still checks for it, though, so nothing breaks; the palette
+  simply has nothing to affect in that mode, and quietly does nothing
+  when opened there.
+
+  **Why the pending-ghost lookup changed.** It used to also match on
+  `kind`, so switching the palette while a ghost was still waiting to be
+  confirmed would strand it — a new ghost of the newly-picked kind would
+  start instead, invisible-ish and unconfirmable forever. Matching on
+  ownership alone confirms whatever you already started, regardless of
+  what the palette says now.
+
+- **3D world editor: shapes, altitude, walking vs. flying, and a
+  placeable object.** Characters can now be a sphere as well as a cube
+  (`shape`), can be resized (`size`, a percent), and can change altitude
+  (`fly` up/down, clamped 0–8) — but only while flying: a new
+  `toggle_flight` tile (`d`) switches a character between walking
+  (grounded, altitude locked to 0, `w`/`s` do nothing) and flying (free
+  to change altitude). A new `place` tile (`a`) adds a full-size,
+  see-through preview object where you stand; pressing it again on that
+  same one confirms it, solid and opaque.
+
+  **Why two presses to place something.** A single press that
+  immediately drops a solid, opaque object gives no chance to see where
+  it landed before it is already in the way. The see-through preview is
+  the same object at the same spot, just not yet real — confirm it, or
+  walk off and place a different one instead.
+
+- **Camera follows you, not the board.** It used to sit back far enough
+  to fit the whole board in frame, like a diorama seen from outside. Now
+  it orbits at a fixed, close distance centred on whoever is playing,
+  and moves with them — the world reads as a place you are standing in
+  rather than a box viewed from outside. Swipe and pinch still control
+  the angle and distance exactly as before, just relative to you instead
+  of the board.
+
+- **Low-poly, flat-shaded rendering**, and a full repaint of the 3D
+  view's own colours — gray and light blue throughout (the floor, the
+  rim wall, the sky/clear colour, every panel) — replacing the old
+  near-black background and neon accents.
+
+- **A button editor** (✎, top bar): select, drag, resize, and fade any
+  button in the 3D view, including the button drawer's own bubbles.
+  Position can also be typed directly as a decimal percent of the
+  screen, and snapped to an optional visible grid; a scrolling list
+  covers every button that exists, including ones dragged off-screen or
+  faded to invisible, so nothing edited this way can get permanently
+  lost. Whole arrangements can be saved under a name and reloaded later,
+  on top of the one arrangement that is always kept live.
+
+- **Backpack** (🎒, top bar): a small virtual file system — folders and
+  files, New folder / New item / Delete — styled like Windows File
+  Explorer on purpose, a deliberate exception to the 3D view's own
+  colours (everything else still follows the gray/light-blue palette
+  above).
+
+- **Properties** (⚙, top bar): a near-fullscreen panel (a margin of the
+  world stays visible all round it, not edge to edge) listing whether
+  grid-lock movement is on — the same toggle as the button editor's, in
+  sync either direction — a clock derived from the world's own tick
+  count and speed, not a real one, a **move speed** slider (ticks per
+  second, 1–30, takes effect immediately rather than only on restart —
+  restarts the tick timer at the new rate), and an opt-in **minimap**
+  toggle.
+
+- **The Object Inspector** (🎯, in the button drawer): colour, resize,
+  relocate (x/y/altitude), flip shape, duplicate, or delete whatever
+  you're touching — or your pending ghost, if you have one, so a newly
+  spawned object can be set up before it is even confirmed. Duplicate
+  copies the object's *current* state (post-edit colour/size/shape), not
+  just what its template started as, placed at the nearest open
+  neighbouring cell. Delete asks first.
+
+  **Tap any object in the 3D view to select it, too** — not just touch
+  it on the ground. Projects every thing to screen space the same way a
+  glyph label already is and picks whichever lands closest to the tap,
+  within a fingertip-sized radius; a glowing ring then tracks the
+  selected object continuously, every frame, wherever it is. A short
+  drag (for turning the camera) is told apart from a tap by distance and
+  time, so swiping to look around never accidentally selects something.
+
+  Local play only, same reasoning as Build mode: it edits the live JS
+  `Thing` object directly, which only exists for the copy of the game
+  running in this tab.
+
+- **A compass, as a meter across the top of the screen** — ticks scroll
+  sideways as the camera turns, the current heading sits under a fixed
+  centre marker, same idea as a flight HUD, not a rotating dial. Built
+  once, spanning eight full turns each direction, so ordinary swiping
+  never scrolls it out of ticks.
+
+- **A quickbar**: seven empty, always-visible bubble slots, no drawer
+  tab to open first — there to have something assigned to them later.
+
+- **Editor preferences survive a reload**: grid-lock on/off, its grid
+  size, which kind Build mode has selected, and the minimap toggle are
+  now kept in `localStorage`. Move speed is deliberately *not* included
+  — that is `project.world.speed`, real game data that already
+  round-trips through a normal save/load; a remembered copy here would
+  silently override whatever pace a *different* game was authored for
+  the next time one loaded.
+
+- **Build mode's palette lists alphabetically and has a search box** —
+  useful once there are more than a couple of custom meshes in it. The
+  Mesh Creator can also **load an existing saved mesh back in to edit**
+  (a picker at the top; saving then defaults to overwriting the same
+  one), **duplicate the selected part**, and **delete a saved mesh**
+  entirely, not just create and edit one.
+
+- **The button drawer's × now arms removal instead of acting
+  immediately** — the next bubble tapped is the one removed, not
+  whatever happened to be selected already, and a bubble can be marked
+  `locked` so it can never be picked that way (used for the drawer's own
+  built-in bubbles, so a stray tap during cleanup cannot remove
+  something the page depends on).
+
+- **Saving a 3D world checks for a name collision first**, and asks
+  before overwriting an existing file. "save" quick-saves back to
+  whatever the world was last saved or loaded as, with no prompt; "save
+  as new" always asks for a name, so a copy can be forked off without
+  touching the file the world came from.
+
 - **`/update spark`** — pull the newest Spark from GitHub into the folder you
   already have. `python3 spark.py install` writes it, along with `update spark`
   and the long form `python3 spark.py update`.

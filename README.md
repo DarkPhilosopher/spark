@@ -10,6 +10,10 @@ Build a game by snapping tiles together. You never type code.
 >   key and button, every command, and step-by-step instructions for connecting
 >   the browser interface and GitHub.
 > - **[CHANGELOG.md](CHANGELOG.md)** — what changed, when, and why.
+>
+> A fourth file, **CLAUDE.md**, is not one of the three: it is working notes for
+> Claude Code (or another AI assistant) editing this repo — conventions to
+> follow, a running task list — not part of the guide a player needs.
 
 A game is a cast of **characters**. Each character has a **brain**, and a brain
 is a list of rows. Every row reads the same way:
@@ -17,7 +21,7 @@ is a list of rows. Every row reads the same way:
     WHEN something is true   DO something
 
 That is the whole idea, and it is the idea Kodu and Project Spark used. Fourteen
-WHEN tiles crossed with twenty-one DO tiles is two hundred and ninety-four
+WHEN tiles crossed with twenty-six DO tiles is three hundred and sixty-four
 different sentences, and rows can hold more than one tile each, so the real
 number is much larger. One of those tiles is **your own**: fold any row up under
 a name and it joins the palette like the rest.
@@ -260,6 +264,11 @@ who arrived before you started a game — they are connected and waiting.
 | placeholder `<who>` has `<face>` `<test>` `<n>` | open `<object>` at `<target>` |
 | placeholder `<who>` is named "`<text>`" | name `<who>` is "`<text>`" |
 | the tile called "`<name>`" — one of your own | the tile called "`<name>`" — one of your own |
+| | flip `<target>`'s shape between cube and sphere |
+| | change `<target>`'s size by `<amount>` |
+| | fly `<direction>` — only while flying, see the tile below |
+| | switch between walking and flying |
+| | add a new `<kind>`, see-through until placed again to confirm it |
 | | value `<who>` = `<box>` `<op>` `<box>` |
 | | vector `<who>` `<axis>` = `<box>` `<op>` `<box>` |
 | | copy my place into vector `<who>` |
@@ -691,7 +700,37 @@ There is a **▶ 3D** button at the top of the browser editor. It opens a second
 tab where the same world stands up off the page: every character becomes a
 block on a board you can turn with one finger and pinch to zoom. The glyph you
 chose sits on top of its block, so a `@` is still a `@`, and the colours are the
-ones you picked.
+ones you picked. A character can be a sphere instead of a block, can be
+resized, and can fly (a toggle switches it between walking, grounded, and
+flying, free to change altitude) — and a new tile lets you place a full-size
+object where you stand, see-through until you press it again to confirm it.
+The camera itself orbits *you*, not the middle of the board, so the world
+reads as a place you are standing in rather than a diorama seen from outside.
+
+Every button on screen — the movement pad, the top bar, the button drawer's
+own bubbles — can be dragged, resized, and faded from a button editor built
+into the tab, and whole arrangements of them saved under a name and swapped
+between. A Backpack (a small file system) and a Properties panel (grid-lock
+status, move speed, an opt-in minimap, and a clock driven by the world's own
+time) live in the top bar too, and a heading meter tracks which way the
+camera is facing across the top of the screen.
+
+Build mode turns the tab into a level editor: pick a kind from a searchable
+palette and place it where you stand, or design an entirely new multi-part
+shape from scratch in the Mesh Creator and it joins the palette alongside
+everything the game already defines. Tapping anything already in the world
+opens the Object Inspector — recolour it, resize it, flip its shape, move it,
+duplicate it, or delete it, all without touching the game's JSON by hand. A
+world can also be marked "expanding," so its floor loads in around you as you
+wander instead of all at once, with new ground able to scatter things onto
+itself as it appears (`games/Game 008008.json` is a working example, with
+pink stone-sized cones standing in for an ore you mine by walking into it).
+Build mode, the Inspector, and expanding worlds all only work in the local,
+in-browser engine (`RUNNING HERE`, below) — they edit the live JavaScript
+world directly, which has no meaning for a game somebody else is hosting.
+
+The full control reference, key by key, is in
+[MANUAL.md](MANUAL.md#controls-the-3d-view).
 
 Nothing is downloaded to make that happen. The 3D is drawn with WebGL, which is
 already in the phone's browser, and no library is fetched from anywhere -- a

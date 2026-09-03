@@ -9,7 +9,7 @@ from . import tiles
 
 COLORS = {
     "white": 37, "red": 31, "green": 32, "yellow": 33,
-    "blue": 34, "magenta": 35, "cyan": 36, "grey": 90,
+    "blue": 34, "magenta": 35, "cyan": 36, "grey": 90, "pink": 95,
 }
 
 
@@ -24,6 +24,18 @@ class Thing:
         self.health = template.get("health", 1)
         self.solid = template.get("solid", False)
         self.role = template.get("role", "prop")
+        self.shape = template.get("shape", "cube")   # "cube" | "sphere"
+        self.size = template.get("size", 100)        # percent; 100 = normal
+        self.z = template.get("z", 0)                # altitude; 0 = ground
+        self.full = template.get("full", False)      # fills its whole grid cell
+        self.ghost = template.get("ghost", False)     # placed but not confirmed yet
+        self.flying = template.get("flying", False)   # walking (grounded) unless true
+        # A multi-part shape (the mesh creator's output): a list of
+        # {shape, dx, dy, dz, sx, sy, sz, color} offsets from this thing's
+        # own (x, y, z), each rendered as its own box or sphere. Only
+        # world3d.html draws them -- kept here too so both engines carry
+        # the same Thing shape and a save/load round trip never drops it.
+        self.parts = template.get("parts", None)
         self.brain = template.get("brain", [])
         self.facing = (0, -1)       # north, until a face/move/shoot tile turns it
         self.owner = None

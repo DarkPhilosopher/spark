@@ -1,0 +1,211 @@
+{
+  "name": "barren",
+  "world": {
+    "width": 20,
+    "height": 20,
+    "wrap": false,
+    "speed": 6
+  },
+  "characters": [
+    {
+      "kind": "hero",
+      "glyph": "@",
+      "color": "cyan",
+      "health": 3,
+      "count": 1,
+      "solid": false,
+      "role": "player",
+      "shape": "sphere",
+      "brain": [
+        {
+          "when": [
+            {
+              "tile": "key",
+              "args": {
+                "key": "up"
+              }
+            }
+          ],
+          "do": [
+            {
+              "tile": "move",
+              "args": {
+                "dir": "up"
+              }
+            }
+          ]
+        },
+        {
+          "when": [
+            {
+              "tile": "key",
+              "args": {
+                "key": "down"
+              }
+            }
+          ],
+          "do": [
+            {
+              "tile": "move",
+              "args": {
+                "dir": "down"
+              }
+            }
+          ]
+        },
+        {
+          "when": [
+            {
+              "tile": "key",
+              "args": {
+                "key": "left"
+              }
+            }
+          ],
+          "do": [
+            {
+              "tile": "move",
+              "args": {
+                "dir": "left"
+              }
+            }
+          ]
+        },
+        {
+          "when": [
+            {
+              "tile": "key",
+              "args": {
+                "key": "right"
+              }
+            }
+          ],
+          "do": [
+            {
+              "tile": "move",
+              "args": {
+                "dir": "right"
+              }
+            }
+          ]
+        },
+        {
+          "when": [
+            {
+              "tile": "key",
+              "args": {
+                "key": "space"
+              }
+            }
+          ],
+          "do": [
+            {
+              "tile": "spawn",
+              "args": {
+                "kind": "cube"
+              }
+            }
+          ]
+        },
+        {
+          "when": [
+            {
+              "tile": "key",
+              "args": {
+                "key": "e"
+              }
+            },
+            {
+              "tile": "touch",
+              "args": {
+                "kind": "cube"
+              }
+            }
+          ],
+          "do": [
+            {
+              "tile": "shape",
+              "args": {
+                "target": "it"
+              }
+            }
+          ]
+        },
+        {
+          "when": [
+            {
+              "tile": "key",
+              "args": {
+                "key": "f"
+              }
+            },
+            {
+              "tile": "touch",
+              "args": {
+                "kind": "cube"
+              }
+            }
+          ],
+          "do": [
+            {
+              "tile": "resize",
+              "args": {
+                "target": "it",
+                "amount": 25
+              }
+            }
+          ]
+        },
+        {
+          "when": [
+            {
+              "tile": "key",
+              "args": {
+                "key": "w"
+              }
+            }
+          ],
+          "do": [
+            {
+              "tile": "fly",
+              "args": {
+                "dir": "up"
+              }
+            }
+          ]
+        },
+        {
+          "when": [
+            {
+              "tile": "key",
+              "args": {
+                "key": "s"
+              }
+            }
+          ],
+          "do": [
+            {
+              "tile": "fly",
+              "args": {
+                "dir": "down"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "cube",
+      "glyph": "c",
+      "color": "yellow",
+      "health": 1,
+      "count": 0,
+      "solid": true,
+      "role": "prop",
+      "shape": "cube",
+      "size": 100,
+      "brain": []
+    }
+  ],
+  "tiles": []
+}

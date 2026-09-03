@@ -657,6 +657,69 @@ def a_spawn(obj, world, a, it):
     world.spawn_somewhere(a["kind"])
 
 
+@action("shape", "flip {target}'s shape between cube and sphere",
+        Param("target", "Flip whom?", "choice", ["it", "self"], "it"))
+def a_shape(obj, world, a, it):
+    victim = obj if a["target"] == "self" else it
+    if victim is not None:
+        victim.shape = "cube" if getattr(victim, "shape", "cube") == "sphere" else "sphere"
+
+
+@action("resize", "change {target}'s size by {amount}",
+        Param("target", "Resize whom?", "choice", ["it", "self"], "it"),
+        Param("amount", "By how much? (percent points, can be negative)", "int", [], 25))
+def a_resize(obj, world, a, it):
+    victim = obj if a["target"] == "self" else it
+    if victim is not None:
+        size = getattr(victim, "size", 100) + a["amount"]
+        victim.size = max(40, min(220, size))
+
+
+@action("fly", "fly {dir}",
+        Param("dir", "Which way?", "choice", ["up", "down"], "up"))
+def a_fly(obj, world, a, it):
+    if not getattr(obj, "flying", False):
+        return   # walking mode -- grounded, fly buttons do nothing
+    step = 1 if a["dir"] == "up" else -1
+    obj.z = max(0, min(8, getattr(obj, "z", 0) + step))
+
+
+@action("toggle_flight", "switch between walking and flying")
+def a_toggle_flight(obj, world, a, it):
+    obj.flying = not getattr(obj, "flying", False)
+    if not obj.flying:
+        obj.z = 0    # land immediately -- walking mode means on the ground
+
+
+@action("place", "add a new {kind}, see-through until placed again to confirm it",
+        Param("kind", "Add what?", "kind", [], "block"))
+def a_place(obj, world, a, it):
+    """Press once to preview a new object where you stand, see-through and
+    not yet solid; press the same tile again to confirm the one you are
+    already previewing, which makes it solid and opaque. One preview per
+    presser at a time -- pressing while someone else's preview is still
+    pending starts your own, it does not confirm theirs.
+
+    `world.memory["palette_kind"]` overrides which kind gets placed, when
+    set -- the build mode's palette writes it directly (browser-only, see
+    world3d.html), so a game never has to know about it. Pending lookup is
+    by owner alone, not kind: switching the palette mid-placement must
+    still confirm whatever ghost you already started, not strand it."""
+    kind = world.memory.get("palette_kind") or a["kind"]
+    pending = next((t for t in world.things
+                     if t.alive and t.ghost and t.owner is obj),
+                    None)
+    if pending is not None:
+        pending.ghost = False
+        pending.solid = True
+    else:
+        fresh = world.spawn(kind, obj.x, obj.y)
+        if fresh is not None:
+            fresh.ghost = True
+            fresh.solid = False
+            fresh.owner = obj
+
+
 @action("remember", "remember {name} is {value}",
         Param("name", "Call it what?", "text", [], "chrome"),
         Param("value", "Which is?", "text", [], "com.android.chrome"))

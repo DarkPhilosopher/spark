@@ -6,16 +6,26 @@
 <title>Spark 3D</title>
 <style>
   :root{
-    --bg:#0d0f12; --panel:#1d2026; --panel2:#252932; --line:#333945;
-    --ink:#e8eaed; --dim:#9aa3b2; --accent:#4dd0e1; --bad:#d0554f;
-    --good:#5dd97f;
+    /* Gray + light blue, on purpose -- no near-black background, no neon
+       accent. See ~/spark/CLAUDE.md "design preference". */
+    --bg:#4a5058; --panel:#5b6169; --panel2:#666d76; --line:#838a94;
+    --ink:#f2f4f6; --dim:#c7ccd3; --accent:#8ecae6; --bad:#d99a94;
+    --good:#a8c9a0;
     /* How big the pad is, as a share of this phone's own screen -- so it comes
        out right on a small phone and a big one without either being measured.
        Upright: half the height, unless the phone is narrow enough that the
        width runs out first. Sideways below. The cap stops a tablet handing you
        a pad the size of a dinner plate. */
     --pad:min(94vw, 50vh, 460px);
-    --util:44px;             /* restart / centre / live: pressed rarely */
+    --util:clamp(36px, 9vw, 48px); /* restart / centre / save / live: pressed rarely */
+    /* The translucent panel colours that kept getting retyped as the same
+       literal rgba() across pad/side/drawer/modals as each was added --
+       named once here instead. Not every rgba() in this file uses these:
+       only the ones that were genuinely the same value more than once. */
+    --glass-input: rgba(102,109,118,.5);   /* text/number inputs inside a modal */
+    --glass-btn: rgba(102,109,118,.6);     /* pad/side/tab/bubble backgrounds */
+    --overlay-text: rgba(74,80,88,.85);    /* HUD/say floating text backgrounds */
+    --modal-bg: rgba(74,80,88,.96);        /* Mesh Creator / Build / Inspector backgrounds */
   }
   *{box-sizing:border-box}
   html,body{height:100%}
@@ -23,11 +33,13 @@
        font:15px/1.4 system-ui,-apple-system,"Roboto",sans-serif;
        -webkit-text-size-adjust:100%;-webkit-user-select:none;user-select:none;
        touch-action:none;
-       display:flex;flex-direction:column;
        height:100vh;height:100dvh}   /* dvh: Chrome's address bar comes and goes */
 
-  /* the world's own region -- the canvas fills this and nothing else */
-  #stage{position:relative;flex:1 1 auto;min-height:0;min-width:0}
+  /* The world always fills the whole device screen -- the bar and the pad
+     float over it as translucent panels instead of splitting the page into
+     a game region and a controls region, so nothing ever crops the view
+     down to a smaller window than the screen actually is. */
+  #stage{position:fixed;inset:0}
   canvas{position:absolute;inset:0;width:100%;height:100%;display:block;
          touch-action:none}
 
@@ -37,11 +49,21 @@
          font:700 15px/1 ui-monospace,monospace;
          text-shadow:0 1px 3px #000,0 0 6px #000;white-space:pre}
 
+  /* Ring around whichever object the Inspector currently has -- tap any
+     object in the world to pick it (see setupObjectPicking()), or it
+     follows whatever the touch-based inspect found. Projected the same
+     way a glyph is, so it tracks the object exactly as the camera moves. */
+  #select-highlight{position:absolute;top:0;left:0;width:46px;height:46px;
+      margin:-23px 0 0 -23px;border-radius:50%;pointer-events:none;
+      border:3px solid var(--accent);box-shadow:0 0 12px var(--accent);
+      display:none}
+  #select-highlight.on{display:block}
+
   /* top bar: the name and badge, then the buttons you press rarely */
   #bar{position:absolute;top:0;left:0;right:0;z-index:4;display:flex;
        flex-direction:column;gap:6px;padding:8px;
        padding-top:calc(8px + env(safe-area-inset-top));
-       background:linear-gradient(#0d0f12f2,#0d0f1200);
+       background:linear-gradient(rgba(74,80,88,.95),rgba(74,80,88,0));
        pointer-events:none}
   #bar button,#bar .badge{pointer-events:auto}
   .barrow{display:flex;gap:8px;align-items:center}
@@ -52,23 +74,37 @@
          background:var(--panel);white-space:nowrap}
   .badge.live{color:var(--good);border-color:var(--good)}
   .badge.local{color:var(--accent);border-color:var(--accent)}
-  #side{display:flex;gap:6px;justify-content:flex-end}
-  #side button{font-size:12px;padding:8px 12px;border-radius:11px;
-               min-height:var(--util);min-width:0}
+  /* Icons for the buttons pressed rarely (restart/recentre/fullscreen),
+     short words for the ones whose meaning an icon would blur (save/new) or
+     that already carry their own dynamic label (mode) -- kept small and
+     wrapping instead of running off the edge of a narrow phone. */
+  #side,#side-tools{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+  #side-tools{margin-top:6px}
+  #side button,#side-tools button{font-size:12px;padding:8px 12px;border-radius:11px;
+               min-height:var(--util);min-width:0;
+               background:var(--glass-btn);backdrop-filter:blur(6px);
+               -webkit-backdrop-filter:blur(6px)}
 
-  #hud{position:absolute;top:calc(104px + env(safe-area-inset-top));left:8px;z-index:4;
+  /* 160px, not the 104px this used to be -- the top bar grew a second
+     row of buttons (#side-tools) and this has to clear both rows plus
+     the title, on the shortest phone this runs on, not just a tall one. */
+  #hud{position:absolute;top:calc(160px + env(safe-area-inset-top));left:8px;z-index:4;
        font:12px/1.7 ui-monospace,monospace;color:var(--dim);
-       background:#0d0f12bb;border-radius:10px;padding:6px 10px}
+       background:var(--overlay-text);border-radius:10px;padding:6px 10px}
   #hud b{color:var(--ink)}
-  #say{position:absolute;top:calc(104px + env(safe-area-inset-top));right:8px;z-index:4;
+  #say{position:absolute;top:calc(160px + env(safe-area-inset-top));right:8px;z-index:4;
        max-width:52vw;text-align:right;color:var(--accent);font-size:13px;
-       background:#0d0f12bb;border-radius:10px;padding:6px 10px}
+       background:var(--overlay-text);border-radius:10px;padding:6px 10px}
   #say:empty{display:none}
 
-  /* the pad's own region: it never sits on top of the world */
-  #controls{flex:0 0 auto;display:flex;align-items:center;justify-content:center;
+  /* Floats over the bottom of the world instead of claiming a strip of the
+     page for itself -- pointer-events:none on the wrapper so a swipe in the
+     empty padding around the pad still reaches the canvas and turns the
+     camera; the pad and its buttons opt back in below. */
+  #controls{position:fixed;left:0;right:0;bottom:0;z-index:4;
+            display:flex;align-items:center;justify-content:center;
             padding:8px;padding-bottom:calc(8px + env(safe-area-inset-bottom));
-            background:var(--bg)}
+            pointer-events:none}
   button{font:inherit;color:var(--ink);background:var(--panel2);
          border:1px solid var(--line);border-radius:14px;
          min-height:48px;min-width:48px;padding:10px 14px}
@@ -76,27 +112,299 @@
   button[disabled]{opacity:.4}
 
   /* A square of side --pad, split three by three. Each key is therefore just
-     under a third of that, whatever size the screen turned out to be. */
+     under a third of that, whatever size the screen turned out to be. Half
+     transparent and blurred, so it reads as floating over the environment
+     rather than a solid panel sitting beside it. */
   #pad{display:grid;width:var(--pad);height:var(--pad);
        grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);
-       gap:3%}
+       gap:3%;pointer-events:auto}
   #pad button{width:100%;height:100%;min-width:0;min-height:0;padding:0;
               border-radius:18%;font-size:calc(var(--pad) * 0.115);
-              background:var(--panel2);border-color:rgba(120,132,150,.55)}
-  #pad .fire{background:#2b3a44;border-color:var(--accent);color:var(--accent);
+              background:rgba(102,109,118,.55);border-color:rgba(131,138,148,.6);
+              backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+  #pad .fire{background:rgba(126,164,186,.4);border-color:var(--accent);color:var(--accent);
              font-size:calc(var(--pad) * 0.09)}
 
-  /* Sideways there is width to spare and no height to spare, so the two
-     regions sit side by side instead of stacked, and the pad is measured
-     against the width. */
+  /* Sideways there is width to spare and no height to spare, so the pad
+     tucks into the bottom-right corner instead of spreading across the
+     bottom -- it still floats over the world, which now fills the whole
+     screen in either orientation. */
   @media (orientation:landscape){
-    body{flex-direction:row}
-    :root{--pad:min(50vw, 94vh, 460px)}
-    #controls{padding-left:0}
+    /* 100vh minus room for the top bar (title + a row of side buttons)
+       and the bottom safe area, so the pad can no longer grow tall enough
+       to reach up and overlap the bar the way a flat vh share could. */
+    :root{--pad:min(46vw, calc(100vh - 150px), 420px)}
+    #controls{justify-content:flex-end;
+              padding-right:calc(8px + env(safe-area-inset-right))}
   }
 
+  /* Button Drawer: a row of round buttons that slides out from the left
+     edge, floating translucent over the world -- see makeDrawer() below
+     and ~/bubble-drawer/README.md for the full write-up. */
+  .drawer{position:fixed;z-index:6;display:flex;
+          transition:transform .25s cubic-bezier(.2,.8,.3,1)}
+  /* A fixed offset from the top, not vertically centered or bottom-anchored
+     -- centered put it right over the HUD on a short landscape screen, and
+     the portrait pad can span nearly the full width of the bottom half, so
+     "low-left" isn't actually clear of it either. This band -- below the
+     HUD, above where a portrait pad's top edge lands -- is clear in both
+     orientations (landscape keeps the whole left half free of the pad,
+     which sits on the right there, regardless of height). */
+  .drawer[data-edge="left"]{top:calc(250px + env(safe-area-inset-top));left:0;
+                             flex-direction:row;
+                             transform:translate(calc(-100% + var(--util)), 0)}
+  .drawer[data-edge="left"].open{transform:translate(0, 0)}
+  .drawer .tab{width:var(--util);height:var(--util);flex:0 0 auto;
+               display:flex;align-items:center;justify-content:center;
+               background:var(--glass-btn);border:1px solid var(--line);
+               color:var(--accent);font-size:20px;cursor:pointer;
+               backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+               border-radius:0 14px 14px 0}
+  .drawer .tab span{transition:transform .25s;display:block}
+  .drawer.open .tab span{transform:rotate(180deg)}
+  .drawer .bubbles{display:flex;flex-direction:column;gap:10px;padding:10px;
+                   background:rgba(74,80,88,.55);border:1px solid var(--line);
+                   backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+  .bubble{width:var(--util);height:var(--util);border-radius:50%;flex:0 0 auto;
+          display:flex;align-items:center;justify-content:center;
+          background:var(--glass-btn);border:1px solid var(--line);
+          color:var(--ink);font-size:18px;cursor:pointer;
+          transition:transform .12s,background .12s}
+  .bubble:active{transform:scale(.88)}
+  .bubble.selected{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent) inset}
+  .bubble.control{margin-top:6px;font-weight:700}
+  .bubble.control.add{color:var(--good);border-color:var(--good)}
+  .bubble.control.remove{color:var(--bad);border-color:var(--bad)}
+  /* armed: waiting for you to tap the bubble to remove, not acting yet */
+  .bubble.control.remove.armed{background:var(--bad);color:var(--bg);
+                                animation:pulse 1s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
+  /* a locked bubble refusing a removal tap: a short shake, nothing removed */
+  .bubble.shake{animation:shake .32s ease}
+  @keyframes shake{
+    0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)}
+    75%{transform:translateX(5px)}
+  }
+
+  /* Button editor: on while body has .editing-buttons. Every button this
+     applies to is marked [data-editable] -- every pad and side-bar button
+     up front, and every button drawer's bubbles too (including its own
+     +/× and any you add), registered as each one is built. A selected one
+     gets a solid outline instead of dashed and the panel shows its
+     sliders; position/size/opacity are stored per-button, by a stable id,
+     in localStorage, so they survive a reload. */
+  body.editing-buttons [data-editable]{outline:2px dashed var(--accent);
+                                        outline-offset:3px;cursor:grab;
+                                        touch-action:none}
+  body.editing-buttons [data-editable].edit-selected{outline-style:solid}
+  /* Near-fullscreen, same "inset from every edge, not edge to edge" idea
+     as Properties -- it was a small bottom-anchored box before, which is
+     how it ended up overflowing off the top of a short screen; a fixed
+     inset can't do that, and there's room for everything to breathe. */
+  #edit-panel{position:fixed;inset:6vh 6vw;z-index:20;display:none;
+              flex-direction:column;gap:8px;overflow-y:auto;touch-action:pan-y;
+              background:rgba(74,80,88,.94);border:1px solid var(--line);
+              border-radius:12px;padding:14px 16px;
+              backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+  #edit-panel.on{display:flex}
+  #edit-panel label{display:flex;align-items:center;gap:8px;
+                     font-size:12px;color:var(--dim)}
+  #edit-panel input[type=range]{flex:1}
+  #edit-panel input[type=number]{flex:1;width:100%;min-width:0;font:inherit;
+                                 color:var(--ink);background:var(--glass-input);
+                                 border:1px solid var(--line);border-radius:6px;
+                                 padding:6px 8px;min-height:32px}
+  #edit-panel .row{display:flex;flex-wrap:wrap;gap:8px}
+  #edit-panel button{flex:1;font-size:12px;padding:6px 10px;min-height:36px}
+  #edit-panel input[type=checkbox]{width:18px;height:18px;flex:0 0 auto}
+  /* faint lines across the whole screen at the grid spacing, so grid lock
+     has something to actually align to, not just invisible snapping.
+     background-size in % is relative to this element's own box, which is
+     the full viewport (position:fixed;inset:0) -- so it always matches
+     the grid size percent with no JS recalculation on resize. */
+  #edit-grid-overlay{position:fixed;inset:0;z-index:5;display:none;
+                     pointer-events:none;
+                     background-image:
+                       linear-gradient(to right, rgba(142,202,230,.4) 1px, transparent 1px),
+                       linear-gradient(to bottom, rgba(142,202,230,.4) 1px, transparent 1px);
+                     background-size:5% 5%}
+  #edit-grid-overlay.on{display:block}
+  /* every button that exists, so one that got dragged off-screen or faded
+     down to invisible can still be found and picked, by name */
+  /* Exactly 4 rows tall (4 * 34px row + 3 * 4px gap), then scrolls for the
+     rest -- a fixed pixel height rather than a vh share, so it is really
+     four rows on every screen instead of "however many happen to fit".
+     min-height:0 matters here: without it a flex child (which this is,
+     #edit-panel is display:flex) refuses to shrink below its content's
+     natural height no matter what max-height says, so the whole list
+     would render at full height regardless of what max-height/overflow
+     said -- exactly what "overflow-y:auto" was supposed to prevent. */
+  #edit-list{display:flex;flex-direction:column;gap:4px;
+             max-height:148px;min-height:0;overflow-y:auto;touch-action:pan-y}
+  .edit-list-row{box-sizing:border-box;height:34px;flex:0 0 auto;
+                 display:flex;align-items:center;
+                 font-size:12px;padding:0 10px;border-radius:8px;
+                 background:var(--glass-input);cursor:pointer;
+                 white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .edit-list-row.on{background:var(--accent);color:var(--bg);font-weight:700}
+  /* named layout saves -- same row look, plus a delete glyph on the right */
+  #edit-layout-list{display:flex;flex-direction:column;gap:4px;
+                    max-height:148px;min-height:0;overflow-y:auto;touch-action:pan-y}
+  .layout-row{display:flex;align-items:center;justify-content:space-between;
+             cursor:default}
+  .layout-name{flex:1;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+  .layout-del{color:var(--bad);font-weight:700;padding:2px 8px;cursor:pointer}
+
+  /* Backpack -- styled like Windows File Explorer, deliberately not the
+     game's own gray/light-blue theme (see the HTML comment above it).
+     Plain light chrome, a classic toolbar row, a breadcrumb, a grid of
+     folder/file icons. */
+  #backpack-modal{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+                  z-index:18;display:none;flex-direction:column;
+                  width:min(92vw,520px);height:min(64vh,440px);
+                  background:#fff;color:#1a1a1a;border:1px solid #b0b0b0;
+                  border-radius:6px;overflow:hidden;
+                  box-shadow:0 12px 40px rgba(0,0,0,.35);
+                  font:13px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+  #backpack-modal.on{display:flex}
+  #backpack-titlebar{display:flex;align-items:center;gap:6px;
+                     background:#f3f3f3;border-bottom:1px solid #ddd;
+                     padding:6px 8px;flex:0 0 auto}
+  #backpack-title-icon{font-size:15px}
+  #backpack-title-text{font-weight:600;margin-right:auto}
+  #backpack-close{background:transparent;border:none;color:#333;
+                  font-size:13px;padding:4px 10px;border-radius:4px;
+                  min-height:28px;min-width:28px}
+  #backpack-close:active{background:#e81123;color:#fff}
+  #backpack-toolbar{display:flex;gap:4px;flex-wrap:wrap;
+                    background:#fafafa;border-bottom:1px solid #e5e5e5;
+                    padding:6px 8px;flex:0 0 auto}
+  #backpack-toolbar button{background:#fff;color:#1a1a1a;
+                           border:1px solid #d0d0d0;border-radius:4px;
+                           font-size:12px;padding:5px 10px;min-height:30px}
+  #backpack-toolbar button:active{background:#e8f0fe;border-color:#8ab4f8}
+  #backpack-toolbar button[disabled]{opacity:.4}
+  #backpack-path{background:#fff;border-bottom:1px solid #eee;
+                 padding:6px 10px;font-size:12px;color:#555;flex:0 0 auto}
+  .bp-crumb{cursor:pointer;color:#0066cc}
+  .bp-crumb:last-child{color:#555;cursor:default}
+  #backpack-grid{flex:1 1 auto;overflow-y:auto;touch-action:pan-y;
+                 display:grid;grid-template-columns:repeat(auto-fill,74px);
+                 gap:4px;padding:10px;align-content:start}
+  .bp-item{display:flex;flex-direction:column;align-items:center;gap:4px;
+           padding:8px 4px;border-radius:6px;cursor:pointer;
+           text-align:center}
+  .bp-item.on{background:#cde8ff}
+  .bp-icon{font-size:30px;line-height:1}
+  .bp-label{font-size:11px;color:#222;word-break:break-word;
+            max-width:70px;line-height:1.2}
+  .bp-empty{grid-column:1/-1;color:#888;font-size:12px;padding:20px;
+            text-align:center}
+
+  /* Properties: near-fullscreen, but inset from every edge on purpose so
+     the world stays visible all the way round it -- in the game's own
+     gray/light-blue theme, unlike the Backpack's deliberate exception. */
+  #properties-modal{position:fixed;inset:6vh 6vw;z-index:17;display:none;
+                    flex-direction:column;background:var(--modal-bg);
+                    border:1px solid var(--line);border-radius:12px;
+                    overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.35);
+                    backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+  #properties-modal.on{display:flex}
+  #properties-titlebar{display:flex;align-items:center;gap:8px;
+                       padding:12px 14px;font-weight:700;
+                       border-bottom:1px solid var(--line);flex:0 0 auto}
+  #properties-titlebar span{margin-right:auto}
+  #properties-titlebar button{min-height:34px;padding:4px 12px}
+  #properties-body{flex:1 1 auto;overflow-y:auto;touch-action:pan-y;padding:14px}
+  .prop-row{display:flex;align-items:center;justify-content:space-between;
+           gap:12px;padding:12px 4px;border-bottom:1px solid rgba(131,138,148,.35)}
+  .prop-label{font-size:14px;color:var(--dim)}
+  .prop-value{font:14px/1 ui-monospace,monospace;color:var(--ink)}
+  .prop-toggle{min-width:64px;min-height:34px;font-size:12px;padding:6px 10px}
+  .prop-toggle.on{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+  #properties-body .row{display:flex;flex-wrap:wrap;gap:8px;width:100%}
+  #properties-body input[type=range]{flex:1}
+  #properties-body input[type=number]{flex:0 0 64px;width:64px;font:inherit;
+      color:var(--ink);background:var(--glass-input);border:1px solid var(--line);
+      border-radius:6px;padding:6px 8px;min-height:32px}
+
+  /* Compass -- a meter across the top, not a dial: ticks scroll sideways
+     as the camera turns (see drawCompass()), the current heading always
+     sits under the fixed centre marker, same idea as a flight HUD. */
+  #compass{position:fixed;top:calc(8px + env(safe-area-inset-top));
+           left:50%;transform:translateX(-50%);z-index:4;
+           width:min(94vw,480px);height:32px;overflow:hidden;
+           background:rgba(74,80,88,.75);border:1px solid var(--line);
+           border-radius:8px;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+  #compass-tape{position:absolute;top:0;left:50%;height:100%;white-space:nowrap}
+  .compass-tick{position:absolute;top:0;bottom:0;transform:translateX(-50%);
+                display:flex;align-items:center;justify-content:center}
+  .compass-tick.minor::before{content:"";display:block;width:1px;height:8px;
+                              background:var(--dim)}
+  .compass-tick.major{font:700 11px/1 ui-monospace,monospace;color:var(--ink);
+                      width:28px}
+  .compass-tick.major.north{color:var(--accent)}
+  #compass-marker{position:absolute;top:0;bottom:0;left:50%;width:2px;
+                  background:var(--accent);transform:translateX(-50%);
+                  pointer-events:none}
+
+  /* Bottom-left, clear of the drawer's own thin tab strip at the very
+     edge, and clear of the pad regardless of orientation (portrait:
+     centred; landscape: pushed to the right). Off by default. */
+  #minimap{position:fixed;bottom:calc(8px + env(safe-area-inset-bottom));
+           left:60px;z-index:4;width:110px;height:110px;
+           border-radius:8px;border:1px solid var(--line);
+           background:rgba(74,80,88,.7);display:none;pointer-events:none}
+  #minimap.on{display:block}
+
+  /* Quickbar -- a fixed row of plain bubble slots, always visible, no tab
+     to open first. Reuses the drawer's own .bubble look for consistency,
+     but is not a drawer: nothing here slides. 245px clears the HUD (which
+     itself starts at 160px, now that the top bar has two button rows). */
+  #quickbar{position:fixed;top:calc(245px + env(safe-area-inset-top));
+           left:50%;transform:translateX(-50%);z-index:4;
+           display:flex;gap:8px;padding:6px}
+  #quickbar .bubble{font-size:16px}
+
+  /* Mesh Creator, Build/palette, and the Object Inspector -- same near-
+     fullscreen, inset-from-every-edge shape as Properties, and the same
+     game colours (this trio is not the Backpack's deliberate exception). */
+  #mesh-modal,#palette-modal,#inspect-modal{position:fixed;inset:6vh 6vw;
+                             z-index:17;display:none;flex-direction:column;
+                             background:var(--modal-bg);
+                             border:1px solid var(--line);border-radius:12px;
+                             overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.35);
+                             backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+  #mesh-modal.on,#palette-modal.on,#inspect-modal.on{display:flex}
+  #mesh-titlebar{display:flex;align-items:center;gap:8px;padding:12px 14px;
+                 font-weight:700;border-bottom:1px solid var(--line);flex:0 0 auto}
+  #mesh-titlebar span{margin-right:auto}
+  #mesh-titlebar button{min-height:34px;padding:4px 12px}
+  #mesh-preview-wrap{flex:0 0 auto;height:34vh;position:relative;
+                     border-bottom:1px solid var(--line)}
+  #mesh-canvas{position:absolute;inset:0;width:100%;height:100%;
+              display:block;touch-action:none}
+  #mesh-body{flex:1 1 auto;overflow-y:auto;touch-action:pan-y;
+            padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+  #mesh-body .row{display:flex;flex-wrap:wrap;gap:8px}
+  #mesh-body label{display:flex;flex-direction:column;gap:4px;
+                   font-size:11px;color:var(--dim)}
+  #mesh-body input[type=number],#mesh-body input[type=text],#mesh-body select{
+      width:100%;min-width:0;flex:1;
+      font:inherit;color:var(--ink);background:var(--glass-input);
+      border:1px solid var(--line);border-radius:6px;padding:6px 8px;
+      min-height:32px}
+  #mesh-body button{flex:1;font-size:12px;padding:6px 10px;min-height:36px}
+  #mesh-part-list,#palette-list{display:flex;flex-direction:column;gap:4px;
+      max-height:148px;min-height:0;overflow-y:auto;touch-action:pan-y}
+  .mesh-part-row,.palette-item{font-size:12px;padding:8px 10px;
+      border-radius:8px;background:var(--glass-input);cursor:pointer;
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mesh-part-row.on,.palette-item.on{background:var(--accent);
+      color:var(--bg);font-weight:700}
+
   #veil{position:fixed;inset:0;z-index:9;display:none;place-items:center;
-        background:#0d0f12ee;padding:24px;text-align:center}
+        background:rgba(58,63,70,.96);padding:24px;text-align:center}
   #veil.on{display:grid}
   #veil div{max-width:44ch;max-height:80vh;overflow-y:auto}
   #veil h1{font-size:19px;margin:0 0 10px}
@@ -116,16 +424,29 @@
 <div id="stage">
   <canvas id="gl"></canvas>
   <div id="labels"></div>
+  <div id="select-highlight"></div>
 
   <div id="bar">
     <div class="barrow">
       <div id="title">Spark 3D</div>
       <div class="badge" id="source">…</div>
     </div>
+    <!-- split on purpose, not just wherever flex-wrap happens to break --
+         pressed often, above pressed rarely, so the row you actually
+         reach for stays short and predictable regardless of screen
+         width. -->
     <div id="side">
-      <button id="restart">restart</button>
-      <button id="recentre">centre</button>
-      <button id="mode">…</button>
+      <button id="restart" data-editable title="restart">↺</button>
+      <button id="recentre" data-editable title="recentre camera">⌖</button>
+      <button id="fullscreen" data-editable title="fullscreen">⛶</button>
+      <button id="mode" data-editable>…</button>
+    </div>
+    <div id="side-tools">
+      <button id="save" data-editable title="save">save</button>
+      <button id="save-as" data-editable title="save as a new 3d world file">new</button>
+      <button id="backpack-toggle" data-editable title="backpack">🎒</button>
+      <button id="properties-toggle" data-editable title="properties">⚙</button>
+      <button id="edit-toggle" title="edit buttons: select, drag, resize, fade">✎</button>
     </div>
   </div>
 
@@ -135,11 +456,222 @@
 
 <div id="controls">
   <div id="pad">
-    <span></span><button data-key="up" aria-label="up">▲</button><span></span>
-    <button data-key="left" aria-label="left">◀</button>
-    <button data-key="space" class="fire" aria-label="space">●</button>
-    <button data-key="right" aria-label="right">▶</button>
-    <span></span><button data-key="down" aria-label="down">▼</button><span></span>
+    <button data-key="e" data-editable class="fire" aria-label="flip shape">⟲</button><button data-key="up" data-editable aria-label="up">▲</button><button data-key="f" data-editable class="fire" aria-label="resize">+</button>
+    <button data-key="left" data-editable aria-label="left">◀</button>
+    <button data-key="space" data-editable class="fire" aria-label="space">●</button>
+    <button data-key="right" data-editable aria-label="right">▶</button>
+    <button data-key="s" data-editable class="fire" aria-label="fly down">⤓</button><button data-key="down" data-editable aria-label="down">▼</button><button data-key="w" data-editable class="fire" aria-label="fly up">⤒</button>
+  </div>
+</div>
+
+<div id="edit-grid-overlay"></div>
+
+<!-- Shown for the whole time edit-buttons mode is on. The list covers
+     every button that exists, including ones dragged off-screen or faded
+     down to where you can no longer find them by tapping -- pick one here
+     instead, then drag it and use the sliders. -->
+<div id="edit-panel">
+  <div id="edit-list"></div>
+  <!-- slider and typed decimal percent, kept in sync both ways, and both
+       filled in with whatever the selected button already has. -->
+  <div class="row">
+    <label style="flex:2">size <input id="edit-size" type="range" min="50" max="150" step="0.1" value="100"></label>
+    <input id="edit-size-num" type="number" step="0.1" min="50" max="150" value="100">
+  </div>
+  <div class="row">
+    <label style="flex:2">opacity <input id="edit-opacity" type="range" min="20" max="100" step="0.1" value="100"></label>
+    <input id="edit-opacity-num" type="number" step="0.1" min="20" max="100" value="100">
+  </div>
+  <!-- typed position, as a decimal percent of the whole screen -- 0,0 is
+       the top-left corner, 100,100 the bottom-right. Shows where the
+       selected button is right now; type new numbers and press "go". -->
+  <div class="row">
+    <label style="flex:1">x% <input id="edit-x" type="number" step="0.1" min="0" max="100"></label>
+    <label style="flex:1">y% <input id="edit-y" type="number" step="0.1" min="0" max="100"></label>
+  </div>
+  <div class="row">
+    <button id="edit-goto-xy">go to x%, y%</button>
+  </div>
+  <!-- grid lock: dragging (and "go to x%, y%") snap to the nearest
+       multiple of the grid size instead of landing anywhere exact. -->
+  <div class="row">
+    <label style="flex:2"><input id="edit-grid-on" type="checkbox"> grid lock</label>
+    <input id="edit-grid-size" type="number" step="0.5" min="1" max="50" value="5" title="grid size, percent of screen">
+  </div>
+  <div class="row">
+    <button id="edit-reset">reset this button</button>
+    <button id="edit-reset-all">reset all buttons</button>
+  </div>
+  <!-- Named layouts: whole-screen snapshots of every button's position/
+       size/opacity, saved under a name and reloaded later -- separate
+       from the one working layout that's always live. -->
+  <div class="row">
+    <button id="edit-save-layout">save layout as…</button>
+  </div>
+  <div id="edit-layout-list"></div>
+</div>
+
+<!-- Backpack: a small virtual file system, styled like Windows File
+     Explorer on purpose -- see ~/spark/CLAUDE.md, this is a deliberate
+     exception to the rest of the game's gray/light-blue theme, not a
+     drift from it. Starts with two folders, "buttons" and "backpack";
+     what goes in them (and any further folders/files) is entirely up
+     to whoever's using it -- New folder/New item/Delete work the same
+     way in every folder you navigate into. -->
+<div id="backpack-modal">
+  <div id="backpack-titlebar">
+    <span id="backpack-title-icon">🎒</span>
+    <span id="backpack-title-text">Backpack</span>
+    <button id="backpack-close" title="close">✕</button>
+  </div>
+  <div id="backpack-toolbar">
+    <button id="bp-up" title="up one folder">⬆ Up</button>
+    <button id="bp-new-folder">📁 New folder</button>
+    <button id="bp-new-file">📄 New item</button>
+    <button id="bp-delete">🗑 Delete</button>
+  </div>
+  <div id="backpack-path"></div>
+  <div id="backpack-grid"></div>
+</div>
+
+<!-- Properties: near-fullscreen on purpose, but not edge to edge -- a
+     visible margin of the world stays in view all the way round. -->
+<div id="properties-modal">
+  <div id="properties-titlebar">
+    <span>⚙ Properties</span>
+    <button id="properties-close" title="close">✕</button>
+  </div>
+  <div id="properties-body">
+    <div class="prop-row">
+      <span class="prop-label">Grid lock movement</span>
+      <button id="prop-gridlock-toggle" class="prop-toggle">OFF</button>
+    </div>
+    <div class="prop-row">
+      <span class="prop-label">World time</span>
+      <span id="prop-clock" class="prop-value">00:00:00</span>
+    </div>
+    <div class="prop-row" style="flex-direction:column;align-items:stretch;gap:8px">
+      <span class="prop-label">Move speed (ticks per second)</span>
+      <div class="row">
+        <input id="prop-speed" type="range" min="1" max="30" step="1" value="6">
+        <input id="prop-speed-num" type="number" min="1" max="30" step="1" value="6">
+      </div>
+    </div>
+    <div class="prop-row">
+      <span class="prop-label">Minimap</span>
+      <button id="prop-minimap-toggle" class="prop-toggle">OFF</button>
+    </div>
+  </div>
+</div>
+
+<!-- Compass: which way the camera is facing, not the character -- the
+     ring rotates under a fixed pointer, same idea as a map app. -->
+<!-- A meter, not a dial: ticks scroll sideways as the camera turns, the
+     current heading always sits under the fixed centre marker -- built
+     and positioned in JS, see setupCompass()/drawCompass(). -->
+<div id="compass" title="camera heading">
+  <div id="compass-tape"></div>
+  <div id="compass-marker"></div>
+</div>
+
+<!-- Minimap: off by default (toggle in Properties) -- one more
+     always-on corner widget was the wrong call given how crowded the
+     top of the screen already got once this session; opt-in instead. -->
+<canvas id="minimap" width="110" height="110"></canvas>
+
+<!-- Mesh Creator: build a custom multi-part shape (a cube here, a sphere
+     there, each offset and sized on its own) and save it as a new,
+     placeable kind. The preview is a second, small WebGL renderer -- same
+     Renderer class as the main view, its own canvas, so it costs nothing
+     extra to keep working and shows exactly what will actually be
+     placed. -->
+<div id="mesh-modal">
+  <div id="mesh-titlebar">
+    <span>🧩 Mesh Creator</span>
+    <button id="mesh-close" title="close">✕</button>
+  </div>
+  <div id="mesh-preview-wrap"><canvas id="mesh-canvas"></canvas></div>
+  <div id="mesh-body">
+    <div class="row">
+      <select id="mesh-load-select"><option value="">— load an existing mesh to edit —</option></select>
+      <button id="mesh-load-btn">load</button>
+      <button id="mesh-delete-btn">🗑</button>
+    </div>
+    <div id="mesh-part-list"></div>
+    <div class="row">
+      <button id="mesh-add-part">+ add a part</button>
+      <button id="mesh-dup-part">⧉ duplicate part</button>
+    </div>
+    <div class="row">
+      <label style="flex:1">shape
+        <select id="mesh-part-shape"><option value="cube">cube</option><option value="sphere">sphere</option><option value="cone">cone</option></select>
+      </label>
+      <label style="flex:1">color <select id="mesh-part-color"></select></label>
+    </div>
+    <div class="row">
+      <label style="flex:1">x <input id="mesh-part-dx" type="number" step="0.05" value="0"></label>
+      <label style="flex:1">y <input id="mesh-part-dy" type="number" step="0.05" value="0"></label>
+      <label style="flex:1">z <input id="mesh-part-dz" type="number" step="0.05" value="0"></label>
+    </div>
+    <div class="row">
+      <label style="flex:1">width <input id="mesh-part-sx" type="number" step="0.05" min="0.05" max="3" value="0.5"></label>
+      <label style="flex:1">height <input id="mesh-part-sy" type="number" step="0.05" min="0.05" max="3" value="0.5"></label>
+      <label style="flex:1">depth <input id="mesh-part-sz" type="number" step="0.05" min="0.05" max="3" value="0.5"></label>
+    </div>
+    <div class="row"><button id="mesh-delete-part">delete this part</button></div>
+    <div class="row">
+      <button id="mesh-new">clear / start over</button>
+      <button id="mesh-save">save as new kind…</button>
+    </div>
+  </div>
+</div>
+
+<!-- Build mode: pick which kind the place tile (▦ / "a") adds next, from
+     everything the project already has plus anything saved in the Mesh
+     Creator, and a Remove tool for taking placed objects back out. Local
+     play only -- see setPaletteKind()'s own note. -->
+<div id="palette-modal">
+  <div id="mesh-titlebar">
+    <span>🎨 Build</span>
+    <button id="palette-close" title="close">✕</button>
+  </div>
+  <div id="mesh-body">
+    <div class="row"><button id="palette-mesh-creator">🧩 open the Mesh Creator</button></div>
+    <div class="row"><input id="palette-search" type="text" placeholder="search…"></div>
+    <div id="palette-list"></div>
+  </div>
+</div>
+
+<!-- Object Inspector: colour, resize, and relocate whatever you're
+     touching -- or, if you have a ghost pending, that instead, so a
+     newly-spawned object can be set up before it's even confirmed. Local
+     play only, same as Build mode: it writes straight into the live Thing
+     instance, which only exists for the copy of the game in this tab. -->
+<div id="inspect-modal">
+  <div id="mesh-titlebar">
+    <span id="inspect-title">🎯 Object</span>
+    <button id="inspect-close" title="close">✕</button>
+  </div>
+  <div id="mesh-body">
+    <div class="row">
+      <label style="flex:1">color <select id="inspect-color"></select></label>
+      <label style="flex:1">shape
+        <select id="inspect-shape"><option value="cube">cube</option><option value="sphere">sphere</option><option value="cone">cone</option></select>
+      </label>
+    </div>
+    <div class="row">
+      <label style="flex:2">size <input id="inspect-size" type="range" min="20" max="300" step="1" value="100"></label>
+      <input id="inspect-size-num" type="number" step="1" min="20" max="300" value="100">
+    </div>
+    <div class="row">
+      <label style="flex:1">x <input id="inspect-x" type="number" step="1"></label>
+      <label style="flex:1">y <input id="inspect-y" type="number" step="1"></label>
+      <label style="flex:1">z (altitude) <input id="inspect-z" type="number" step="1" min="0" max="8"></label>
+    </div>
+    <div class="row">
+      <button id="inspect-duplicate">⧉ duplicate</button>
+      <button id="inspect-delete">🗑 delete this object</button>
+    </div>
   </div>
 </div>
 
@@ -149,7 +681,32 @@
   <button id="veil-b">try again</button>
 </div></div>
 
+
 <script>
+// Roughly in this order, top to bottom (search for the heading text to
+// jump straight there -- this file grew a UI subsystem at a time, so nothing
+// is alphabetical and nothing is grouped by file the way separate files
+// would be):
+//
+//   SPARK-ENGINE-START..END   the JS twin of engine/*.py (see check_engines.py)
+//   "The 3D view"             WebGL constants, colours, pushBox/Sphere/Cone
+//   "class Renderer"          the WebGL renderer itself (also reused for
+//                             the Mesh Creator's own preview canvas)
+//   "touch: one finger..."    camera drag/pinch, then movement key input
+//   "Button editor"           select/drag/resize/fade any button, named layouts
+//   "Backpack"                the small virtual file system
+//   "Properties"              grid-lock/world-clock/move-speed/minimap panel
+//   "Mesh Creator"            multi-part custom shapes, with live preview
+//   "Build mode / palette"    which kind the place tile adds next
+//   "Object Inspector"        colour/resize/relocate/duplicate a placed object
+//   "an "expanding" world"    windowed floor loading + auto-scatter
+//   "the frame"               the render loop itself, and the HUD/compass/
+//                             minimap/selection-ring draws it calls each tick
+//   "Button Drawer"           the slide-out row of bubbles (see also
+//                             ~/bubble-drawer/README.md, this is a copy)
+//   "Quickbar"                the always-visible empty bubble slots
+//   save/load, then the final (async () => { ... })() that actually starts
+//   the page once everything above it is defined.
 // ==== SPARK-ENGINE-START ====
 // A second copy of engine/world.py and engine/tiles.py, in JavaScript, so that
 // this page can run a game with nothing behind it -- no Termux, no Cloudflare,
@@ -374,6 +931,17 @@ class Thing {
     this.health = template.health === undefined ? 1 : template.health;
     this.solid = !!template.solid;
     this.role = template.role || "prop";
+    this.shape = template.shape || "cube";   // "cube" | "sphere"
+    this.size = template.size === undefined ? 100 : template.size; // percent
+    this.z = template.z === undefined ? 0 : template.z; // altitude, 0 = ground
+    this.full = !!template.full;     // fills its whole grid cell
+    this.ghost = !!template.ghost;   // placed but not confirmed yet
+    this.flying = !!template.flying; // walking (grounded) unless true
+    // A multi-part shape from the mesh creator: {shape,dx,dy,dz,sx,sy,sz,
+    // color}[], each relative to this thing's own (x,y,z). Only rendering
+    // cares -- when set, buildThings() draws these instead of the usual
+    // single shape/size.
+    this.parts = template.parts || null;
     this.brain = template.brain || [];
     this.facing = [0, -1];
     this.owner = null;
@@ -463,6 +1031,50 @@ const ACTIONS = {
   },
   heal: (obj, world, a) => { obj.health += num(a.amount, 1); },
   spawn: (obj, world, a) => { world.spawnSomewhere(a.kind); },
+  shape: (obj, world, a, it) => {
+    const victim = a.target === "self" ? obj : it;
+    if (victim) victim.shape = victim.shape === "sphere" ? "cube" : "sphere";
+  },
+  resize: (obj, world, a, it) => {
+    const victim = a.target === "self" ? obj : it;
+    if (victim) {
+      const size = (victim.size === undefined ? 100 : victim.size) + num(a.amount, 25);
+      victim.size = Math.max(40, Math.min(220, size));
+    }
+  },
+  fly: (obj, world, a) => {
+    if (!obj.flying) return;   // walking mode -- grounded, fly buttons do nothing
+    const step = a.dir === "down" ? -1 : 1;
+    obj.z = Math.max(0, Math.min(8, (obj.z || 0) + step));
+  },
+  toggle_flight: (obj) => {
+    obj.flying = !obj.flying;
+    if (!obj.flying) obj.z = 0;   // land immediately -- walking mode means on the ground
+  },
+  // Press once to preview a new object where you stand, see-through and not
+  // yet solid; press the same tile again to confirm the one you are already
+  // previewing. One preview per presser at a time.
+  place: (obj, world, a) => {
+    // world.memory.palette_kind overrides which kind gets placed, when set
+    // -- the build mode's palette writes it directly (see setPaletteKind
+    // below). Pending lookup is by owner alone, not kind: switching the
+    // palette mid-placement must still confirm whatever ghost is already
+    // started, not strand it.
+    const kind = world.memory.palette_kind || a.kind;
+    const pending = world.things.find(t =>
+      t.alive && t.ghost && t.owner === obj);
+    if (pending) {
+      pending.ghost = false;
+      pending.solid = true;
+    } else {
+      const fresh = world.spawn(kind, obj.x, obj.y);
+      if (fresh) {
+        fresh.ghost = true;
+        fresh.solid = false;
+        fresh.owner = obj;
+      }
+    }
+  },
   remember: (obj, world, a) => {
     const name = String(a.name === undefined ? "" : a.name).trim();
     if (name) world.memory[name] = String(a.value === undefined ? "" : a.value);
@@ -699,11 +1311,12 @@ const MIN_DIST = 4, MAX_DIST = 900;
 const COLOR_RGB = {
   white: [0.91, 0.92, 0.93], red: [0.82, 0.33, 0.31], green: [0.36, 0.85, 0.50],
   yellow: [0.88, 0.75, 0.29], blue: [0.29, 0.53, 0.78], magenta: [0.73, 0.41, 0.78],
-  cyan: [0.30, 0.82, 0.88], grey: [0.55, 0.58, 0.63],
+  cyan: [0.30, 0.82, 0.88], grey: [0.55, 0.58, 0.63], pink: [0.93, 0.55, 0.68],
 };
 const COLOR_CSS = {
   white: "#e8eaed", red: "#d0554f", green: "#5dd97f", yellow: "#e0c04a",
   blue: "#4a86c7", magenta: "#b968c7", cyan: "#4dd0e1", grey: "#8b93a1",
+  pink: "#ed8cae",
 };
 
 // -- the smallest amount of matrix maths that will do ----------------------
@@ -752,12 +1365,15 @@ const VERTEX_SRC = `
 attribute vec3 aPos;
 attribute vec3 aNormal;
 attribute vec3 aColor;
+attribute float aAlpha;
 uniform mat4 uMVP;
 varying vec3 vNormal;
 varying vec3 vColor;
+varying float vAlpha;
 void main() {
   vNormal = aNormal;
   vColor = aColor;
+  vAlpha = aAlpha;
   gl_Position = uMVP * vec4(aPos, 1.0);
 }`;
 
@@ -765,10 +1381,11 @@ const FRAGMENT_SRC = `
 precision mediump float;
 varying vec3 vNormal;
 varying vec3 vColor;
+varying float vAlpha;
 const vec3 LIGHT = vec3(0.35, 0.86, 0.37);
 void main() {
   float lambert = max(dot(normalize(vNormal), LIGHT), 0.0);
-  gl_FragColor = vec4(vColor * (0.34 + 0.72 * lambert), 1.0);
+  gl_FragColor = vec4(vColor * (0.34 + 0.72 * lambert), vAlpha);
 }`;
 
 // Six faces, each two triangles: offsets and the normal that goes with them.
@@ -781,11 +1398,75 @@ const FACES = [
   {n: [-1,0, 0], v: [[0,0,0],[0,0,1],[0,1,1],[0,0,0],[0,1,1],[0,1,0]]},  // west
 ];
 
-function pushBox(out, x, y, z, sx, sy, sz, rgb, faces) {
+function pushBox(out, x, y, z, sx, sy, sz, rgb, faces, alpha = 1) {
   for (const face of faces || FACES)
     for (const corner of face.v)
       out.push(x + corner[0] * sx, y + corner[1] * sy, z + corner[2] * sz,
-               face.n[0], face.n[1], face.n[2], rgb[0], rgb[1], rgb[2]);
+               face.n[0], face.n[1], face.n[2], rgb[0], rgb[1], rgb[2], alpha);
+}
+
+/* A low-poly ball inscribed in the same (x,y,z .. x+sx,y+sy,z+sz) box that
+ * pushBox would fill, so a character's shape can flip between the two with
+ * no other code needing to care which one it got. Same segment count as a
+ * smooth sphere would use, but each triangle gets its own flat face normal
+ * instead of a normal that points straight out from the centre, which is
+ * what turns it into visible low-poly facets instead of a smooth ball. */
+function pushSphere(out, x, y, z, sx, sy, sz, rgb, alpha = 1) {
+  const LAT = 6, LON = 10;
+  const cx = x + sx / 2, cy = y + sy / 2, cz = z + sz / 2;
+  const rx = sx / 2, ry = sy / 2, rz = sz / 2;
+  const point = (lat, lon) => {
+    const theta = lat * Math.PI / LAT;
+    const phi = lon * 2 * Math.PI / LON;
+    const st = Math.sin(theta), ct = Math.cos(theta);
+    return [cx + st * Math.cos(phi) * rx, cy + ct * ry, cz + st * Math.sin(phi) * rz];
+  };
+  const face = (a, b, c) => {
+    const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
+    const vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+    let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    const len = Math.hypot(nx, ny, nz) || 1;
+    nx /= len; ny /= len; nz /= len;
+    for (const p of [a, b, c])
+      out.push(p[0], p[1], p[2], nx, ny, nz, rgb[0], rgb[1], rgb[2], alpha);
+  };
+  for (let lat = 0; lat < LAT; lat++) {
+    for (let lon = 0; lon < LON; lon++) {
+      const a = point(lat, lon), b = point(lat + 1, lon);
+      const c = point(lat + 1, lon + 1), d = point(lat, lon + 1);
+      face(a, b, c);
+      face(a, c, d);
+    }
+  }
+}
+
+/* A low-poly cone inscribed the same way pushBox/pushSphere are: a circular
+ * base at the bottom of the box, tapering to a point at the top. Same flat-
+ * face-normal approach as pushSphere, for the same faceted look. */
+function pushCone(out, x, y, z, sx, sy, sz, rgb, alpha = 1) {
+  const SIDES = 10;
+  const cx = x + sx / 2, cz = z + sz / 2;
+  const rx = sx / 2, rz = sz / 2;
+  const apex = [cx, y + sy, cz];
+  const bottom = [cx, y, cz];
+  const rim = [];
+  for (let i = 0; i <= SIDES; i++) {
+    const a = (i / SIDES) * Math.PI * 2;
+    rim.push([cx + Math.cos(a) * rx, y, cz + Math.sin(a) * rz]);
+  }
+  const face = (a, b, c) => {
+    const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
+    const vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+    let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    const len = Math.hypot(nx, ny, nz) || 1;
+    nx /= len; ny /= len; nz /= len;
+    for (const p of [a, b, c])
+      out.push(p[0], p[1], p[2], nx, ny, nz, rgb[0], rgb[1], rgb[2], alpha);
+  };
+  for (let i = 0; i < SIDES; i++) {
+    face(rim[i], rim[i + 1], apex);        // the slope
+    face(bottom, rim[i + 1], rim[i]);      // the base cap
+  }
 }
 
 class Renderer {
@@ -802,6 +1483,7 @@ class Renderer {
     this.aPos = gl.getAttribLocation(this.program, "aPos");
     this.aNormal = gl.getAttribLocation(this.program, "aNormal");
     this.aColor = gl.getAttribLocation(this.program, "aColor");
+    this.aAlpha = gl.getAttribLocation(this.program, "aAlpha");
     this.uMVP = gl.getUniformLocation(this.program, "uMVP");
 
     this.floorBuf = gl.createBuffer();
@@ -810,7 +1492,9 @@ class Renderer {
     this.thingCount = 0;
 
     gl.enable(gl.DEPTH_TEST);
-    gl.clearColor(0.051, 0.059, 0.071, 1);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.clearColor(0.75, 0.80, 0.86, 1);   // light sky, not the old near-black
 
     // camera, in spherical coordinates around the middle of the board
     this.yaw = 0.0; this.pitch = 0.86; this.dist = 26;
@@ -821,26 +1505,18 @@ class Renderer {
     this.mvp = new Float32Array(16);
   }
 
-  /* Stand far enough back to see the whole board, from any angle.
+  /* Stand close, at a comfortable follow distance -- the camera orbits
+   * around you as you move (see frame()'s centre tracking) rather than
+   * sitting back to fit the whole board, so the world reads as a place
+   * you are standing inside rather than a diorama viewed from outside.
    *
-   * Fitting the width and the depth separately is the obvious thing and it is
-   * wrong, because the camera turns: swing a quarter turn and a board's width
-   * is now its depth. So what gets fitted is the sphere the whole board sits
-   * inside, whose radius does not care which way round anything is.
-   *
-   * The shape of the screen matters as much as the size of the board. A phone
-   * held upright has a narrow horizontal field of view -- the vertical one
-   * squeezed by the aspect ratio -- and a wide world runs off the sides long
-   * before it runs off the top. The tighter of the two angles decides. */
+   * The radius still has to reach the farthest corner you could be
+   * standing next to, so nothing behind you gets sliced off by the far
+   * clipping plane -- the full board diagonal covers that regardless of
+   * where you are on it. */
   frameBoard() {
-    const wide = this.canvas.clientWidth || window.innerWidth || 1;
-    const high = this.canvas.clientHeight || window.innerHeight || 1;
-    const halfV = this.fovy / 2;
-    const halfH = Math.atan(Math.tan(halfV) * (wide / high));
-    // + 0.5 for the rim around the board, 1.3 for how tall a character stands
-    this.radius = Math.hypot(this.board[0] / 2 + 0.5, this.board[1] / 2 + 0.5, 1.3);
-    const room = this.radius / Math.sin(Math.min(halfV, halfH)) * 1.06;
-    this.dist = Math.max(MIN_DIST, Math.min(MAX_DIST, room));
+    this.radius = Math.hypot(this.board[0] + 1, this.board[1] + 1, 1.3);
+    this.dist = Math.max(MIN_DIST, Math.min(MAX_DIST, 9));
   }
 
   link(vertexSrc, fragmentSrc) {
@@ -872,29 +1548,47 @@ class Renderer {
     this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
   }
 
-  /* The board only changes when the game does, so it is built once and kept. */
-  buildFloor(width, height) {
+  /* The board only changes when the game does, so it is built once and kept.
+     Gray + light blue, not the old near-black -- see ~/spark/CLAUDE.md
+     "design preference". */
+  /* cx/cy, when given, build only a window around that point instead of
+     the whole board -- "loads more baseplate the further you go" for a
+     game whose world is set to `expanding` (see frame()'s periodic
+     rebuild and startLocal()/startLive()'s initial call). Every other
+     game never passes them, so this behaves exactly as it always has for
+     everything except a game that explicitly opts in. */
+  buildFloor(width, height, cx, cy) {
     const data = [];
-    for (let y = 0; y < height; y++)
-      for (let x = 0; x < width; x++) {
+    const windowed = cx !== undefined;
+    const RADIUS = 26;
+    const x0 = windowed ? Math.max(0, Math.floor(cx - RADIUS)) : 0;
+    const x1 = windowed ? Math.min(width, Math.ceil(cx + RADIUS)) : width;
+    const y0 = windowed ? Math.max(0, Math.floor(cy - RADIUS)) : 0;
+    const y1 = windowed ? Math.min(height, Math.ceil(cy + RADIUS)) : height;
+    for (let y = y0; y < y1; y++)
+      for (let x = x0; x < x1; x++) {
         const dark = (x + y) % 2 === 0;
-        const shade = dark ? [0.109, 0.125, 0.149] : [0.133, 0.153, 0.180];
+        const shade = dark ? [0.42, 0.46, 0.52] : [0.50, 0.54, 0.60];
         pushBox(data, x, -0.35, y, 1, 0.35, 1, shade, [FACES[0]]);
       }
-    // a low wall around the edge, so you can see where the world stops
-    const rim = [0.180, 0.200, 0.235];
-    pushBox(data, -0.4, -0.35, -0.4, width + 0.8, 0.35, 0.4, rim);
-    pushBox(data, -0.4, -0.35, height, width + 0.8, 0.35, 0.4, rim);
-    pushBox(data, -0.4, -0.35, 0, 0.4, 0.35, height, rim);
-    pushBox(data, width, -0.35, 0, 0.4, 0.35, height, rim);
+    // a low wall, only where the current window actually reaches a true
+    // edge of the board -- never floating in the middle of a huge one,
+    // only ever where the world genuinely stops.
+    const rim = [0.58, 0.63, 0.70];
+    if (y0 <= 0) pushBox(data, x0 - 0.4, -0.35, -0.4, (x1 - x0) + 0.8, 0.35, 0.4, rim);
+    if (y1 >= height) pushBox(data, x0 - 0.4, -0.35, height, (x1 - x0) + 0.8, 0.35, 0.4, rim);
+    if (x0 <= 0) pushBox(data, -0.4, -0.35, y0, 0.4, 0.35, (y1 - y0), rim);
+    if (x1 >= width) pushBox(data, width, -0.35, y0, 0.4, 0.35, (y1 - y0), rim);
 
     const gl = this.gl;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.floorBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
-    this.floorCount = data.length / 9;
-    this.centre = [width / 2, 0, height / 2];
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.DYNAMIC_DRAW);
+    this.floorCount = data.length / 10;
     this.board = [width, height];
-    this.frameBoard();
+    if (!windowed) {
+      this.centre = [width / 2, 0, height / 2];
+      this.frameBoard();
+    }
   }
 
   /* Characters change every tick, so their mesh is thrown away and remade. */
@@ -902,17 +1596,46 @@ class Renderer {
     const data = [];
     for (const thing of things) {
       const rgb = COLOR_RGB[thing.color] || COLOR_RGB.white;
+      // A mesh-creator shape: several parts instead of the usual single
+      // one, each offset from this thing's own (x, y, z). Skips the rest
+      // of the loop body entirely -- a multi-part thing has no single
+      // shape/size of its own.
+      if (thing.parts && thing.parts.length) {
+        const alpha = thing.ghost ? 0.45 : 1;
+        const cx = thing.x + 0.5, cz = thing.y + 0.5, baseY = thing.z || 0;
+        for (const part of thing.parts) {
+          const prgb = (part.color && COLOR_RGB[part.color]) || rgb;
+          const sx = part.sx || 0.5, sy = part.sy || sx, sz = part.sz || sx;
+          const px = cx + (part.dx || 0) - sx / 2;
+          const py = baseY + (part.dz || 0);
+          const pz = cz + (part.dy || 0) - sz / 2;
+          if (part.shape === "sphere") pushSphere(data, px, py, pz, sx, sy, sz, prgb, alpha);
+          else if (part.shape === "cone") pushCone(data, px, py, pz, sx, sy, sz, prgb, alpha);
+          else pushBox(data, px, py, pz, sx, sy, sz, prgb, undefined, alpha);
+        }
+        continue;
+      }
       const shot = thing.kind === "shot";
+      const scale = shot ? 1 : (thing.size === undefined ? 100 : thing.size) / 100;
+      const shape = thing.shape || "cube";
+      const sphere = shape === "sphere";
       const tall = thing.role === "player" ? 1.15 : (thing.solid ? 1.0 : 0.75);
-      const size = shot ? 0.34 : 0.86;
-      const height = shot ? 0.34 : tall;
+      // "full" fills its whole grid cell edge to edge and floor to ceiling --
+      // for placed/buildable objects, not the smaller action-demo props.
+      const size = thing.full ? 1.0 : (shot ? 0.34 : 0.86) * scale;
+      const height = shot ? 0.34 : (sphere ? size : (thing.full ? 1.0 : tall * scale));
       const inset = (1 - size) / 2;
-      pushBox(data, thing.x + inset, 0, thing.y + inset, size, height, size, rgb);
+      // still being placed -- see-through until pressed again to confirm it
+      const alpha = thing.ghost ? 0.45 : 1;
+      const x = thing.x + inset, y = thing.z || 0, z = thing.y + inset;
+      if (sphere) pushSphere(data, x, y, z, size, height, size, rgb, alpha);
+      else if (shape === "cone") pushCone(data, x, y, z, size, height, size, rgb, alpha);
+      else pushBox(data, x, y, z, size, height, size, rgb, undefined, alpha);
     }
     const gl = this.gl;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.thingBuf);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.DYNAMIC_DRAW);
-    this.thingCount = data.length / 9;
+    this.thingCount = data.length / 10;
   }
 
   camera() {
@@ -941,10 +1664,11 @@ class Renderer {
                                    [this.thingBuf, this.thingCount]]) {
       if (!count) continue;
       gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-      const stride = 36;
-      for (const [loc, offset] of [[this.aPos, 0], [this.aNormal, 12], [this.aColor, 24]]) {
+      const stride = 40;
+      for (const [loc, offset, size] of [[this.aPos, 0, 3], [this.aNormal, 12, 3],
+                                          [this.aColor, 24, 3], [this.aAlpha, 36, 1]]) {
         gl.enableVertexAttribArray(loc);
-        gl.vertexAttribPointer(loc, 3, gl.FLOAT, false, stride, offset);
+        gl.vertexAttribPointer(loc, size, gl.FLOAT, false, stride, offset);
       }
       gl.drawArrays(gl.TRIANGLES, 0, count);
     }
@@ -1006,11 +1730,16 @@ const DEMO = {
 let renderer = null;
 let world = null;             // the local engine's world, when running locally
 let project = null;           // the game data
+let lastSaveName = null;      // the file "save" quick-saves back over
+let floorCenter = null;       // [x, y] the floor was last built around -- only used by an "expanding" world
+const FLOOR_REBUILD_DIST = 12;   // how far you can wander before more baseplate loads in
+const scatteredChunks = new Set();   // chunk keys already auto-populated, "expanding" worlds only
 let live = false;             // are we mirroring a real server?
 let liveSnapshot = null;
 let forcedLocal = false;      // the user pressed "run here"
 let stepTimer = null, pollTimer = null;
 const pressed = new Set();
+let editingButtons = false;   // true while the button editor is open
 
 function authHeaders() {
   const headers = {};
@@ -1083,7 +1812,22 @@ function startLocal() {
   live = false;
   liveSnapshot = null;
   world = new World(project, null);
-  renderer.buildFloor(world.width, world.height);
+  // world.memory starts empty every time a World is constructed, but which
+  // kind Build mode has selected is a per-viewer preference, not part of
+  // any one game -- carry it over rather than losing it on every restart.
+  const remembered = loadEditorSettings().paletteKind;
+  if (remembered && world.templates[remembered]) world.memory.palette_kind = remembered;
+  if (project.world && project.world.expanding) {
+    scatteredChunks.clear();   // a fresh world -- forget what was already scattered
+    const player = world.things.find(t => t.role === "player");
+    floorCenter = player ? [player.x, player.y] : [world.width / 2, world.height / 2];
+    renderer.buildFloor(world.width, world.height, floorCenter[0], floorCenter[1]);
+    renderer.centre = [floorCenter[0], 0, floorCenter[1]];
+    renderer.frameBoard();
+  } else {
+    floorCenter = null;
+    renderer.buildFloor(world.width, world.height);
+  }
   setSource("local", "RUNNING HERE");
   $("#mode").textContent = forcedLocal ? "go live" : "reload";
   if (stepTimer) clearInterval(stepTimer);
@@ -1150,16 +1894,134 @@ function currentHud() {
           status: world.status, name: project.name};
 }
 
+// -- an "expanding" world: more baseplate loads in the further you go ------
+//
+// Local play only, same reasoning as the palette/inspector: this rebuilds
+// renderer.buildFloor() around wherever the player currently is, which
+// only exists for the copy of the game running in this browser tab. Opt-in
+// per game via project.world.expanding -- every other game never calls
+// this at all (maybeExpandFloor returns immediately), so nothing here can
+// affect a game that doesn't ask for it.
+const SCATTER_CHUNK = 10;   // cells per side of one "already decorated" region
+
+function maybeExpandFloor(me) {
+  if (!me || !world || live || !project.world || !project.world.expanding) return;
+  if (floorCenter && Math.hypot(me.x - floorCenter[0], me.y - floorCenter[1]) < FLOOR_REBUILD_DIST) return;
+  floorCenter = [me.x, me.y];
+  renderer.buildFloor(world.width, world.height, me.x, me.y);
+  scatterNewChunks(me.x, me.y);
+}
+
+// Any character template with `autoScatter: true` gets a chance to appear
+// once per newly-revealed chunk, at a random empty cell in it -- generic,
+// not specific to any one kind, so it's "cones are pink and autoScatter"
+// that makes cones appear, not special-cased cone logic here.
+function scatterNewChunks(cx, cy) {
+  const reach = Math.ceil(26 / SCATTER_CHUNK) + 1;
+  const baseX = Math.floor(cx / SCATTER_CHUNK), baseY = Math.floor(cy / SCATTER_CHUNK);
+  for (let dcy = -reach; dcy <= reach; dcy++) {
+    for (let dcx = -reach; dcx <= reach; dcx++) {
+      const key = (baseX + dcx) + "," + (baseY + dcy);
+      if (scatteredChunks.has(key)) continue;
+      scatteredChunks.add(key);
+      for (const kind of Object.keys(world.templates)) {
+        const tpl = world.templates[kind];
+        if (!tpl.autoScatter) continue;
+        if (Math.random() > (tpl.scatterChance === undefined ? 0.3 : tpl.scatterChance)) continue;
+        const x = (baseX + dcx) * SCATTER_CHUNK + Math.floor(Math.random() * SCATTER_CHUNK);
+        const y = (baseY + dcy) * SCATTER_CHUNK + Math.floor(Math.random() * SCATTER_CHUNK);
+        if (!world.inBounds(x, y)) continue;
+        if (world.things.some(o => o.alive && o.x === x && o.y === y)) continue;
+        const spawned = world.spawn(kind, x, y);
+        if (spawned) spawned.scattered = true;   // marks it as forgettable, see unloadFarChunks
+      }
+    }
+  }
+  unloadFarChunks(cx, cy);
+}
+
+// Without this, every step outward adds more auto-scattered things to
+// simulate and render, forever, with nothing ever taken back off the
+// list -- a long exploring session would slowly grind to a halt. Forget
+// chunks (and remove what they scattered) once they're well behind you;
+// wandering back re-scatters them fresh, same as they'd never loaded.
+const SCATTER_UNLOAD_DIST = 60;
+
+function unloadFarChunks(cx, cy) {
+  const baseX = Math.floor(cx / SCATTER_CHUNK), baseY = Math.floor(cy / SCATTER_CHUNK);
+  const reachChunks = Math.ceil(SCATTER_UNLOAD_DIST / SCATTER_CHUNK);
+  for (const key of scatteredChunks) {
+    const [kx, ky] = key.split(",").map(Number);
+    if (Math.max(Math.abs(kx - baseX), Math.abs(ky - baseY)) > reachChunks) {
+      scatteredChunks.delete(key);
+    }
+  }
+  for (const t of world.things) {
+    if (t.scattered && t.alive && Math.hypot(t.x - cx, t.y - cy) > SCATTER_UNLOAD_DIST) {
+      world.remove(t);
+    }
+  }
+}
+
 // -- the frame -------------------------------------------------------------
 const labelPool = [];
 
 function frame() {
   const things = currentThings();
+  // The camera orbits around you, not a fixed spot over the board -- so the
+  // world reads as the place you are standing in, not a box seen from
+  // outside. yaw/pitch/dist stay exactly what your swipe and pinch left them.
+  const me = things.find(t => t.role === "player") || things[0];
+  if (me) {
+    renderer.centre[0] = me.x + 0.5;
+    renderer.centre[1] = 0.9 + (me.z || 0);
+    renderer.centre[2] = me.y + 0.5;
+  }
+  maybeExpandFloor(me);
   renderer.buildThings(things);
   renderer.draw();
   drawGlyphs(things);
   drawHud();
+  drawCompass();
+  drawSelection();
+  drawMinimap();
   requestAnimationFrame(frame);
+}
+
+/* A meter, not a dial: the tape is built once, spanning far more than a
+ * full turn each way, and the whole thing just slides sideways under a
+ * fixed centre marker as the camera's yaw changes. Not a real-world
+ * heading, just this world's own yaw=0 called "north".
+ *
+ * Built wide (8 full turns each direction) rather than regenerated every
+ * frame, because sliding one already-built strip is one style write; the
+ * only reason it is wide at all is so spinning the camera several times
+ * over never scrolls it out of ticks -- an ordinary swipe never gets
+ * anywhere close to the edge of it. */
+const COMPASS_PX_PER_DEG = 4;
+const COMPASS_NAMES = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+
+function setupCompass() {
+  const tape = $("#compass-tape");
+  const span = 8 * 360;
+  for (let deg = -span; deg <= span; deg += 15) {
+    const tick = document.createElement("div");
+    const wrapped = ((deg % 360) + 360) % 360;
+    const isMajor = wrapped % 45 === 0;
+    tick.className = "compass-tick " + (isMajor ? "major" : "minor");
+    if (isMajor) {
+      const name = COMPASS_NAMES[wrapped / 45];
+      tick.textContent = name;
+      if (name === "N") tick.classList.add("north");
+    }
+    tick.style.left = (deg * COMPASS_PX_PER_DEG) + "px";
+    tape.appendChild(tick);
+  }
+}
+
+function drawCompass() {
+  const deg = renderer.yaw * 180 / Math.PI;
+  $("#compass-tape").style.transform = `translateX(${-deg * COMPASS_PX_PER_DEG}px)`;
 }
 
 function drawGlyphs(things) {
@@ -1173,7 +2035,12 @@ function drawGlyphs(things) {
   things.forEach((thing, i) => {
     const node = labelPool[i];
     const shot = thing.kind === "shot";
-    const top = shot ? 0.4 : (thing.role === "player" ? 1.2 : 0.85);
+    // A resized thing (any prop, not just a cone -- this predates cones)
+    // is taller or shorter than its base height, so the glyph floating
+    // over it should scale the same way its actual mesh does, or a big
+    // one ends up with its label sitting well below its own top.
+    const scale = shot ? 1 : (thing.size === undefined ? 100 : thing.size) / 100;
+    const top = (shot ? 0.4 : (thing.role === "player" ? 1.2 : 0.85) * scale) + (thing.z || 0);
     const at = renderer.project(thing.x + 0.5, top, thing.y + 0.5);
     if (!at) { node.style.display = "none"; return; }
     node.style.display = "";
@@ -1192,6 +2059,8 @@ function drawHud() {
   const bits = ["score <b>" + hud.score + "</b>", "tick <b>" + hud.tick + "</b>"];
   if (hud.health !== null && hud.health !== undefined)
     bits.splice(1, 0, "health <b>" + hud.health + "</b>");
+  const nearby = nearbyList();
+  if (nearby) bits.push(nearby);
   $("#hud").innerHTML = bits.join("<br>");
   $("#title").textContent = hud.name || "Spark 3D";
   $("#say").textContent = hud.status
@@ -1199,10 +2068,33 @@ function drawHud() {
     : (hud.message || "");
 }
 
+// What's within touch range right now -- the same range-1 reach the touch
+// sensor itself uses, so "can I interact with it" and "is it listed here"
+// always agree. Local play only: world.things only exists for the copy of
+// the game running in this tab.
+function nearbyList() {
+  if (!world) return "";
+  const player = world.things.find(t => t.role === "player");
+  if (!player) return "";
+  const counts = {};
+  for (const t of world.things) {
+    if (!t.alive || t === player) continue;
+    if (Math.max(Math.abs(t.x - player.x), Math.abs(t.y - player.y)) > 1) continue;
+    counts[t.kind] = (counts[t.kind] || 0) + 1;
+  }
+  const names = Object.keys(counts).sort();
+  if (!names.length) return "";
+  return "near <b>" + names.map(k => k + (counts[k] > 1 ? " ×" + counts[k] : "")).join(", ") + "</b>";
+}
+
 // -- touch: one finger turns the camera, two pinch it ----------------------
-function bindCamera(canvas) {
+// rend defaults to the main game renderer, so every existing call site
+// (just bindCamera($("#gl"))) still targets it exactly as before; the mesh
+// creator's own preview canvas passes its own renderer instead.
+function bindCamera(canvas, rend, minDist, maxDist) {
   const touches = new Map();
   let lastPinch = null;
+  const lo = minDist || MIN_DIST, hi = maxDist || MAX_DIST;
 
   canvas.addEventListener("pointerdown", e => {
     canvas.setPointerCapture(e.pointerId);
@@ -1213,16 +2105,17 @@ function bindCamera(canvas) {
     if (!touches.has(e.pointerId)) return;
     const last = touches.get(e.pointerId);
     touches.set(e.pointerId, [e.clientX, e.clientY]);
+    const r = rend || renderer;
 
     if (touches.size === 1) {
-      renderer.yaw -= (e.clientX - last[0]) * 0.008;
-      renderer.pitch += (e.clientY - last[1]) * 0.006;
-      renderer.pitch = Math.max(0.18, Math.min(1.5, renderer.pitch));
+      r.yaw -= (e.clientX - last[0]) * 0.008;
+      r.pitch += (e.clientY - last[1]) * 0.006;
+      r.pitch = Math.max(0.18, Math.min(1.5, r.pitch));
     } else if (touches.size === 2) {
       const [a, b] = [...touches.values()];
       const gap = Math.hypot(a[0] - b[0], a[1] - b[1]);
-      if (lastPinch) renderer.dist *= lastPinch / Math.max(1, gap);
-      renderer.dist = Math.max(MIN_DIST, Math.min(MAX_DIST, renderer.dist));
+      if (lastPinch) r.dist *= lastPinch / Math.max(1, gap);
+      r.dist = Math.max(lo, Math.min(hi, r.dist));
       lastPinch = gap;
     }
   });
@@ -1236,14 +2129,20 @@ function bindCamera(canvas) {
 
   canvas.addEventListener("wheel", e => {
     e.preventDefault();
-    renderer.dist = Math.max(MIN_DIST,
-      Math.min(MAX_DIST, renderer.dist * (1 + e.deltaY * 0.001)));
+    const r = rend || renderer;
+    r.dist = Math.max(lo, Math.min(hi, r.dist * (1 + e.deltaY * 0.001)));
   }, {passive: false});
 }
 
 function bindControls() {
   for (const button of document.querySelectorAll("#pad button[data-key]")) {
-    const press = e => { e.preventDefault(); pressed.add(button.dataset.key); };
+    // Not while the button editor has this one -- a drag there must not
+    // also move the character or fire an action.
+    const press = e => {
+      if (editingButtons) return;
+      e.preventDefault();
+      pressed.add(button.dataset.key);
+    };
     button.addEventListener("pointerdown", press);
   }
   const named = {ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left",
@@ -1253,6 +2152,18 @@ function bindControls() {
     if (key) { pressed.add(key); e.preventDefault(); }
   });
 
+  // Same idea for the side bar's plain onclick buttons: while editing,
+  // swallow the click before restart/save/etc. ever see it. Capture phase,
+  // so this runs before any button's own onclick.
+  document.addEventListener("click", e => {
+    if (editingButtons && e.target.closest("[data-editable]")) {
+      e.stopImmediatePropagation();
+      e.preventDefault();
+    }
+  }, true);
+
+  setupButtonEditor();
+
   $("#restart").onclick = () => {
     if (live) return;
     startLocal();
@@ -1261,6 +2172,15 @@ function bindControls() {
     renderer.yaw = 0; renderer.pitch = 0.86;
     renderer.frameBoard();          // re-fitted to the screen as it is now
   };
+  $("#save").onclick = saveWorld;
+  $("#save-as").onclick = saveWorldAs;
+  $("#fullscreen").onclick = () => {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else document.documentElement.requestFullscreen().catch(() => {});
+  };
+  document.addEventListener("fullscreenchange", () => {
+    $("#fullscreen").textContent = document.fullscreenElement ? "⛝" : "⛶";
+  });
   $("#mode").onclick = async () => {
     forcedLocal = !forcedLocal;
     if (forcedLocal) startLocal();
@@ -1269,6 +2189,1283 @@ function bindControls() {
       if (snap) startLive(snap); else startLocal();
     }
   };
+}
+
+/* ---------------------------------------------------------------------
+ * Button editor -- select, drag, resize, fade any button, including a
+ * button drawer's own bubbles (registered as each is built, since the
+ * drawer rebuilds its DOM on every add/remove/select). Position/size/
+ * opacity are per-viewer preferences, not game data, so they live in
+ * localStorage rather than the saved world file. The list exists because
+ * a button dragged off-screen or faded to invisible would otherwise be
+ * impossible to tap and fix again.
+ * ------------------------------------------------------------------- */
+const BUTTON_LAYOUT_KEY = "spark3d-button-layout";
+
+function loadButtonLayout() {
+  try { return JSON.parse(localStorage.getItem(BUTTON_LAYOUT_KEY) || "{}"); }
+  catch (err) { return {}; }
+}
+const buttonLayout = loadButtonLayout();
+function saveButtonLayout() {
+  try { localStorage.setItem(BUTTON_LAYOUT_KEY, JSON.stringify(buttonLayout)); }
+  catch (err) { /* private mode or storage full -- edits just won't stick */ }
+}
+
+// Named snapshots of the whole layout, separate from buttonLayout itself
+// (which is always the one "live" arrangement) -- save one under a name,
+// reload it later, switch between a few without losing any of them.
+const BUTTON_LAYOUT_SAVES_KEY = "spark3d-button-layout-saves";
+function loadLayoutSaves() {
+  try { return JSON.parse(localStorage.getItem(BUTTON_LAYOUT_SAVES_KEY) || "{}"); }
+  catch (err) { return {}; }
+}
+const layoutSaves = loadLayoutSaves();
+function saveLayoutSaves() {
+  try { localStorage.setItem(BUTTON_LAYOUT_SAVES_KEY, JSON.stringify(layoutSaves)); }
+  catch (err) { /* private mode or storage full -- edits just won't stick */ }
+}
+
+function renderLayoutList() {
+  const box = $("#edit-layout-list");
+  box.innerHTML = "";
+  const names = Object.keys(layoutSaves);
+  if (!names.length) {
+    const empty = document.createElement("div");
+    empty.className = "edit-list-row";
+    empty.style.cursor = "default";
+    empty.textContent = "(no saved layouts yet)";
+    box.appendChild(empty);
+    return;
+  }
+  for (const name of names) {
+    const row = document.createElement("div");
+    row.className = "edit-list-row layout-row";
+    const label = document.createElement("span");
+    label.className = "layout-name";
+    label.textContent = name;
+    label.title = "load this layout";
+    label.onclick = () => loadButtonLayoutByName(name);
+    const del = document.createElement("span");
+    del.className = "layout-del";
+    del.textContent = "×";
+    del.title = "delete this saved layout";
+    del.onclick = e => {
+      e.stopPropagation();
+      if (!confirm('Delete the saved layout "' + name + '"? This cannot be undone.')) return;
+      delete layoutSaves[name];
+      saveLayoutSaves();
+      renderLayoutList();
+    };
+    row.append(label, del);
+    box.appendChild(row);
+  }
+}
+
+function saveCurrentLayoutAs(name) {
+  layoutSaves[name] = JSON.parse(JSON.stringify(buttonLayout));   // a real snapshot, not a live reference
+  saveLayoutSaves();
+  renderLayoutList();
+}
+
+function loadButtonLayoutByName(name) {
+  const snap = layoutSaves[name];
+  if (!snap) return;
+  for (const key of Object.keys(buttonLayout)) delete buttonLayout[key];
+  Object.assign(buttonLayout, snap);
+  for (const {el} of editableButtons.values()) {
+    const uid = el.dataset.uid;
+    if (buttonLayout[uid]) applyButtonStyle(el, buttonLayout[uid]);
+    else { el.style.transform = ""; el.style.opacity = ""; }
+  }
+  saveButtonLayout();
+  selectEditable(null);
+  drawerToast('loaded "' + name + '"');
+}
+
+function applyButtonStyle(btn, entry) {
+  const dx = entry.dx || 0, dy = entry.dy || 0;
+  const scale = entry.scale || 1;
+  const opacity = entry.opacity === undefined ? 1 : entry.opacity;
+  btn.style.transform = `translate(${dx}px, ${dy}px) scale(${scale})`;
+  btn.style.opacity = String(opacity);
+}
+
+// uid -> {el, label}. Every currently-existing editable button, kept in
+// sync as the drawer adds/removes/rebuilds its own -- see registerEditable.
+const editableButtons = new Map();
+let editSelected = null;      // uid, or null
+let editDragging = null;      // {uid, x, y, dx, dy}, or null
+let gridLockOn = false;       // dragging (and "go to x%, y%") snap to a grid
+
+// The grid size input is read live rather than cached, so typing a new
+// size takes effect immediately without a separate "apply" step.
+const currentGridSize = () => Math.max(0.5, parseFloat($("#edit-grid-size").value) || 5);
+const snapVal = v => gridLockOn ? Math.round(v / currentGridSize()) * currentGridSize() : v;
+
+// Editor preferences that used to reset on every reload -- grid lock, its
+// size, move speed, and which kind Build mode has selected. None of this
+// is game data, so it lives in localStorage next to buttonLayout/the
+// Backpack, not in the saved world file.
+const EDITOR_SETTINGS_KEY = "spark3d-editor-settings";
+function loadEditorSettings() {
+  try { return JSON.parse(localStorage.getItem(EDITOR_SETTINGS_KEY) || "{}"); }
+  catch (err) { return {}; }
+}
+function saveEditorSettings(patch) {
+  const cur = loadEditorSettings();
+  Object.assign(cur, patch);
+  try { localStorage.setItem(EDITOR_SETTINGS_KEY, JSON.stringify(cur)); }
+  catch (err) { /* private mode or storage full -- just won't stick */ }
+}
+
+function updateGridOverlay() {
+  const overlay = $("#edit-grid-overlay");
+  overlay.classList.toggle("on", editingButtons && gridLockOn);
+  const size = currentGridSize() + "%";
+  overlay.style.backgroundSize = size + " " + size;
+}
+
+// After a drag moves a button, nudge it the rest of the way to the
+// nearest grid intersection -- same "measure the real rect, work out how
+// far off target that is, add the difference to dx/dy" approach as
+// "go to x%, y%", just run continuously while dragging instead of once.
+function snapElementToGrid(el, entry) {
+  if (!gridLockOn) return;
+  const pos = currentPercent(el);
+  const targetXPercent = snapVal(pos.x), targetYPercent = snapVal(pos.y);
+  const rect = el.getBoundingClientRect();
+  const w = window.innerWidth || 1, h = window.innerHeight || 1;
+  entry.dx += (targetXPercent / 100) * w - (rect.left + rect.width / 2);
+  entry.dy += (targetYPercent / 100) * h - (rect.top + rect.height / 2);
+  applyButtonStyle(el, entry);
+}
+
+// Where a button's centre is right now, as a decimal percent of the whole
+// screen -- 0,0 top-left corner, 100,100 bottom-right. Reads the actual
+// rendered box (getBoundingClientRect), so it is correct regardless of
+// whatever drag/scale is already applied.
+function currentPercent(el) {
+  const rect = el.getBoundingClientRect();
+  const w = window.innerWidth || 1, h = window.innerHeight || 1;
+  const x = ((rect.left + rect.width / 2) / w) * 100;
+  const y = ((rect.top + rect.height / 2) / h) * 100;
+  // A number input shows nothing at all for NaN rather than "NaN" or the
+  // last value -- round() of a bad rect would otherwise leave the box
+  // silently blank instead of a visible, obviously-wrong 0.
+  return {
+    x: Number.isFinite(x) ? Math.round(x * 10) / 10 : 0,
+    y: Number.isFinite(y) ? Math.round(y * 10) / 10 : 0,
+  };
+}
+
+function selectEditable(uid) {
+  if (editSelected && editableButtons.has(editSelected)) {
+    editableButtons.get(editSelected).el.classList.remove("edit-selected");
+  }
+  editSelected = uid;
+  if (uid && editableButtons.has(uid)) {
+    const entry = buttonLayout[uid] || {};
+    const el = editableButtons.get(uid).el;
+    el.classList.add("edit-selected");
+    const size = Math.round((entry.scale || 1) * 1000) / 10;      // e.g. 87.5
+    const opacity = Math.round((entry.opacity === undefined ? 1 : entry.opacity) * 1000) / 10;
+    $("#edit-size").value = size;
+    $("#edit-size-num").value = size;
+    $("#edit-opacity").value = opacity;
+    $("#edit-opacity-num").value = opacity;
+    const pos = currentPercent(el);
+    $("#edit-x").value = pos.x;
+    $("#edit-y").value = pos.y;
+  }
+  renderEditList();
+}
+
+function renderEditList() {
+  const box = $("#edit-list");
+  box.innerHTML = "";
+  for (const [uid, {el, label}] of editableButtons) {
+    const row = document.createElement("div");
+    row.className = "edit-list-row" + (uid === editSelected ? " on" : "");
+    row.textContent = (el.textContent || "□").trim() + "  " + (label || uid);
+    row.onclick = () => selectEditable(uid);
+    box.appendChild(row);
+  }
+}
+
+/* Called once for the pad/side buttons at startup, and again every time
+ * the button drawer rebuilds one of its own -- re-registering an existing
+ * uid just points it at the new element and re-applies whatever was saved
+ * for it, so a drawer bubble keeps its custom size/position/fade across
+ * every re-render instead of losing it the moment the drawer redraws. */
+function registerEditable(el, uid, label) {
+  el.dataset.editable = "";
+  el.dataset.uid = uid;
+  editableButtons.set(uid, {el, label});
+  if (buttonLayout[uid]) applyButtonStyle(el, buttonLayout[uid]);
+  if (uid === editSelected) el.classList.add("edit-selected");
+
+  el.addEventListener("pointerdown", e => {
+    if (!editingButtons) return;
+    e.preventDefault();
+    e.stopPropagation();
+    selectEditable(uid);
+    const entry = buttonLayout[uid] || (buttonLayout[uid] = {});
+    editDragging = {uid, x: e.clientX, y: e.clientY, dx: entry.dx || 0, dy: entry.dy || 0};
+    el.setPointerCapture(e.pointerId);
+  });
+  el.addEventListener("pointermove", e => {
+    if (!editDragging || editDragging.uid !== uid) return;
+    const entry = buttonLayout[uid];
+    entry.dx = editDragging.dx + (e.clientX - editDragging.x);
+    entry.dy = editDragging.dy + (e.clientY - editDragging.y);
+    applyButtonStyle(el, entry);
+    snapElementToGrid(el, entry);
+  });
+  const endDrag = () => {
+    if (!editDragging || editDragging.uid !== uid) return;
+    editDragging = null;
+    saveButtonLayout();
+  };
+  el.addEventListener("pointerup", endDrag);
+  el.addEventListener("pointercancel", endDrag);
+
+  if (editingButtons) renderEditList();
+}
+
+function setupButtonEditor() {
+  for (const el of document.querySelectorAll("[data-editable]")) {
+    registerEditable(el, el.id || el.dataset.key, el.title || el.getAttribute("aria-label"));
+  }
+
+  // Slider and typed number for the same property stay in sync either
+  // direction -- move one, the other updates to match, and either can
+  // apply. Decimal precision throughout: sliders step by 0.1 too, not
+  // whole percent.
+  function applySizeOpacity(size, opacity) {
+    if (!editSelected) return;
+    const entry = buttonLayout[editSelected] || (buttonLayout[editSelected] = {});
+    entry.scale = size / 100;
+    entry.opacity = opacity / 100;
+    applyButtonStyle(editableButtons.get(editSelected).el, entry);
+    saveButtonLayout();
+  }
+  $("#edit-size").addEventListener("input", () => {
+    $("#edit-size-num").value = $("#edit-size").value;
+    applySizeOpacity($("#edit-size").value, $("#edit-opacity").value);
+  });
+  $("#edit-size-num").addEventListener("input", () => {
+    $("#edit-size").value = $("#edit-size-num").value;
+    applySizeOpacity($("#edit-size-num").value, $("#edit-opacity").value);
+  });
+  $("#edit-opacity").addEventListener("input", () => {
+    $("#edit-opacity-num").value = $("#edit-opacity").value;
+    applySizeOpacity($("#edit-size").value, $("#edit-opacity").value);
+  });
+  $("#edit-opacity-num").addEventListener("input", () => {
+    $("#edit-opacity").value = $("#edit-opacity-num").value;
+    applySizeOpacity($("#edit-size").value, $("#edit-opacity-num").value);
+  });
+
+  // Typed exact position: move the button so its centre lands at that
+  // decimal percent of the screen, whatever position it is at now.
+  $("#edit-goto-xy").onclick = () => {
+    if (!editSelected) return;
+    const el = editableButtons.get(editSelected).el;
+    const entry = buttonLayout[editSelected] || (buttonLayout[editSelected] = {});
+    const xPercent = snapVal(Math.max(0, Math.min(100, parseFloat($("#edit-x").value) || 0)));
+    const yPercent = snapVal(Math.max(0, Math.min(100, parseFloat($("#edit-y").value) || 0)));
+    const rect = el.getBoundingClientRect();
+    const curCentreX = rect.left + rect.width / 2;
+    const curCentreY = rect.top + rect.height / 2;
+    const targetX = (xPercent / 100) * window.innerWidth;
+    const targetY = (yPercent / 100) * window.innerHeight;
+    entry.dx = (entry.dx || 0) + (targetX - curCentreX);
+    entry.dy = (entry.dy || 0) + (targetY - curCentreY);
+    applyButtonStyle(el, entry);
+    saveButtonLayout();
+    const pos = currentPercent(el);   // read back the real result, not just echo the typed numbers
+    $("#edit-x").value = pos.x;
+    $("#edit-y").value = pos.y;
+  };
+
+  $("#edit-reset").onclick = () => {
+    if (!editSelected) return;
+    delete buttonLayout[editSelected];
+    const el = editableButtons.get(editSelected).el;
+    el.style.transform = "";
+    el.style.opacity = "";
+    saveButtonLayout();
+    selectEditable(editSelected);   // sliders back to their defaults
+  };
+
+  $("#edit-reset-all").onclick = () => {
+    if (!confirm("Reset every button back to its default size, position, "
+                + "and opacity? This cannot be undone.")) return;
+    for (const key of Object.keys(buttonLayout)) delete buttonLayout[key];
+    for (const {el} of editableButtons.values()) {
+      el.style.transform = "";
+      el.style.opacity = "";
+    }
+    saveButtonLayout();
+    selectEditable(null);   // clears the selection and sliders too
+  };
+
+  $("#edit-toggle").onclick = () => {
+    editingButtons = !editingButtons;
+    document.body.classList.toggle("editing-buttons", editingButtons);
+    $("#edit-toggle").textContent = editingButtons ? "✓" : "✎";
+    $("#edit-panel").classList.toggle("on", editingButtons);
+    updateGridOverlay();
+    if (editingButtons) { renderEditList(); renderLayoutList(); }
+    else selectEditable(null);
+  };
+
+  // Restored once, here, rather than at the top-level -- the elements
+  // themselves need to exist first, and this runs after they're in the DOM.
+  const savedSettings = loadEditorSettings();
+  if (savedSettings.gridSize) $("#edit-grid-size").value = savedSettings.gridSize;
+  if (savedSettings.gridLockOn) {
+    gridLockOn = true;
+    $("#edit-grid-on").checked = true;
+  }
+
+  $("#edit-grid-on").addEventListener("change", () => {
+    gridLockOn = $("#edit-grid-on").checked;
+    syncGridLockDisplays();   // keeps the Properties toggle matching too
+    saveEditorSettings({gridLockOn});
+  });
+  $("#edit-grid-size").addEventListener("input", () => {
+    updateGridOverlay();
+    saveEditorSettings({gridSize: currentGridSize()});
+  });
+
+  $("#edit-save-layout").onclick = () => {
+    const name = (prompt("Save the current button layout as:", "layout 1") || "").trim();
+    if (!name) return;
+    if (layoutSaves[name] && !confirm('"' + name + '" already exists. Overwrite it?')) return;
+    saveCurrentLayoutAs(name);
+  };
+}
+
+/* Turns whatever is alive right now into a project file: each character
+ * kind keeps its template (brain, glyph, shape, ...) but its `count` becomes
+ * how many of that kind are alive this instant, so a barren world you built
+ * up with the spawn/shape/resize buttons saves back out the way it looks. */
+function buildSaveProject() {
+  const counts = {};
+  for (const thing of world.things) {
+    if (thing.alive) counts[thing.kind] = (counts[thing.kind] || 0) + 1;
+  }
+  const characters = Object.keys(world.templates)
+    .filter(kind => kind !== "shot")   // added on the fly, not a real tile
+    .map(kind => ({...world.templates[kind], kind, count: counts[kind] || 0}));
+  return {
+    name: (project && project.name) || "barren",
+    // spread the original world settings first, so a custom field like
+    // `expanding` survives a save/reload -- then override with whatever
+    // is actually live right now.
+    world: {...(project && project.world), width: world.width, height: world.height,
+            wrap: world.wrap, speed: (project && project.world && project.world.speed) || 6},
+    characters,
+    tiles: (project && project.tiles) || [],
+  };
+}
+
+/* Names this session has already agreed to (over)write -- once a name is
+ * confirmed, quick-saving back to it again does not nag a second time,
+ * same as any editor's plain "Save" not re-asking every keystroke. */
+const confirmedNames = new Set();
+
+/* null means "couldn't check" (no server reachable), not "not taken" --
+ * callers must not treat null as a green light. */
+async function nameTaken(name) {
+  try {
+    const res = await fetch("api/game?name=" + encodeURIComponent(name),
+                            {headers: authHeaders()});
+    return res.ok;
+  } catch (err) {
+    return null;
+  }
+}
+
+async function writeSave(name) {
+  const safe = name.replace(/[^A-Za-z0-9 _-]/g, "").trim();
+  if (!safe) { window.alert("give it a name"); return; }
+
+  if (!confirmedNames.has(safe)) {
+    const taken = await nameTaken(safe);
+    if (taken) {
+      const overwrite = window.confirm(
+        "A 3D world named \"" + safe + "\" already exists.\n\n" +
+        "Overwrite it? This cannot be undone.");
+      if (!overwrite) return;   // blocked -- pick a different name and try again
+    }
+    confirmedNames.add(safe);
+  }
+
+  const proj = buildSaveProject();
+  proj.name = safe;
+
+  try {
+    const res = await fetch("api/game", {method: "POST",
+      headers: {"Content-Type": "application/json", ...authHeaders()},
+      body: JSON.stringify(proj)});
+    if (res.ok) {
+      lastSaveName = safe;
+      window.alert("saved as games/" + safe + ".json");
+      return;
+    }
+  } catch (err) { /* no server reachable -- fall through to a download */ }
+
+  const blob = new Blob([JSON.stringify(proj, null, 2)], {type: "application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = safe + ".json";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(a.href);
+  lastSaveName = safe;
+}
+
+/* "save": writes straight back over whatever this world was last saved or
+ * loaded as, no prompt -- unless nothing like that exists yet, in which
+ * case there is nothing to overwrite and it falls back to asking. */
+async function saveWorld() {
+  if (lastSaveName) { await writeSave(lastSaveName); return; }
+  await saveWorldAs();
+}
+
+/* "save as new": always asks for a name, so a copy can be forked off
+ * without touching the file this world came from. */
+async function saveWorldAs() {
+  const name = window.prompt("Save this world as a new 3D world file:",
+                              buildSaveProject().name);
+  if (!name) return;
+  await writeSave(name);
+}
+
+/* ---------------------------------------------------------------------
+ * Button Drawer -- a row of round buttons that slides out from a screen
+ * edge, floating translucent over the world instead of a separate panel.
+ * Full write-up (including the built-in select/add/remove controls) lives
+ * in ~/bubble-drawer/README.md; this is the same component, restyled to
+ * match the pad instead of carrying its own colors.
+ * ------------------------------------------------------------------- */
+function drawerToast(msg) {
+  const t = document.createElement("div");
+  t.textContent = msg;
+  t.style.cssText = "position:fixed;left:50%;bottom:14%;transform:translateX(-50%);"
+    + "background:rgba(74,80,88,.92);color:#f2f4f6;border:1px solid #838a94;"
+    + "border-radius:10px;padding:8px 14px;z-index:99;font-size:13px";
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 1200);
+}
+
+/* ---------------------------------------------------------------------
+ * Backpack -- a small virtual file system: folders and files, browsed and
+ * edited the way Windows Explorer's New folder / New item / Delete work.
+ * It is a per-viewer thing (localStorage), not game data -- what you keep
+ * in it has nothing to do with any one world file.
+ * ------------------------------------------------------------------- */
+const BACKPACK_KEY = "spark3d-backpack";
+
+function loadBackpack() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(BACKPACK_KEY));
+    if (saved && saved.children) return saved;
+  } catch (err) { /* fall through to a fresh one */ }
+  return {name: "Backpack", type: "folder", children: [
+    {name: "buttons", type: "folder", children: []},
+    {name: "backpack", type: "folder", children: []},
+  ]};
+}
+function saveBackpack() {
+  try { localStorage.setItem(BACKPACK_KEY, JSON.stringify(backpackRoot)); }
+  catch (err) { /* private mode or storage full -- edits just won't stick */ }
+}
+
+const backpackRoot = loadBackpack();
+let backpackPath = [backpackRoot];   // the folders navigated into, root first
+let backpackSelected = null;         // a child of the current folder, or null
+
+const currentBackpackFolder = () => backpackPath[backpackPath.length - 1];
+
+function renderBackpack() {
+  const folder = currentBackpackFolder();
+
+  const pathEl = $("#backpack-path");
+  pathEl.innerHTML = "";
+  backpackPath.forEach((node, i) => {
+    if (i > 0) pathEl.appendChild(document.createTextNode(" › "));
+    const seg = document.createElement("span");
+    seg.className = "bp-crumb";
+    seg.textContent = node.name;
+    seg.onclick = () => {
+      backpackPath = backpackPath.slice(0, i + 1);
+      backpackSelected = null;
+      renderBackpack();
+    };
+    pathEl.appendChild(seg);
+  });
+
+  const grid = $("#backpack-grid");
+  grid.innerHTML = "";
+  if (!folder.children.length) {
+    const empty = document.createElement("div");
+    empty.className = "bp-empty";
+    empty.textContent = "This folder is empty.";
+    grid.appendChild(empty);
+  }
+  for (const node of folder.children) {
+    const item = document.createElement("div");
+    item.className = "bp-item" + (node === backpackSelected ? " on" : "");
+    const icon = document.createElement("div");
+    icon.className = "bp-icon";
+    icon.textContent = node.type === "folder" ? "\u{1F4C1}" : "\u{1F4C4}";
+    const label = document.createElement("div");
+    label.className = "bp-label";
+    label.textContent = node.name;
+    item.append(icon, label);
+    item.onclick = () => {
+      if (node.type === "folder") {
+        backpackPath = [...backpackPath, node];
+        backpackSelected = null;
+      } else {
+        backpackSelected = backpackSelected === node ? null : node;
+      }
+      renderBackpack();
+    };
+    grid.appendChild(item);
+  }
+
+  $("#bp-up").disabled = backpackPath.length <= 1;
+  $("#bp-delete").disabled = !backpackSelected;
+}
+
+function backpackNewFolder() {
+  const name = (prompt("New folder name:", "New folder") || "").trim();
+  if (!name) return;
+  currentBackpackFolder().children.push({name, type: "folder", children: []});
+  saveBackpack();
+  renderBackpack();
+}
+function backpackNewFile() {
+  const name = (prompt("New item name:", "New item") || "").trim();
+  if (!name) return;
+  currentBackpackFolder().children.push({name, type: "file"});
+  saveBackpack();
+  renderBackpack();
+}
+function backpackDelete() {
+  if (!backpackSelected) return;
+  const what = backpackSelected.type === "folder"
+    ? `"${backpackSelected.name}" and everything in it` : `"${backpackSelected.name}"`;
+  if (!confirm(`Delete ${what}? This cannot be undone.`)) return;
+  const folder = currentBackpackFolder();
+  folder.children = folder.children.filter(n => n !== backpackSelected);
+  backpackSelected = null;
+  saveBackpack();
+  renderBackpack();
+}
+function backpackUp() {
+  if (backpackPath.length <= 1) return;
+  backpackPath = backpackPath.slice(0, -1);
+  backpackSelected = null;
+  renderBackpack();
+}
+
+function setupBackpack() {
+  $("#backpack-toggle").onclick = () => {
+    if (editingButtons) return;   // the button editor owns taps for now
+    backpackPath = [backpackRoot];
+    backpackSelected = null;
+    renderBackpack();
+    $("#backpack-modal").classList.add("on");
+  };
+  $("#backpack-close").onclick = () => $("#backpack-modal").classList.remove("on");
+  $("#bp-up").onclick = backpackUp;
+  $("#bp-new-folder").onclick = backpackNewFolder;
+  $("#bp-new-file").onclick = backpackNewFile;
+  $("#bp-delete").onclick = backpackDelete;
+}
+
+/* ---------------------------------------------------------------------
+ * Properties -- near-fullscreen panel listing grid-lock movement (synced
+ * with the same toggle in the button editor, either one flips both) and
+ * a clock derived from the world's own tick count and speed, not a real
+ * clock -- ticks / (ticks per second) = elapsed seconds since the world
+ * started.
+ * ------------------------------------------------------------------- */
+function worldClockText() {
+  const hud = currentHud();
+  const tick = hud ? hud.tick : 0;
+  const speed = (project && project.world && project.world.speed) || 6;
+  const totalSeconds = Math.floor(tick / speed);
+  const pad = n => String(n).padStart(2, "0");
+  return pad(Math.floor(totalSeconds / 3600)) + ":" +
+         pad(Math.floor((totalSeconds % 3600) / 60)) + ":" +
+         pad(totalSeconds % 60);
+}
+
+function syncGridLockDisplays() {
+  $("#prop-gridlock-toggle").textContent = gridLockOn ? "ON" : "OFF";
+  $("#prop-gridlock-toggle").classList.toggle("on", gridLockOn);
+  $("#edit-grid-on").checked = gridLockOn;
+  updateGridOverlay();
+}
+
+// Ticks per second -- the same number startLocal() already reads out of
+// project.world.speed, just changeable while the game is running instead
+// of only at the moment it (re)starts.
+// Not persisted to localStorage on purpose: this is project.world.speed,
+// which already is game data -- it round-trips through the normal save/
+// load a world already goes through. A separate remembered copy here
+// would silently override whatever pace a *different* game was authored
+// for the next time one loaded.
+function setMoveSpeed(newSpeed) {
+  const speed = Math.max(1, Math.min(30, Math.round(newSpeed) || 6));
+  project.world = project.world || {};
+  project.world.speed = speed;
+  if (world && !live && stepTimer) {
+    clearInterval(stepTimer);
+    stepTimer = setInterval(localStep, 1000 / speed);
+  }
+  return speed;
+}
+
+let minimapOn = false;
+
+// A 2D canvas, not a third WebGL context -- it only ever needs flat dots
+// on a flat square, so the far simpler 2D API is the right tool, not more
+// of the same machinery the two 3D views already use.
+function drawMinimap() {
+  if (!minimapOn || !world) return;
+  const canvas = $("#minimap");
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+  const sx = w / Math.max(1, world.width), sy = h / Math.max(1, world.height);
+  for (const t of world.things) {
+    if (!t.alive) continue;
+    ctx.fillStyle = COLOR_CSS[t.color] || COLOR_CSS.white;
+    ctx.beginPath();
+    ctx.arc((t.x + 0.5) * sx, (t.y + 0.5) * sy, t.role === "player" ? 4 : 2.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function setupProperties() {
+  if (loadEditorSettings().minimapOn) {
+    minimapOn = true;
+    $("#minimap").classList.add("on");
+    $("#prop-minimap-toggle").textContent = "ON";
+    $("#prop-minimap-toggle").classList.add("on");
+  }
+  $("#prop-minimap-toggle").onclick = () => {
+    minimapOn = !minimapOn;
+    $("#minimap").classList.toggle("on", minimapOn);
+    $("#prop-minimap-toggle").textContent = minimapOn ? "ON" : "OFF";
+    $("#prop-minimap-toggle").classList.toggle("on", minimapOn);
+    saveEditorSettings({minimapOn});
+  };
+  $("#properties-toggle").onclick = () => {
+    if (editingButtons) return;   // the button editor owns taps for now
+    $("#prop-clock").textContent = worldClockText();
+    syncGridLockDisplays();
+    const speed = (project && project.world && project.world.speed) || 6;
+    $("#prop-speed").value = speed;
+    $("#prop-speed-num").value = speed;
+    $("#properties-modal").classList.add("on");
+  };
+  $("#properties-close").onclick = () => $("#properties-modal").classList.remove("on");
+  $("#prop-gridlock-toggle").onclick = () => {
+    gridLockOn = !gridLockOn;
+    syncGridLockDisplays();
+    saveEditorSettings({gridLockOn});
+  };
+  $("#prop-speed").addEventListener("input", () => {
+    const v = setMoveSpeed($("#prop-speed").value);
+    $("#prop-speed-num").value = v;
+  });
+  $("#prop-speed-num").addEventListener("input", () => {
+    const v = setMoveSpeed($("#prop-speed-num").value);
+    $("#prop-speed").value = v;
+  });
+  // Only bothers updating the DOM while the panel is actually open.
+  setInterval(() => {
+    if ($("#properties-modal").classList.contains("on")) {
+      $("#prop-clock").textContent = worldClockText();
+    }
+  }, 500);
+}
+
+/* ---------------------------------------------------------------------
+ * Mesh Creator -- build a custom shape out of several cube/sphere parts,
+ * each with its own offset, size, and colour, and save it as a new,
+ * placeable kind. The preview is a second Renderer on its own canvas --
+ * the exact same class the main 3D view uses, so what you see here is
+ * exactly what gets placed, not an approximation of it.
+ * ------------------------------------------------------------------- */
+let meshParts = [];
+let meshSelected = null;
+let meshRenderer = null;
+let meshLoopRunning = false;
+let meshEditingKind = null;   // set while editing an existing saved mesh, so save overwrites it by default
+
+function ensureMeshRenderer() {
+  if (meshRenderer) return;
+  meshRenderer = new Renderer($("#mesh-canvas"));
+  meshRenderer.centre = [0.5, 0.35, 0.5];
+  meshRenderer.yaw = 0.6; meshRenderer.pitch = 0.5; meshRenderer.dist = 2.2;
+  meshRenderer.radius = 3;
+  bindCamera($("#mesh-canvas"), meshRenderer, 1, 20);   // closer minimum zoom than the main view
+}
+
+function meshFrame() {
+  if (!$("#mesh-modal").classList.contains("on")) { meshLoopRunning = false; return; }
+  const fake = {kind: "preview", color: "white", parts: meshParts, ghost: false, x: 0, y: 0, z: 0};
+  meshRenderer.buildThings(meshParts.length ? [fake] : []);
+  meshRenderer.draw();
+  requestAnimationFrame(meshFrame);
+}
+
+function renderMeshPartList() {
+  const box = $("#mesh-part-list");
+  box.innerHTML = "";
+  if (!meshParts.length) {
+    const empty = document.createElement("div");
+    empty.className = "mesh-part-row";
+    empty.style.cursor = "default";
+    empty.textContent = "(no parts yet -- add one below)";
+    box.appendChild(empty);
+    return;
+  }
+  meshParts.forEach((p, i) => {
+    const row = document.createElement("div");
+    row.className = "mesh-part-row" + (i === meshSelected ? " on" : "");
+    row.textContent = (p.shape || "cube") + " (" + (p.color || "white") + ")";
+    row.onclick = () => selectMeshPart(i);
+    box.appendChild(row);
+  });
+}
+
+function selectMeshPart(i) {
+  meshSelected = i;
+  const p = meshParts[i];
+  if (!p) return;
+  $("#mesh-part-shape").value = p.shape || "cube";
+  $("#mesh-part-color").value = p.color || "white";
+  $("#mesh-part-dx").value = p.dx || 0;
+  $("#mesh-part-dy").value = p.dy || 0;
+  $("#mesh-part-dz").value = p.dz || 0;
+  $("#mesh-part-sx").value = p.sx || 0.5;
+  $("#mesh-part-sy").value = p.sy || 0.5;
+  $("#mesh-part-sz").value = p.sz || 0.5;
+  renderMeshPartList();
+}
+
+function applyMeshFieldsToSelected() {
+  if (meshSelected === null || !meshParts[meshSelected]) return;
+  const p = meshParts[meshSelected];
+  p.shape = $("#mesh-part-shape").value;
+  p.color = $("#mesh-part-color").value;
+  p.dx = parseFloat($("#mesh-part-dx").value) || 0;
+  p.dy = parseFloat($("#mesh-part-dy").value) || 0;
+  p.dz = parseFloat($("#mesh-part-dz").value) || 0;
+  p.sx = Math.max(0.05, parseFloat($("#mesh-part-sx").value) || 0.5);
+  p.sy = Math.max(0.05, parseFloat($("#mesh-part-sy").value) || 0.5);
+  p.sz = Math.max(0.05, parseFloat($("#mesh-part-sz").value) || 0.5);
+  renderMeshPartList();
+}
+
+function refreshMeshLoadSelect() {
+  const sel = $("#mesh-load-select");
+  sel.innerHTML = '<option value="">— load an existing mesh to edit —</option>';
+  if (!world) return;
+  const withParts = Object.keys(world.templates)
+    .filter(k => world.templates[k].parts && world.templates[k].parts.length)
+    .sort((a, b) => a.localeCompare(b));
+  for (const kind of withParts) {
+    const opt = document.createElement("option");
+    opt.value = kind; opt.textContent = kind;
+    sel.appendChild(opt);
+  }
+}
+
+function loadMeshForEditing(kind) {
+  const template = world && world.templates[kind];
+  if (!template || !template.parts) return;
+  meshParts = JSON.parse(JSON.stringify(template.parts));
+  meshEditingKind = kind;
+  meshSelected = meshParts.length ? 0 : null;
+  renderMeshPartList();
+  if (meshSelected !== null) selectMeshPart(0);
+  drawerToast('editing "' + kind + '"');
+}
+
+function openMeshCreator() {
+  ensureMeshRenderer();
+  renderMeshPartList();
+  refreshMeshLoadSelect();
+  $("#mesh-modal").classList.add("on");
+  if (!meshLoopRunning) { meshLoopRunning = true; meshFrame(); }
+}
+
+function setupMeshCreator() {
+  const colorSelect = $("#mesh-part-color");
+  for (const name of Object.keys(COLOR_RGB)) {
+    const opt = document.createElement("option");
+    opt.value = name; opt.textContent = name;
+    colorSelect.appendChild(opt);
+  }
+
+  $("#mesh-add-part").onclick = () => {
+    meshParts.push({shape: "cube", dx: 0, dy: 0, dz: 0, sx: 0.5, sy: 0.5, sz: 0.5, color: "white"});
+    selectMeshPart(meshParts.length - 1);
+  };
+  $("#mesh-delete-part").onclick = () => {
+    if (meshSelected === null) return;
+    meshParts.splice(meshSelected, 1);
+    meshSelected = meshParts.length ? Math.min(meshSelected, meshParts.length - 1) : null;
+    if (meshSelected !== null) selectMeshPart(meshSelected); else renderMeshPartList();
+  };
+  $("#mesh-new").onclick = () => {
+    if (meshParts.length && !confirm("Clear the current mesh and start a new one?")) return;
+    meshParts = []; meshSelected = null; meshEditingKind = null;
+    $("#mesh-load-select").value = "";
+    renderMeshPartList();
+  };
+  $("#mesh-load-btn").onclick = () => {
+    const kind = $("#mesh-load-select").value;
+    if (!kind) return;
+    if (meshParts.length && !confirm('Replace the current mesh with "' + kind + '"?')) {
+      $("#mesh-load-select").value = "";
+      return;
+    }
+    loadMeshForEditing(kind);
+  };
+  $("#mesh-delete-btn").onclick = () => {
+    const kind = $("#mesh-load-select").value;
+    if (!kind) { drawerToast("pick one from the list first"); return; }
+    if (!confirm('Delete the saved mesh "' + kind + '"? This cannot be undone.')) return;
+    if (world) delete world.templates[kind];
+    if (project && project.characters) {
+      project.characters = project.characters.filter(c => c.kind !== kind);
+    }
+    if (meshEditingKind === kind) { meshEditingKind = null; }
+    refreshMeshLoadSelect();
+    drawerToast('deleted "' + kind + '"');
+  };
+  $("#mesh-dup-part").onclick = () => {
+    if (meshSelected === null || !meshParts[meshSelected]) return;
+    const copy = JSON.parse(JSON.stringify(meshParts[meshSelected]));
+    copy.dx = (copy.dx || 0) + 0.3;
+    meshParts.splice(meshSelected + 1, 0, copy);
+    selectMeshPart(meshSelected + 1);
+  };
+  for (const id of ["mesh-part-shape", "mesh-part-color", "mesh-part-dx", "mesh-part-dy",
+                     "mesh-part-dz", "mesh-part-sx", "mesh-part-sy", "mesh-part-sz"]) {
+    $("#" + id).addEventListener("input", applyMeshFieldsToSelected);
+    $("#" + id).addEventListener("change", applyMeshFieldsToSelected);
+  }
+
+  $("#mesh-save").onclick = () => {
+    if (!meshParts.length) { window.alert("add at least one part first"); return; }
+    const existing = meshEditingKind && world && world.templates[meshEditingKind];
+    const name = (prompt("Save this mesh as a kind named:",
+                          meshEditingKind || "mymesh") || "").trim();
+    if (!name) return;
+    const safe = name.replace(/[^A-Za-z0-9_-]/g, "");
+    if (!safe) { window.alert("give it a name"); return; }
+    const glyphDefault = (existing && existing.glyph) || safe[0].toUpperCase();
+    const glyph = (prompt("One-letter glyph for it:", glyphDefault) || glyphDefault).slice(0, 1);
+    const template = {
+      kind: safe, glyph, color: meshParts[0].color || "white", health: 1,
+      count: 0, solid: true, role: "prop",
+      parts: JSON.parse(JSON.stringify(meshParts)), brain: [],
+    };
+    // both places a template can live: the project (so it round-trips
+    // through save/load) and the live world (so it is placeable this
+    // instant, with no restart needed).
+    if (project && project.characters) {
+      const idx = project.characters.findIndex(c => c.kind === safe);
+      if (idx >= 0) project.characters[idx] = template; else project.characters.push(template);
+    }
+    if (world) world.templates[safe] = template;
+    meshEditingKind = safe;
+    drawerToast('saved "' + safe + '" -- pick it in 🎨 Build');
+    $("#mesh-modal").classList.remove("on");
+  };
+
+  $("#mesh-close").onclick = () => $("#mesh-modal").classList.remove("on");
+}
+
+/* ---------------------------------------------------------------------
+ * Build mode / palette -- pick which kind the place tile adds next.
+ *
+ * Local play only: world.memory.palette_kind is set here by writing
+ * straight to the live JS World object, which only exists for the copy
+ * of the game running in this browser tab. A LIVE game (mirrored from a
+ * real Termux server) has no such object to write into, so the palette
+ * has nothing to affect there and place quietly keeps using whatever
+ * kind its own tile says (see the "place" action).
+ * ------------------------------------------------------------------- */
+function renderPaletteList() {
+  const box = $("#palette-list");
+  box.innerHTML = "";
+  if (!world) {
+    box.textContent = "Not available in LIVE mode -- switch to \"run here\" first.";
+    return;
+  }
+  const current = world.memory.palette_kind;
+  const query = ($("#palette-search").value || "").trim().toLowerCase();
+  const kinds = Object.keys(world.templates)
+    .filter(k => k !== "shot")
+    .filter(k => !query || k.toLowerCase().includes(query))
+    .sort((a, b) => a.localeCompare(b));
+  if (!kinds.length) {
+    const empty = document.createElement("div");
+    empty.className = "palette-item";
+    empty.style.cursor = "default";
+    empty.textContent = query ? "(nothing matches \"" + query + "\")" : "(nothing to place yet)";
+    box.appendChild(empty);
+    return;
+  }
+  for (const kind of kinds) {
+    const row = document.createElement("div");
+    row.className = "palette-item" + (kind === current ? " on" : "");
+    row.textContent = kind;
+    row.onclick = () => {
+      world.memory.palette_kind = kind;
+      saveEditorSettings({paletteKind: kind});
+      drawerToast('now placing "' + kind + '"');
+      renderPaletteList();
+    };
+    box.appendChild(row);
+  }
+}
+
+function openPalette() {
+  renderPaletteList();
+  $("#palette-modal").classList.add("on");
+}
+
+function setupPalette() {
+  $("#palette-close").onclick = () => $("#palette-modal").classList.remove("on");
+  $("#palette-mesh-creator").onclick = () => {
+    $("#palette-modal").classList.remove("on");
+    openMeshCreator();
+  };
+  $("#palette-search").addEventListener("input", renderPaletteList);
+}
+
+/* ---------------------------------------------------------------------
+ * Object Inspector -- colour, resize, and relocate whatever you're
+ * touching, or your pending ghost if you have one (so a newly-spawned
+ * object can be set up before it's even confirmed). Local play only,
+ * same reasoning as Build mode: it writes straight into the live Thing
+ * instance, which only exists for the copy of the game in this tab.
+ * ------------------------------------------------------------------- */
+let inspectTarget = null;
+
+function findPlayer() {
+  return world && world.things.find(t => t.role === "player");
+}
+
+// A pending ghost first (the "as I'm spawning one" case), else whatever
+// is within one square -- the same reach the touch sensor itself uses.
+function findInspectTarget() {
+  const player = findPlayer();
+  if (!player) return null;
+  const ghost = world.things.find(t => t.alive && t.ghost && t.owner === player);
+  if (ghost) return ghost;
+  return world.things.find(t => t.alive && t !== player &&
+    Math.max(Math.abs(t.x - player.x), Math.abs(t.y - player.y)) <= 1) || null;
+}
+
+// The first open, in-bounds neighbour of (x, y) -- used to duplicate an
+// object right next to the original instead of dropping it somewhere
+// random across the board.
+function findFreeAdjacent(x, y) {
+  const offsets = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]];
+  for (const [dx, dy] of offsets) {
+    const nx = x + dx, ny = y + dy;
+    if (!world.inBounds(nx, ny)) continue;
+    if (!world.things.some(t => t.alive && t.solid && t.x === nx && t.y === ny)) return [nx, ny];
+  }
+  return [x, y];
+}
+
+/* Tap any object in the 3D view to pick it -- projects every thing to
+ * screen space the exact same way a glyph label already is, and takes
+ * whichever one lands closest to the tap, within a comfortable fingertip
+ * radius. A cheap stand-in for real ray-casting that costs nothing extra:
+ * the projection math already runs every frame for the glyphs anyway. */
+function pickObjectAt(sx, sy) {
+  if (!world) return;
+  const player = findPlayer();
+  let best = null, bestDist = 44;
+  for (const t of world.things) {
+    if (!t.alive || t === player) continue;
+    const tScale = (t.size === undefined ? 100 : t.size) / 100;
+    const top = (t.role === "player" ? 0.6 : 0.4) * tScale + (t.z || 0);
+    const at = renderer.project(t.x + 0.5, top, t.y + 0.5);
+    if (!at) continue;
+    const d = Math.hypot(at[0] - sx, at[1] - sy);
+    if (d < bestDist) { bestDist = d; best = t; }
+  }
+  if (best) openInspector(best);
+}
+
+// A tap selects; a drag (used for turning the camera) must not also
+// select whatever the drag happened to end on top of.
+function setupObjectPicking(canvas) {
+  let downX = 0, downY = 0, downT = 0;
+  canvas.addEventListener("pointerdown", e => {
+    downX = e.clientX; downY = e.clientY; downT = Date.now();
+  });
+  canvas.addEventListener("pointerup", e => {
+    const moved = Math.hypot(e.clientX - downX, e.clientY - downY);
+    if (moved > 12 || Date.now() - downT > 500) return;   // a drag, not a tap
+    pickObjectAt(e.clientX, e.clientY);
+  });
+}
+
+// Ring around whichever object the Inspector currently has, wherever it
+// is now -- tracked every frame the same way a glyph label is.
+function drawSelection() {
+  const el = $("#select-highlight");
+  if (!inspectTarget || !inspectTarget.alive) { el.classList.remove("on"); return; }
+  const scale = (inspectTarget.size === undefined ? 100 : inspectTarget.size) / 100;
+  const top = (inspectTarget.role === "player" ? 0.6 : 0.4) * scale + (inspectTarget.z || 0);
+  const at = renderer.project(inspectTarget.x + 0.5, top, inspectTarget.y + 0.5);
+  if (!at) { el.classList.remove("on"); return; }
+  el.classList.add("on");
+  el.style.left = at[0] + "px";
+  el.style.top = at[1] + "px";
+}
+
+function openInspector(pickedTarget) {
+  if (!world) { drawerToast("not available in LIVE mode"); return; }
+  const target = pickedTarget || findInspectTarget();
+  if (!target) { drawerToast("touch something, or tap one in the world, first"); return; }
+  inspectTarget = target;
+  $("#inspect-title").textContent = "🎯 " + target.kind + (target.ghost ? " (still being placed)" : "");
+  $("#inspect-color").value = target.color || "white";
+  $("#inspect-shape").value = target.shape || "cube";
+  const size = target.size === undefined ? 100 : target.size;
+  $("#inspect-size").value = size;
+  $("#inspect-size-num").value = size;
+  $("#inspect-x").value = target.x;
+  $("#inspect-y").value = target.y;
+  $("#inspect-z").value = target.z || 0;
+  $("#inspect-modal").classList.add("on");
+}
+
+function applyInspectorSize(fromSlider) {
+  if (!inspectTarget || !inspectTarget.alive) return;
+  const raw = fromSlider ? $("#inspect-size").value : $("#inspect-size-num").value;
+  const v = Math.max(20, Math.min(300, parseFloat(raw) || 100));
+  $("#inspect-size").value = v;
+  $("#inspect-size-num").value = v;
+  inspectTarget.size = v;
+}
+
+function applyInspectorPosition() {
+  if (!inspectTarget || !inspectTarget.alive || !world) return;
+  let x = Math.round(parseFloat($("#inspect-x").value));
+  let y = Math.round(parseFloat($("#inspect-y").value));
+  if (!Number.isFinite(x)) x = inspectTarget.x;
+  if (!Number.isFinite(y)) y = inspectTarget.y;
+  if (!world.inBounds(x, y)) { drawerToast("that's outside the world"); return; }
+  inspectTarget.x = x;
+  inspectTarget.y = y;
+  const z = parseFloat($("#inspect-z").value);
+  inspectTarget.z = Number.isFinite(z) ? Math.max(0, Math.min(8, z)) : 0;
+}
+
+function setupInspector() {
+  const colorSelect = $("#inspect-color");
+  for (const name of Object.keys(COLOR_RGB)) {
+    const opt = document.createElement("option");
+    opt.value = name; opt.textContent = name;
+    colorSelect.appendChild(opt);
+  }
+  colorSelect.addEventListener("change", () => {
+    if (inspectTarget && inspectTarget.alive) inspectTarget.color = colorSelect.value;
+  });
+  $("#inspect-shape").addEventListener("change", () => {
+    // has no visible effect on a mesh-creator object (parts override
+    // shape entirely in the renderer), same as it always has -- shape
+    // only ever meant anything for a single-shape thing.
+    if (inspectTarget && inspectTarget.alive) inspectTarget.shape = $("#inspect-shape").value;
+  });
+  $("#inspect-size").addEventListener("input", () => applyInspectorSize(true));
+  $("#inspect-size-num").addEventListener("input", () => applyInspectorSize(false));
+  for (const id of ["inspect-x", "inspect-y", "inspect-z"]) {
+    $("#" + id).addEventListener("input", applyInspectorPosition);
+    $("#" + id).addEventListener("change", applyInspectorPosition);
+  }
+  $("#inspect-duplicate").onclick = () => {
+    if (!inspectTarget || !inspectTarget.alive || !world) return;
+    const [nx, ny] = findFreeAdjacent(inspectTarget.x, inspectTarget.y);
+    const copy = world.spawn(inspectTarget.kind, nx, ny);
+    if (!copy) { drawerToast("no room to duplicate it here"); return; }
+    // the fresh copy starts from the template again -- carry over whatever
+    // this specific instance was actually customized to, not just what it
+    // was born with.
+    copy.color = inspectTarget.color;
+    copy.size = inspectTarget.size;
+    copy.shape = inspectTarget.shape;
+    copy.z = inspectTarget.z;
+    drawerToast("duplicated");
+  };
+  $("#inspect-delete").onclick = () => {
+    if (!inspectTarget) return;
+    if (!confirm('Delete this ' + inspectTarget.kind + '? This cannot be undone.')) return;
+    world.remove(inspectTarget);
+    inspectTarget = null;
+    $("#inspect-modal").classList.remove("on");
+  };
+  $("#inspect-close").onclick = () => {
+    $("#inspect-modal").classList.remove("on");
+    inspectTarget = null;
+  };
+}
+
+/* Quickbar -- a fixed row of plain bubble slots, always visible, no tab
+ * to slide open first (that's what the drawer is for). Each slot is
+ * still a real [data-editable] button, so it can be dragged/resized/
+ * faded the same as anything else -- there's just nothing assigned to
+ * any of them yet. */
+function makeQuickbar(count) {
+  const bar = document.createElement("div");
+  bar.id = "quickbar";
+  for (let i = 1; i <= count; i++) {
+    const el = document.createElement("div");
+    el.className = "bubble";
+    el.textContent = String(i);
+    el.title = "quickbar slot " + i;
+    el.onclick = () => { if (!editingButtons) drawerToast("slot " + i + " -- nothing set yet"); };
+    registerEditable(el, "quickbar:" + i, "quickbar slot " + i);
+    bar.appendChild(el);
+  }
+  document.body.appendChild(bar);
+}
+
+function makeDrawer({edge = "left", buttons = []}) {
+  const root = document.createElement("div");
+  root.className = "drawer";
+  root.dataset.edge = edge;
+
+  const tab = document.createElement("div");
+  tab.className = "tab";
+  tab.innerHTML = '<span>&#8250;</span>';
+  root.appendChild(tab);
+
+  const bubbles = document.createElement("div");
+  bubbles.className = "bubbles";
+  root.appendChild(bubbles);
+
+  const nextUid = () => "bub" + Math.random().toString(36).slice(2, 9);
+  const list = buttons.slice();
+  for (const b of list) b.__uid = b.__uid || nextUid();
+  let selected = list.length ? 0 : null;
+  // Armed by ×: the next bubble you tap is the one that gets removed,
+  // instead of whatever happened to be selected already. A bubble marked
+  // `locked: true` in its config (the built-ins this drawer ships with,
+  // e.g.) refuses to be picked that way at all.
+  let removing = false;
+
+  const bubbleEl = (icon, title, extraClass) => {
+    const el = document.createElement("div");
+    el.className = "bubble" + (extraClass ? " " + extraClass : "");
+    if (title) el.title = title;
+    el.textContent = icon;
+    return el;
+  };
+
+  function render() {
+    bubbles.innerHTML = "";
+    list.forEach((b, i) => {
+      const el = bubbleEl(b.icon || "?", b.label || "");
+      el.classList.toggle("selected", i === selected);
+      el.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (editingButtons) return;   // the button editor owns taps for now
+        if (removing) {
+          if (b.locked) {
+            el.classList.add("shake");
+            setTimeout(() => el.classList.remove("shake"), 320);
+            return;   // stays armed -- this one just is not removable
+          }
+          list.splice(i, 1);
+          if (selected === i) selected = null;
+          else if (selected !== null && selected > i) selected -= 1;
+          removing = false;
+          render();
+          return;
+        }
+        selected = i;
+        render();
+        if (b.onTap) b.onTap();
+      });
+      // Registered on every render, not just once -- the drawer rebuilds
+      // this element from scratch each time, and registerEditable both
+      // points the editor at the new one and re-applies its saved size/
+      // position/fade, so customizing a bubble survives its own redraws.
+      registerEditable(el, "drawer:" + edge + ":" + b.__uid, b.label || b.icon);
+      bubbles.appendChild(el);
+    });
+
+    const add = bubbleEl("+", "add a button before the selected one", "control add");
+    add.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (editingButtons) return;
+      removing = false;   // adding cancels an armed removal
+      const icon = prompt("icon for the new button", "★");
+      if (icon === null) { render(); return; }
+      const at = selected === null ? list.length : selected;
+      const fresh = {icon: icon || "•", label: "new", __uid: nextUid(),
+                     onTap: () => drawerToast(icon || "•")};
+      list.splice(at, 0, fresh);
+      selected = at;
+      render();
+    });
+    registerEditable(add, "drawer:" + edge + ":add", "add a button (drawer control)");
+    bubbles.appendChild(add);
+
+    const remove = bubbleEl("×",
+      removing ? "tap the button to remove (tap × again to cancel)" : "remove a button",
+      "control remove");
+    remove.classList.toggle("armed", removing);
+    remove.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (editingButtons) return;
+      removing = !removing;
+      render();
+    });
+    registerEditable(remove, "drawer:" + edge + ":remove", "remove a button (drawer control)");
+    bubbles.appendChild(remove);
+  }
+  render();
+
+  let drawerOpen = false;
+  const setOpen = (v) => {
+    drawerOpen = v;
+    root.classList.toggle("open", drawerOpen);
+    if (!v && removing) { removing = false; render(); }   // closing cancels it
+  };
+  tab.addEventListener("click", (e) => {
+    e.stopPropagation();
+    setOpen(!drawerOpen);
+  });
+  document.addEventListener("click", () => { if (drawerOpen) setOpen(false); });
+
+  document.body.appendChild(root);
+  return {root, open: () => setOpen(true), close: () => setOpen(false)};
 }
 
 function fail(heading, detail) {
@@ -1310,13 +3507,44 @@ window.addEventListener("unhandledrejection",
 
   const [found, where] = await findProject();
   project = found;
+  lastSaveName = project.name || null;
+  // Already the file this world came from -- overwriting it via plain
+  // "save" is expected, not a collision to ask about.
+  if (project.name) confirmedNames.add(project.name);
   $("#title").textContent = project.name || "Spark 3D";
 
   const snap = await probeLive();
   if (snap) startLive(snap); else startLocal();
 
   bindCamera($("#gl"));
+  setupObjectPicking($("#gl"));
   bindControls();
+  makeDrawer({edge: "left", buttons: [
+    // press once for a see-through preview where you stand, press again
+    // (the same bubble, or the "a" key) to confirm and place it for real.
+    // locked: it ships with this drawer, not something you added, so ×
+    // refuses to pick it -- add/remove is for your own bubbles only.
+    {icon: "▦", label: "add a 3D object", onTap: () => pressed.add("a"), locked: true},
+    // walking (grounded, w/s fly buttons do nothing) <-> flying (w/s
+    // change altitude). Same key ("d") as pressing it on a keyboard.
+    {icon: "🕊", label: "toggle walk/fly mode", onTap: () => pressed.add("d"), locked: true},
+    // "remove" is not a real keyboard key -- pressed is just a set of
+    // strings, and nothing requires those strings to be real keys. Any
+    // WHEN row can watch for one that only a UI button ever sends.
+    {icon: "🗑", label: "remove the object I'm touching", onTap: () => pressed.add("remove"), locked: true},
+    {icon: "🎨", label: "build: pick what to place, or open the Mesh Creator",
+     onTap: () => openPalette(), locked: true},
+    // whatever you're touching, or your pending ghost if you have one --
+    // colour, resize, and relocate it directly, live.
+    {icon: "🎯", label: "inspect: colour, resize, relocate", onTap: () => openInspector(), locked: true},
+  ]});
+  setupBackpack();
+  setupProperties();
+  setupMeshCreator();
+  setupPalette();
+  setupInspector();
+  setupCompass();
+  makeQuickbar(7);
 
   // Turning the phone swaps which region is which shape, and a camera framed
   // for one is wrong for the other. Only a flip re-fits it, though: Chrome

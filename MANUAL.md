@@ -301,30 +301,54 @@ of blocks, with each character's glyph floating over its own block.
 | **pinch** two fingers | moves the camera closer or further away |
 | **scroll wheel** | the same, with a mouse |
 | ▲ ▼ ◀ ▶ | the direction keys, for your character |
-| ● | the space key, usually shoot |
+| ● (space) | usually shoot |
+| ⟲ (`e`) | flip the touched object's shape, cube ↔ sphere |
+| + (`f`) | resize the touched object |
+| ⤒ (`w`) | fly up — only while flying, see `d` below |
+| ⤓ (`s`) | fly down — only while flying |
+| ▦ (`a`) | add a 3D object where you stand, see-through until pressed again to confirm it |
+| `d` | toggle walking (grounded, `w`/`s` do nothing) ↔ flying |
+| 🗑 | arm removal — the *next* object touched is deleted, not whatever was already selected; drawer bubbles marked `locked` (the built-in ones) can never be picked this way |
+| 🎨 | Build mode: a searchable, alphabetical palette of every kind the game defines, to place where you stand — or open the Mesh Creator to design a new multi-part shape and add it to that palette. Local play only |
+| 🎯 | the Object Inspector: recolour, resize, flip the shape of, relocate, duplicate, or delete whatever you're touching (or a pending ghost from ▦, before it's even confirmed). **Tap anything in the world to select it directly**, without touching it on the ground first — a glowing ring marks the current selection. Local play only |
 | **restart** | starts the game again from the beginning (local play only) |
-| **centre** | puts the camera back where it started |
+| **recentre** | puts the camera back where it started |
+| **save** / **save as new** | quick-saves back to the file this world came from, or always asks for a new name |
+| **⛶** | fullscreen |
+| **🎒** | Backpack, a small virtual file system |
+| **⚙** | Properties — grid-lock status, move speed, an opt-in minimap, and a clock, all driven by the world itself |
+| **✎** | the button editor — select, drag, resize, and fade any button here, including the drawer's own |
 | **run here** / **go live** | switches between the running game and this tab's own engine |
 
-**The pad never covers the world.** The screen is two regions that do not
-overlap: the world above, the pad below. Turn the phone sideways and they sit
-beside each other instead — world on the left, pad on the right — because a
-landscape screen has width to spare and no height to spare. The camera fits the
-board to whichever region it has been given, so nothing is ever drawn where a
-button is.
+The **compass**, a meter across the top of the screen rather than a dial,
+scrolls sideways as the camera turns so the current heading always sits
+under the fixed centre marker — this world's own idea of "north," not a
+real one. The **quickbar** is seven empty, always-visible bubble slots with
+no drawer to open first, there to have something assigned to them later.
 
-The pad is as big as that leaves room for, measured **as a share of your own
-screen** rather than in fixed pixels: half the screen's height upright, half its
-width sideways, capped so a tablet does not hand you a pad the size of a dinner
-plate. Each key is just under a third of that — from about 89px on a small
-phone to 144px on a tablet, against the roughly 48px a fingertip needs. Nothing
-is measured against any particular phone, so a screen I have never seen gets a
-pad in the same proportion.
+"Local play only" above means the feature edits the live JavaScript world
+directly, in this tab's own copy of the game — it has no effect, and does
+not appear to make sense, while watching a `LIVE` server-hosted game (see
+the badge table below), since there is no local copy to edit.
 
-**restart**, **centre** and **run here** stay in the top bar, over the sky at
-the top of the world where there is nothing to hide, since they are pressed once
-in a while and the pad wants the room. Anywhere in the world you touch that is
-not a button turns the camera.
+**The world always fills the whole screen** — the top bar, the pad, the
+button drawer, the compass, and the quickbar all float over it as
+translucent panels rather than splitting the page into a world region and
+a controls region, in either orientation. The empty space around the pad
+still passes a swipe straight through to the camera underneath it.
+
+The pad is sized **as a share of your own screen** rather than in fixed
+pixels: about half the screen's height upright, capped in landscape so it
+cannot grow tall enough to reach the top bar, and capped altogether so a
+tablet does not hand you a pad the size of a dinner plate. Nothing is
+measured against any particular phone, so a screen I have never seen gets
+a pad in the same proportion.
+
+Every button here — the pad, the top bar, the drawer's own bubbles — can
+be dragged to a new spot, resized, and faded from the button editor (✎),
+either by touch or by typing an exact position as a decimal percent of
+the screen. Anywhere in the world you touch that is not a button turns
+the camera.
 
 A real keyboard works: arrows, space, and `w a s d e f`.
 
