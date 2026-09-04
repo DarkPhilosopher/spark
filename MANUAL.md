@@ -438,7 +438,10 @@ Every button here — the two pads, the top bar, the drawer's own bubbles —
 can be dragged to a new spot, resized, and faded from the button editor
 (✎), either by touch or by typing an exact position as a decimal percent
 of the screen. Anywhere in the world you touch that is not a button turns
-the camera.
+the camera. A drag can never leave a button entirely past an edge of the
+screen with no way back to it — it always keeps a small margin of itself
+reachable, correcting on its own if it ever ends up otherwise (a screen
+resized or rotated after a position was saved, say).
 
 The button editor's own panel covers most of the screen, which can get in
 the way of seeing exactly where a button lands relative to everything

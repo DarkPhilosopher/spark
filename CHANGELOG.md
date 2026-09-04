@@ -16,6 +16,25 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ### Fixed
 
+- **A button could be dragged (or end up saved) off the edge of the
+  screen with no way back to it except knowing about the button
+  editor's own `#edit-list` workaround** — reported from a real phone,
+  the button drawer specifically. `buttonLayout` entries (the saved
+  `dx`/`dy` a button's own drag leaves behind) had no bound on them at
+  all — a drag that ended near an edge, a screen rotated or resized
+  after a position was saved, or anything else that shifted a button's
+  effective position could leave it wholly past a screen edge, unable
+  to be tapped again short of "reset all buttons" (which throws away
+  every other customization too, not just that one button's). New
+  `clampToScreen()`: after any drag, and once on every load for every
+  registered button, keeps at least a 24px margin of it on screen by
+  correcting `dx`/`dy` (and re-saving the correction, so it does not
+  need re-earning on the next reload) rather than only offering a way
+  to *find* an off-screen button after the fact. The drawer's own tab
+  isn't itself draggable (only its bubbles are, individually) — if this
+  turns out not to have been the actual cause, worth a follow-up with
+  more specifics about what was seen.
+
 - **A mental playthrough of the 3D view's controls, tool by tool, turned
   up three more ergonomic gaps beyond the compass fix below — fixed all
   three, not just written down:**

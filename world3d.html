@@ -2669,6 +2669,35 @@ function updateGridOverlay() {
   overlay.style.backgroundSize = size + " " + size;
 }
 
+// Whatever put a button here -- its own normal grid/flex position, a
+// dx/dy saved from a previous session, or mid-drag right now -- keeps at
+// least a corner of it reachable rather than letting it end up entirely
+// past an edge of the screen with no way back to it short of "reset all
+// buttons" below (which throws away every other customization too, not
+// just this one button's). Same "measure the real rect, correct dx/dy by
+// however far off that is" approach as snapElementToGrid just below.
+// Applied both live while dragging (so a button can't be dragged fully
+// off in the first place) and once on every load (so a position saved
+// off-screen before this existed -- or from a screen this button's
+// current position has never actually been seen on -- self-corrects the
+// next time the page opens, instead of staying stuck there forever).
+function clampToScreen(el, entry) {
+  const rect = el.getBoundingClientRect();
+  const w = window.innerWidth || 1, h = window.innerHeight || 1;
+  const margin = 24;   // this much of the button always stays on screen
+  let ddx = 0, ddy = 0;
+  if (rect.right < margin) ddx = margin - rect.right;
+  else if (rect.left > w - margin) ddx = (w - margin) - rect.left;
+  if (rect.bottom < margin) ddy = margin - rect.bottom;
+  else if (rect.top > h - margin) ddy = (h - margin) - rect.top;
+  if (ddx || ddy) {
+    entry.dx = (entry.dx || 0) + ddx;
+    entry.dy = (entry.dy || 0) + ddy;
+    applyButtonStyle(el, entry);
+    saveButtonLayout();   // so a correction on load doesn't need re-earning on every reload
+  }
+}
+
 // After a drag moves a button, nudge it the rest of the way to the
 // nearest grid intersection -- same "measure the real rect, work out how
 // far off target that is, add the difference to dx/dy" approach as
@@ -2745,7 +2774,10 @@ function registerEditable(el, uid, label) {
   el.dataset.editable = "";
   el.dataset.uid = uid;
   editableButtons.set(uid, {el, label});
-  if (buttonLayout[uid]) applyButtonStyle(el, buttonLayout[uid]);
+  if (buttonLayout[uid]) {
+    applyButtonStyle(el, buttonLayout[uid]);
+    clampToScreen(el, buttonLayout[uid]);
+  }
   if (uid === editSelected) el.classList.add("edit-selected");
 
   el.addEventListener("pointerdown", e => {
@@ -2765,6 +2797,7 @@ function registerEditable(el, uid, label) {
     entry.dy = editDragging.dy + (e.clientY - editDragging.y);
     applyButtonStyle(el, entry);
     snapElementToGrid(el, entry);
+    clampToScreen(el, entry);   // can't be dragged fully past an edge, either
   });
   const endDrag = () => {
     if (!editDragging || editDragging.uid !== uid) return;
