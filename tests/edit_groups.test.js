@@ -34,9 +34,8 @@ const nameOf = uid => { const i = groupOf(uid); return i < 0 ? "other" : EDIT_GR
 console.log("every real uid in the app lands in the group a person would expect");
 {
   const cases = [
-    ["up", "pad (move)"], ["left", "pad (move)"], ["right", "pad (move)"], ["down", "pad (move)"],
-    ["e", "pad (actions)"], ["f", "pad (actions)"], ["space", "pad (actions)"],
-    ["s", "pad (actions)"], ["w", "pad (actions)"],
+    ["up", "pad"], ["left", "pad"], ["right", "pad"], ["down", "pad"],
+    ["e", "pad"], ["f", "pad"], ["space", "pad"], ["s", "pad"], ["w", "pad"],
     ["restart", "top bar"], ["recentre", "top bar"], ["fullscreen", "top bar"], ["mode", "top bar"],
     ["save", "top bar"], ["save-as", "top bar"], ["backpack-toggle", "top bar"],
     ["properties-toggle", "top bar"],

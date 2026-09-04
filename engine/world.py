@@ -100,6 +100,15 @@ class World:
         self.tick = 0
         self.score = 0
         self.message = ""
+        # {x1,y1,z1,x2,y2,z2,color}[] -- see the draw_line tile. Cleared at
+        # the top of every step() and rebuilt by whichever rows fire that
+        # tick, so a line only shows for as long as the row drawing it keeps
+        # firing (WHEN that made it true going false makes it vanish, same
+        # tick, with nothing extra to clean up). Only world3d.html actually
+        # draws these; Python carries the list so a save/load round trip and
+        # the two engines agree on what a game *asked* to have drawn, even
+        # though only one of them can show it.
+        self.lines = []
         self.status = None          # None | "win" | "lose"
         self.keys = set()           # keys at this device, for solo play
         self.player_keys = {}       # player id -> keys, for a shared world
@@ -244,6 +253,7 @@ class World:
 
     def step(self):
         self.tick += 1
+        self.lines = []       # see draw_line -- a fresh slate each tick
         for thing in list(self.things):
             if not thing.alive or self.status:
                 continue

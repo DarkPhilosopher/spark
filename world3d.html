@@ -11,15 +11,15 @@
     --bg:#4a5058; --panel:#5b6169; --panel2:#666d76; --line:#838a94;
     --ink:#f2f4f6; --dim:#c7ccd3; --accent:#8ecae6; --bad:#d99a94;
     --good:#a8c9a0;
-    /* How big each pad is, as a share of this phone's own screen -- so it
+    /* How big the pad is, as a share of this phone's own screen -- so it
        comes out right on a small phone and a big one without either being
-       measured. There are two pads side by side now (move + actions, see
-       .pad below), so this is under half of what a single combined pad
-       used to claim, not the old 94vw -- 40% of the width leaves genuine
-       room between the two thumb zones instead of them nearly touching in
-       the middle. Sideways this is overridden below. The cap stops a
-       tablet handing either one the size of a dinner plate. */
-    --pad:min(40vw, 46vh, 230px);
+       measured. Back to one combined pad (see .pad below), so this is
+       back to its original, generous single-pad share too -- nearly the
+       full width upright, unless the phone is narrow enough that the
+       width runs out before half the height does. Sideways this is
+       overridden below. The cap stops a tablet handing it the size of a
+       dinner plate. */
+    --pad:min(94vw, 50vh, 460px);
     --util:clamp(36px, 9vw, 48px); /* restart / centre / save / live: pressed rarely */
     /* The translucent panel colours that kept getting retyped as the same
        literal rgba() across pad/side/drawer/modals as each was added --
@@ -128,14 +128,12 @@
 
   /* Floats over the bottom of the world instead of claiming a strip of the
      page for itself -- pointer-events:none on the wrapper so a swipe in the
-     empty middle between the two pads still reaches the canvas and turns
-     the camera; the pads and their buttons opt back in below.
-     space-between (not centered) is the point of the split: one pad sits
-     at the left edge, the other at the right, so each lands under whichever
-     thumb is already resting near that side of the phone instead of both
-     controls sharing one block you have to reach into the middle for. */
+     empty space around the pad still reaches the canvas and turns the
+     camera; the pad and its buttons opt back in below. Centred: one pad
+     again, not the two-thumb-zone split this used to be (see the pad's
+     own comment for the current arrangement and why it changed back). */
   #controls{position:fixed;left:0;right:0;bottom:0;z-index:4;
-            display:flex;align-items:flex-end;justify-content:space-between;
+            display:flex;align-items:flex-end;justify-content:center;
             padding:8px;padding-bottom:calc(8px + env(safe-area-inset-bottom));
             pointer-events:none}
   button{font:inherit;color:var(--ink);background:var(--panel2);
@@ -144,27 +142,21 @@
   button:active{filter:brightness(1.45)}
   button[disabled]{opacity:.4}
 
-  /* Two thumb-zone pads instead of one combined block (see #controls above):
-     #pad-move (bottom-left) is just the four arrows in a plus, #pad-actions
-     (bottom-right) is the fire/utility buttons that used to sit in the
-     corners and centre of the old single pad -- same keys, same relative
-     positions, just carried by a grid of their own. Both are still a square
-     of side --pad, three cells by three (grid-template-areas below leaves
-     the unused cells empty rather than dropping to fewer columns, so a
-     button is never smaller, or the pad never narrower, than the old
-     combined one's per-key size was). Half transparent and blurred, so
-     each reads as floating over the environment rather than a solid panel
-     sitting beside it. */
-  /* pointer-events:auto on the buttons themselves, not the grid -- neither
-     pad fills all nine cells (pad-move uses 4, pad-actions 5), and the
-     grid container used to catch pointer-events across its own empty
-     cells too, turning them into dead zones a swipe could not pass
-     through -- exactly what "the empty space passes a swipe straight
-     through to the camera" (see #controls above) already promised
-     everywhere else on screen, just not actually true here. */
+  /* One combined pad again (was briefly split into two thumb-zone pads,
+     #pad-move/#pad-actions -- merged back on request into a single block,
+     rearranged from either of those). All nine cells filled this time, in
+     an order chosen for what's most reached for: jump (space) gets its
+     own top-centre spot, above the movement up-arrow one row down, with
+     the two flanking rows -- fly down/up, then strafe left/down/right --
+     built out around that shared centre column. Half transparent and
+     blurred, so it reads as floating over the environment rather than a
+     solid panel sitting beside it. */
   .pad{display:grid;width:var(--pad);height:var(--pad);
        grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);
-       gap:3%}
+       gap:3%;
+       grid-template-areas:"e    space f"
+                            "s    up    w"
+                            "left down  right"}
   .pad button{width:100%;height:100%;min-width:0;min-height:0;padding:0;
               pointer-events:auto;
               border-radius:18%;font-size:calc(var(--pad) * 0.115);
@@ -172,38 +164,25 @@
               backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
   .pad .fire{background:rgba(126,164,186,.4);border-color:var(--accent);color:var(--accent);
              font-size:calc(var(--pad) * 0.09)}
-  #pad-move{grid-template-areas:".    up    ."
-                                 "left .     right"
-                                 ".    down  ."}
-  #pad-move button[data-key="up"]{grid-area:up}
-  #pad-move button[data-key="left"]{grid-area:left}
-  #pad-move button[data-key="right"]{grid-area:right}
-  #pad-move button[data-key="down"]{grid-area:down}
-  #pad-actions{grid-template-areas:"e . f"
-                                    ". space ."
-                                    "s . w"}
-  #pad-actions button[data-key="e"]{grid-area:e}
-  #pad-actions button[data-key="f"]{grid-area:f}
-  #pad-actions button[data-key="space"]{grid-area:space}
-  #pad-actions button[data-key="s"]{grid-area:s}
-  #pad-actions button[data-key="w"]{grid-area:w}
+  #pad button[data-key="e"]{grid-area:e}
+  #pad button[data-key="space"]{grid-area:space}
+  #pad button[data-key="f"]{grid-area:f}
+  #pad button[data-key="s"]{grid-area:s}
+  #pad button[data-key="up"]{grid-area:up}
+  #pad button[data-key="w"]{grid-area:w}
+  #pad button[data-key="left"]{grid-area:left}
+  #pad button[data-key="down"]{grid-area:down}
+  #pad button[data-key="right"]{grid-area:right}
 
-  /* Upright there are two of these side by side, so each gets less than
-     the old single pad's full share of the screen -- 40vw not 94vw --
-     while the 46vh floor and 230px cap stop it shrinking or growing past
-     a sensible thumb-zone size regardless of screen shape. Sideways there
-     is width to spare and no height to spare, so both pads shrink to a
-     landscape-appropriate size (same 46vw share the single pad used to
-     use, since now two share the width instead of one taking it all) and
-     the row's own height cap keeps neither one tall enough to reach up
-     into the top bar. Either way #controls above still puts one at each
-     bottom corner; only the size formula changes here. */
+  /* Upright: about half the screen's height, unless the phone is narrow
+     enough that the width runs out first -- the cap stops a tablet
+     handing it the size of a dinner plate. Sideways there is width to
+     spare and no height to spare, so it's capped by height instead, low
+     enough to never grow tall enough to reach up into the top bar. */
   @media (orientation:landscape){
-    /* 100vh minus room for the top bar (title + a row of side buttons)
-       and the bottom safe area, so a pad can no longer grow tall enough
-       to reach up and overlap the bar the way a flat vh share could. */
-    :root{--pad:min(46vw, calc(100vh - 150px), 230px)}
-    #controls{padding-right:calc(8px + env(safe-area-inset-right))}
+    :root{--pad:min(46vw, calc(100vh - 150px), 420px)}
+    #controls{justify-content:flex-end;
+              padding-right:calc(8px + env(safe-area-inset-right))}
   }
 
   /* Button Drawer: a row of round buttons that slides out from the left
@@ -651,23 +630,24 @@
 </div>
 
 <div id="controls">
-  <!-- Split into two thumb zones rather than one combined block: movement
-       at bottom-left for the thumb that naturally rests there, actions at
-       bottom-right for the other -- see the CSS comment above .pad for why,
-       and why the four data-key values below are unchanged from the old
-       single #pad (so saved button-editor layouts keep matching by key). -->
-  <div id="pad-move" class="pad" aria-label="move">
-    <button data-key="up" data-editable aria-label="up">▲</button>
-    <button data-key="left" data-editable aria-label="left">◀</button>
-    <button data-key="right" data-editable aria-label="right">▶</button>
-    <button data-key="down" data-editable aria-label="down">▼</button>
-  </div>
-  <div id="pad-actions" class="pad" aria-label="actions">
+  <!-- One pad again, not two -- back to a single combined block on
+       request, but rearranged from either the original layout or the
+       two-pad split: jump (space) front and centre on its own top row,
+       flanked by the two shape/resize actions; fly down/up flank the
+       movement up-arrow on the row below that; strafe left/down/right
+       make up the bottom row. data-key values unchanged throughout (so
+       saved button-editor layouts keep matching by key regardless of
+       which formation the pad itself is in). -->
+  <div id="pad" class="pad">
     <button data-key="e" data-editable class="fire" aria-label="flip shape">⟲</button>
-    <button data-key="f" data-editable class="fire" aria-label="resize">+</button>
     <button data-key="space" data-editable class="fire" aria-label="space">●</button>
+    <button data-key="f" data-editable class="fire" aria-label="resize">+</button>
     <button data-key="s" data-editable class="fire" aria-label="fly down">⤓</button>
+    <button data-key="up" data-editable aria-label="up">▲</button>
     <button data-key="w" data-editable class="fire" aria-label="fly up">⤒</button>
+    <button data-key="left" data-editable aria-label="left">◀</button>
+    <button data-key="down" data-editable aria-label="down">▼</button>
+    <button data-key="right" data-editable aria-label="right">▶</button>
   </div>
 </div>
 
@@ -1331,6 +1311,26 @@ const ACTIONS = {
       flashes: Math.max(1, num(a.flashes, 4)),
     };
   },
+  // Fire it again every tick you want the line to keep showing -- there's
+  // no separate "stop drawing" tile, the same way a `say` line just stops
+  // when nothing sets it any more (see world.lines/drawLines() below,
+  // which harvesting also uses directly, not through this tile, since
+  // it's driven by a real-time countdown rather than a WHEN/DO row).
+  draw_line: (obj, world, a, it) => {
+    // Defaults match the Python tile exactly: start defaults to self,
+    // end defaults to it -- so an omitted param resolves the same way in
+    // both engines, not just whichever one happens to be explicit.
+    const startSide = a.start === undefined ? "self" : a.start;
+    const endSide = a.end === undefined ? "it" : a.end;
+    const start = startSide === "it" ? it : obj;
+    const end = endSide === "it" ? it : obj;
+    if (!start || !end) return;
+    world.lines.push({
+      x1: start.x, y1: start.y, z1: start.z || 0,
+      x2: end.x, y2: end.y, z2: end.z || 0,
+      color: a.color === undefined ? "white" : a.color,
+    });
+  },
   fly: (obj, world, a) => {
     if (!obj.flying) return;   // walking mode -- grounded, fly buttons do nothing
     const step = a.dir === "down" ? -1 : 1;
@@ -1466,6 +1466,13 @@ class World {
     this.tick = 0;
     this.score = 0;
     this.message = "";
+    // {x1,y1,z1,x2,y2,z2,color}[] -- see the draw_line tile and drawLines()
+    // in the Harvest section below (harvesting uses this same array
+    // directly, not through the tile, since it's driven by a real-time
+    // countdown rather than a WHEN/DO row). Cleared at the top of every
+    // step(), so a line only shows for as long as whatever's drawing it
+    // keeps asking every tick.
+    this.lines = [];
     this.status = null;
     this.keys = new Set();
     this.playerKeys = {};
@@ -1580,6 +1587,7 @@ class World {
 
   step() {
     this.tick += 1;
+    this.lines = [];   // see draw_line -- a fresh slate each tick
     for (const thing of this.things.slice()) {
       if (!thing.alive || this.status) continue;
       thing.age += 1;
@@ -1871,6 +1879,48 @@ function pushOctahedron(out, x, y, z, sx, sy, sz, rgb, alpha = 1) {
   }
 }
 
+/* A thin oriented box between two arbitrary points -- see the draw_line
+ * tile and buildLines() above. Not an axis-aligned box like pushBox: this
+ * is the one shape here whose long axis can point anywhere, so it builds
+ * its own little basis (two axes perpendicular to the line itself, "up"
+ * and "right") rather than reusing the fixed FACES table those all share.
+ * Same flat-face-normal approach as pushSphere/pushCone, just four long
+ * side faces and two end caps instead of a curved surface. */
+function pushLine(out, x1, y1, z1, x2, y2, z2, rgb, alpha, thickness) {
+  const dx = x2 - x1, dy = y2 - y1, dz = z2 - z1;
+  const len = Math.hypot(dx, dy, dz);
+  if (len < 1e-6) return;   // the two ends coincide -- nothing to draw
+  const ux = dx / len, uy = dy / len, uz = dz / len;
+  // Any reference not parallel to the line works to build the other two
+  // basis axes from -- world-up, unless the line itself is close enough
+  // to vertical that "up" would be (near-)parallel to it and useless.
+  const ref = Math.abs(uy) > 0.9 ? [1, 0, 0] : [0, 1, 0];
+  let rx = uy * ref[2] - uz * ref[1], ry = uz * ref[0] - ux * ref[2], rz = ux * ref[1] - uy * ref[0];
+  const rlen = Math.hypot(rx, ry, rz) || 1;
+  rx /= rlen; ry /= rlen; rz /= rlen;
+  const upx = uy * rz - uz * ry, upy = uz * rx - ux * rz, upz = ux * ry - uy * rx;
+  const t = thickness / 2;
+  const corner = (px, py, pz, s1, s2) => [
+    px + (rx * s1 + upx * s2) * t, py + (ry * s1 + upy * s2) * t, pz + (rz * s1 + upz * s2) * t,
+  ];
+  const a0 = corner(x1, y1, z1, -1, -1), a1 = corner(x1, y1, z1, 1, -1);
+  const a2 = corner(x1, y1, z1, 1, 1), a3 = corner(x1, y1, z1, -1, 1);
+  const b0 = corner(x2, y2, z2, -1, -1), b1 = corner(x2, y2, z2, 1, -1);
+  const b2 = corner(x2, y2, z2, 1, 1), b3 = corner(x2, y2, z2, -1, 1);
+  const face = (p, q, r, s) => {
+    const ax = q[0] - p[0], ay = q[1] - p[1], az = q[2] - p[2];
+    const bx = r[0] - p[0], by = r[1] - p[1], bz = r[2] - p[2];
+    let nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
+    const nlen = Math.hypot(nx, ny, nz) || 1;
+    nx /= nlen; ny /= nlen; nz /= nlen;
+    for (const v of [p, q, r, p, r, s])
+      out.push(v[0], v[1], v[2], nx, ny, nz, rgb[0], rgb[1], rgb[2], alpha);
+  };
+  face(a0, a1, b1, b0); face(a1, a2, b2, b1);   // four long sides
+  face(a2, a3, b3, b2); face(a3, a0, b0, b3);
+  face(a3, a2, a1, a0); face(b0, b1, b2, b3);   // two end caps
+}
+
 // Every shape a character or a mesh part can be, and where its geometry
 // comes from -- one place to add to when a new push*() joins the others
 // above. cube stays the default for anything unrecognised (an older save,
@@ -1949,6 +1999,8 @@ class Renderer {
     this.floorCount = 0;
     this.thingBuf = gl.createBuffer();
     this.thingCount = 0;
+    this.lineBuf = gl.createBuffer();
+    this.lineCount = 0;
 
     gl.enable(gl.DEPTH_TEST);
     gl.enable(gl.BLEND);
@@ -2086,6 +2138,24 @@ class Renderer {
     this.thingCount = data.length / 10;
   }
 
+  /* world.lines -- see the draw_line tile and pushLine() above -- rebuilt
+   * fresh every frame the exact same way buildThings() already is, one
+   * more small triangle buffer alongside the floor and the things
+   * themselves (see draw() below, which already loops over a list of
+   * [buffer, count] pairs, so a third one costs nothing extra there). */
+  buildLines(lines) {
+    const data = [];
+    for (const line of lines || []) {
+      const rgb = COLOR_RGB[line.color] || COLOR_RGB.white;
+      pushLine(data, line.x1 + 0.5, line.z1 + 0.15, line.y1 + 0.5,
+                     line.x2 + 0.5, line.z2 + 0.15, line.y2 + 0.5, rgb, 1, 0.06);
+    }
+    const gl = this.gl;
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.lineBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.DYNAMIC_DRAW);
+    this.lineCount = data.length / 10;
+  }
+
   camera() {
     const cp = Math.cos(this.pitch), sp = Math.sin(this.pitch);
     const eye = [
@@ -2109,7 +2179,8 @@ class Renderer {
     gl.useProgram(this.program);
     gl.uniformMatrix4fv(this.uMVP, false, this.mvp);
     for (const [buffer, count] of [[this.floorBuf, this.floorCount],
-                                   [this.thingBuf, this.thingCount]]) {
+                                   [this.thingBuf, this.thingCount],
+                                   [this.lineBuf, this.lineCount]]) {
       if (!count) continue;
       gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
       const stride = 40;
@@ -2437,6 +2508,10 @@ function frame() {
     things = things.filter(t => t !== harvestTarget);
   }
   renderer.buildThings(things);
+  // world.lines only exists on this tab's own local engine -- a LIVE
+  // (server-mirrored) game has no equivalent in its snapshot, the same
+  // reason Build mode/the Inspector/Harvest are all local play only too.
+  renderer.buildLines(world ? world.lines : []);
   renderer.draw();
   drawGlyphs(things);
   drawHud();
@@ -2919,8 +2994,11 @@ function selectEditable(uid) {
 // register before the drawer's, which rebuilds its own on every open,
 // etc.) -- each group is gathered by matching uids, not by position.
 const EDIT_GROUPS = [
-  {name: "pad (move)", match: uid => ["up", "left", "right", "down"].includes(uid)},
-  {name: "pad (actions)", match: uid => ["e", "f", "space", "s", "w"].includes(uid)},
+  // One group again, not two -- #pad-move/#pad-actions merged back into
+  // a single #pad (see its own CSS comment), so these nine uids are one
+  // on-screen cluster once more too.
+  {name: "pad", match: uid =>
+    ["up", "left", "right", "down", "e", "f", "space", "s", "w"].includes(uid)},
   {name: "top bar", match: uid => ["restart", "recentre", "fullscreen", "mode", "save",
                                     "save-as", "backpack-toggle", "properties-toggle"].includes(uid)},
   {name: "button drawer", match: uid => uid.startsWith("drawer:")},
@@ -4466,6 +4544,17 @@ function updateHarvest() {
     cancelHarvest();   // it's gone, or you walked away -- no reward either way
     return;
   }
+  // The same world.lines the draw_line tile writes to -- pushed fresh
+  // every frame rather than through the tile (this is driven by a real-
+  // time countdown, not a WHEN/DO row), but rendered exactly the same
+  // way. world.step() clears the list once a tick; frame() runs far more
+  // often than that, so this keeps re-appearing well before the next
+  // clear ever has a chance to leave a visible gap.
+  world.lines.push({
+    x1: player.x, y1: player.y, z1: player.z || 0,
+    x2: harvestTarget.x, y2: harvestTarget.y, z2: harvestTarget.z || 0,
+    color: "gold",
+  });
   const now = performance.now();
   if (harvestFlashUntilMs) {
     if (now >= harvestFlashUntilMs) { finishHarvest(); return; }

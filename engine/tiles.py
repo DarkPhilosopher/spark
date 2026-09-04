@@ -745,6 +745,39 @@ def a_harvestable(obj, world, a, it):
     }
 
 
+# Not imported from world.py to avoid a circular import (world.py already
+# imports this module), same reasoning as _SHAPES above -- kept in sync by
+# hand instead.
+_COLORS = ["white", "red", "green", "yellow", "blue", "magenta", "cyan", "grey", "pink",
+           "orange", "purple", "brown", "black", "lime", "teal", "navy", "maroon",
+           "gold", "silver"]
+
+
+@action("draw_line", "draw a line from {start} to {end}, coloured {color}",
+        Param("start", "Starting from?", "choice", ["self", "it"], "self"),
+        Param("end", "Ending at?", "choice", ["self", "it"], "it"),
+        Param("color", "What colour?", "choice", _COLORS, "white"))
+def a_draw_line(obj, world, a, it):
+    """Only world3d.html actually draws a line -- this just records where
+    one was asked to go, in world.lines (cleared fresh at the top of every
+    step(), see World.step), so a save/load round trip and the two
+    engines agree on what a game *asked* to have drawn even though only
+    one of them can show it. Fire it again every tick you want the line
+    to keep showing -- there is no separate "stop drawing" tile, the same
+    way a `say` line just stops when nothing sets it any more. Silently
+    does nothing if either end isn't available yet (no `it`, e.g.) rather
+    than drawing a stray line to nowhere."""
+    start = obj if a["start"] == "self" else it
+    end = obj if a["end"] == "self" else it
+    if start is None or end is None:
+        return
+    world.lines.append({
+        "x1": start.x, "y1": start.y, "z1": getattr(start, "z", 0) or 0,
+        "x2": end.x, "y2": end.y, "z2": getattr(end, "z", 0) or 0,
+        "color": a["color"],
+    })
+
+
 @action("fly", "fly {dir}",
         Param("dir", "Which way?", "choice", ["up", "down"], "up"))
 def a_fly(obj, world, a, it):

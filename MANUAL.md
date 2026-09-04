@@ -429,24 +429,25 @@ directly, in this tab's own copy of the game — it has no effect, and does
 not appear to make sense, while watching a `LIVE` server-hosted game (see
 the badge table below), since there is no local copy to edit.
 
-**The world always fills the whole screen** — the top bar, the two pads,
-the button drawer, the compass, and the quickbar all float over it as
+**The world always fills the whole screen** — the top bar, the pad, the
+button drawer, the compass, and the quickbar all float over it as
 translucent panels rather than splitting the page into a world region and
-a controls region, in either orientation. The empty space between and
-around the pads still passes a swipe straight through to the camera
-underneath it.
+a controls region, in either orientation. The empty space around the pad
+still passes a swipe straight through to the camera underneath it.
 
-**Two separate pads, one per thumb**, not one combined block: ▲▼◀▶ sit in
-their own pad at the bottom-left corner, and ⟲ + ● ⤓⤒ sit in their own pad
-at the bottom-right — so each lands wherever that thumb is already resting
-on the phone instead of both needing a hand near the middle of the screen.
-Each is sized **as a share of your own screen** rather than in fixed
-pixels, capped in landscape so neither can grow tall enough to reach the
-top bar, and capped altogether so a tablet does not hand you a pad the
-size of a dinner plate. Nothing is measured against any particular phone,
-so a screen I have never seen gets pads in the same proportion.
+**One combined pad**, nine keys, three by three — briefly split into two
+separate thumb-zone pads, merged back into one block on request. Read
+left to right, top to bottom: ⟲ (flip shape), ● (space), + (resize) along
+the top; ⤓ (fly down), ▲ (up), ⤒ (fly up) in the middle, so the two fly
+keys flank the movement up-arrow directly below space; ◀ (left), ▼ (down),
+▶ (right) along the bottom. Sized **as a share of your own screen** rather
+than in fixed pixels, capped in landscape so it cannot grow tall enough to
+reach the top bar, and capped altogether so a tablet does not hand you a
+pad the size of a dinner plate. Nothing is measured against any
+particular phone, so a screen I have never seen gets a pad in the same
+proportion.
 
-Every button here — the two pads, the top bar, the drawer's own bubbles —
+Every button here — the pad, the top bar, the drawer's own bubbles —
 can be dragged to a new spot, resized, and faded from the button editor
 (✎), either by touch or by typing an exact position as a decimal percent
 of the screen. Anywhere in the world you touch that is not a button turns

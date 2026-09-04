@@ -518,6 +518,59 @@
       ]
     },
     {
+      "id": "draw_line",
+      "label": "draw a line from {start} to {end}, coloured {color}",
+      "params": [
+        {
+          "name": "start",
+          "prompt": "Starting from?",
+          "kind": "choice",
+          "choices": [
+            "self",
+            "it"
+          ],
+          "default": "self"
+        },
+        {
+          "name": "end",
+          "prompt": "Ending at?",
+          "kind": "choice",
+          "choices": [
+            "self",
+            "it"
+          ],
+          "default": "it"
+        },
+        {
+          "name": "color",
+          "prompt": "What colour?",
+          "kind": "choice",
+          "choices": [
+            "white",
+            "red",
+            "green",
+            "yellow",
+            "blue",
+            "magenta",
+            "cyan",
+            "grey",
+            "pink",
+            "orange",
+            "purple",
+            "brown",
+            "black",
+            "lime",
+            "teal",
+            "navy",
+            "maroon",
+            "gold",
+            "silver"
+          ],
+          "default": "white"
+        }
+      ]
+    },
+    {
       "id": "fly",
       "label": "fly {dir}",
       "params": [

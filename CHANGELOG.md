@@ -16,6 +16,47 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ### Added
 
+- **`draw_line`: a new tile that draws a real beam between two targets,
+  used to connect the harvester and whatever they're harvesting for the
+  length of the countdown.** Requested directly, after harvesting itself:
+  "draw a line from one target to another, then use that during the
+  harvest." `draw_line` (DO, both engines) takes `start`/`end` (each
+  self/it) and a colour, and appends `{x1,y1,z1,x2,y2,z2,color}` to a new
+  `world.lines` — cleared at the top of every tick (`World.step()`), so a
+  line only keeps showing for as long as whatever's drawing it keeps
+  asking every tick; there's no separate "stop drawing" tile, the same
+  way a `say` line just stops when nothing sets it any more. Python
+  carries `world.lines` but never draws from it (same reasoning as
+  shape/size); world3d.html's new `pushLine()` renders each one as an
+  actual thin oriented 3D box between the two points — not an
+  axis-aligned box like `pushBox`, so it builds its own little basis
+  (two axes perpendicular to the line) rather than reusing the shared
+  `FACES` table the other shapes do, same flat-face-normal low-poly
+  look throughout. A third `Renderer` buffer (`lineBuf`, alongside the
+  existing floor/things ones) costs nothing extra to draw, since
+  `draw()` already looped over a list of `[buffer, count]` pairs.
+
+  The Harvest panel now draws exactly this line between the harvester
+  and their target for as long as a harvest is in progress — pushed
+  into `world.lines` every rendered frame rather than through the tile
+  (it's driven by a real-time countdown, not a WHEN/DO row), but
+  rendered through the exact same path. `world.step()` clears the list
+  once a tick; `frame()` runs far more often than that, so the line
+  keeps reappearing well before a clear could ever leave a visible gap.
+
+  Validated the same way as harvesting: `tests/check_draw_line.py` (5
+  checks, Python) and `tests/draw_line.test.js` (8 checks, JS — 3
+  matching the Python cases, plus 5 checking `pushLine()`'s own
+  geometry: vertex count, that every number is finite, that every
+  normal is unit length, that coincident endpoints produce nothing
+  rather than a degenerate box, and that a straight-up line — the one
+  case where the "up" reference used to build the cross-section would
+  itself be parallel to the line — still comes out valid). Deliberately
+  not wired into `check_engines.py`'s shared snapshot/parity harness,
+  same reasoning as the harvest tiles. `node --check`, a full
+  `html.parser` pass, and the full existing suite all green. The beam
+  itself has not been seen on a real screen yet.
+
 - **Harvesting: a new `harvestable` tile, an inventory (`give_item`/
   `has_item`), and a small panel in the 3D view that appears on its own
   whenever you're standing next to something harvestable.** Requested
@@ -82,6 +123,26 @@ Each entry says **what** changed and, where it is not obvious, **why**.
   real screen yet.
 
 ### Changed
+
+- **The two thumb-zone pads (`#pad-move`/`#pad-actions`) merged back into
+  one combined pad, rearranged** — requested directly, with an exact,
+  specific layout: read left to right, top to bottom, ⟲ (flip shape), ●
+  (space/jump), + (resize) along the top row; ⤓ (fly down), ▲ (up), ⤒
+  (fly up) in the middle, putting the two fly keys either side of the
+  movement up-arrow, directly under space; ◀ (left), ▼ (down), ▶ (right)
+  along the bottom. All nine `data-key` values unchanged throughout, so
+  saved button-editor layouts keep matching by key regardless of which
+  pad formation they were saved under. `--pad` (the shared size
+  variable) went back to its original single-pad share,
+  `min(94vw, 50vh, 460px)`, since one pad has the screen to itself
+  again rather than splitting it with a second one; `#controls` went
+  back to centring it (`justify-content:center`) instead of
+  `space-between`. The button editor's own list groups these nine uids
+  under one "pad" heading again too (`EDIT_GROUPS`), not the two
+  "pad (move)"/"pad (actions)" headings the split briefly needed —
+  `tests/edit_groups.test.js` updated to match. Validated with
+  `node --check`, a full `html.parser` pass, and the full existing
+  suite; not seen on a real screen yet.
 
 - **The button drawer moved 8px in from the true left edge of the
   screen (and picked up fully-rounded corners to match)** — requested

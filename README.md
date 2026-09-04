@@ -21,7 +21,7 @@ is a list of rows. Every row reads the same way:
     WHEN something is true   DO something
 
 That is the whole idea, and it is the idea Kodu and Project Spark used. Fifteen
-WHEN tiles crossed with twenty-nine DO tiles is four hundred and thirty-five
+WHEN tiles crossed with thirty DO tiles is four hundred and fifty
 different sentences, and rows can hold more than one tile each, so the real
 number is much larger. One of those tiles is **your own**: fold any row up under
 a name and it joins the palette like the rest.
@@ -733,8 +733,7 @@ again to confirm it. The camera itself orbits *you*, not the middle of the
 board, so the world reads as a place you are standing in rather than a
 diorama seen from outside.
 
-Every button on screen — the two thumb-zone pads (movement at bottom-left,
-actions at bottom-right), the top bar, the button drawer's
+Every button on screen — the pad, the top bar, the button drawer's
 own bubbles — can be dragged, resized, and faded from a button editor built
 into the tab (its own panel can hide itself for the length of each drag, on
 by default, so it doesn't block the view of where the button is actually
@@ -776,6 +775,13 @@ since two players in one game must not share one inventory. What you're
 actually carrying shows in a small read-only Inventory panel — separate
 from the Backpack, which is an editor tool for saved buttons and notes,
 not a game concept.
+
+`draw_line` draws a real beam, coloured however you pick, from one target to another.
+Fire it again every tick a row you built keeps firing, since there's no
+separate "stop drawing" tile — the line only shows for as long as
+whatever's drawing it keeps asking. The Harvest panel above uses this
+same line for the beam it shows between you and whatever you're
+mid-harvest on.
 
 **Backpack, Properties, Mesh Creator, Build, and the Object Inspector share
 one shape**: up to six large buttons filling most of the screen, a box off
@@ -896,6 +902,8 @@ Once `python3 spark.py install` has been run, every one of these works as plain
 | `node tests/edit_groups.test.js` | check the button editor's list groups every button correctly |
 | `python3 tests/check_harvest.py` | check give_item/has_item/harvestable in the Python engine |
 | `node tests/harvest_tiles.test.js` | check give_item/has_item/harvestable in the JavaScript engine |
+| `python3 tests/check_draw_line.py` | check draw_line/world.lines in the Python engine |
+| `node tests/draw_line.test.js` | check draw_line/world.lines and pushLine's own geometry |
 | `python3 tests/check_docs.py` | check this README still matches the code |
 | `python3 tests/check_sync.py` | check the GitHub push/pull logic |
 | `python3 tests/check_permissions.py` | check guests cannot exceed their code |
@@ -1000,6 +1008,7 @@ inert, exactly as it would arriving any other way.
     tests/check_menu.py         drives the terminal's menu through a real pty: arrow keys,
                                  digits, escape, and the fallback with no terminal at all
     tests/check_harvest.py      checks give_item/has_item/harvestable in the Python engine
+    tests/check_draw_line.py    checks draw_line/world.lines in the Python engine
     tests/mesh_merge.test.js    checks the 3D view's merge-objects arithmetic: offsets,
                                  and dropping geometry that ends up fully hidden inside another part
     tests/modal_pages.test.js   checks the 3D view's modals: page navigation, colour/shape
@@ -1009,6 +1018,8 @@ inert, exactly as it would arriving any other way.
                                  "button group 00N" heading a person would actually expect
     tests/harvest_tiles.test.js checks give_item/has_item/harvestable in the JavaScript engine,
                                  against the same cases tests/check_harvest.py runs in Python
+    tests/draw_line.test.js     checks draw_line/world.lines against check_draw_line.py's own
+                                 cases, plus pushLine's own vertex/normal geometry
     tests/engine_trace.js       runs the JavaScript engine from a terminal, for that test
 
 Two files are **generated** — do not edit them by hand:
