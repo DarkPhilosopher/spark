@@ -56,12 +56,17 @@ class FakeButton {
 // real DOM element (one object, however many times you re-select it) is.
 function makeNodeRegistry() {
   const nodes = {};
-  for (const id of ["edit-grid-size", "edit-mini-label", "edit-mini-size", "edit-mini-opacity"]) {
+  for (const id of ["edit-grid-size", "edit-mini-label", "edit-mini-size", "edit-mini-opacity",
+                     "edit-props-title"]) {
     nodes["#" + id] = {value: "", textContent: ""};
   }
   const classes = new Set();
   nodes["#edit-mini"] = {classList: {
     add: c => classes.add(c), remove: c => classes.delete(c), contains: c => classes.has(c),
+  }};
+  const propsClasses = new Set();
+  nodes["#edit-props-page"] = {classList: {
+    add: c => propsClasses.add(c), remove: c => propsClasses.delete(c), contains: c => propsClasses.has(c),
   }};
   nodes["#edit-grid-size"].value = "5";
   return nodes;
@@ -84,12 +89,14 @@ function load(presetStore) {
       applyButtonStyle, syncButtonPositions, clampToScreen, snapElementToGrid,
       currentPercent, editableButtons, buttonLayout,
       exitPickMode, updateMiniPopup,
+      openPropertiesPage, closePropertiesPage,
       currentOrientation, allButtonLayouts, checkOrientationSwitch,
       getButtonLayout: () => buttonLayout,   // buttonLayout itself gets reassigned on a switch
       setGridLock: v => { gridLockOn = v; },
       setPickMode: v => { pickModeOn = v; },
       getPickMode: () => pickModeOn,
       setSelected: uid => { editSelected = uid; },
+      getSelected: () => editSelected,
       setWindow: (w, h) => { window.innerWidth = w; window.innerHeight = h; },
     };
   `;
@@ -204,6 +211,31 @@ console.log("\n\"pick on screen\": the floating readout tracks whatever's select
   api.exitPickMode();
   ok("exitPickMode turns pick mode off", api.getPickMode() === false);
   ok("...and hides the readout", !nodes["#edit-mini"].classList.contains("on"));
+}
+
+console.log("\nthe properties page: opens for a real selection, closes without deselecting");
+{
+  const {api, nodes} = load();
+  const uid = "restart";
+  api.editableButtons.set(uid, {el: new FakeButton(0, 0, 40, 40), label: "restart"});
+  api.buttonLayout[uid] = {};
+
+  api.setSelected(null);
+  api.openPropertiesPage();
+  ok("nothing selected -> refuses to open", !nodes["#edit-props-page"].classList.contains("on"));
+
+  api.setSelected(uid);
+  api.openPropertiesPage();
+  ok("a real selection -> opens", nodes["#edit-props-page"].classList.contains("on"));
+  ok("titles itself with the selected button's own label",
+     nodes["#edit-props-title"].textContent === "restart");
+
+  api.closePropertiesPage();
+  ok("closing hides the page again", !nodes["#edit-props-page"].classList.contains("on"));
+  ok("...but does NOT deselect -- reopening picks up where it left off", api.getSelected() === uid);
+  api.openPropertiesPage();
+  ok("reopening after a close (same selection still standing) works again",
+     nodes["#edit-props-page"].classList.contains("on"));
 }
 
 console.log("\none preset per rotation: portrait and landscape stay independent");

@@ -481,11 +481,20 @@ The button editor's own panel is eight big buttons and a box, the same
 shape every other modal in this file uses: **done editing**, **grid
 lock**, **pick on screen**, **size −10%**/**+10%**, **reset this
 button**, **reset ALL buttons**, and **save layout as…**. The box below
-them holds everything continuous or exact — the button-picker list
-(grouped under a numbered "button group 001," "002," … heading, the pad,
-the top bar, the drawer, and the quickbar each their own, instead of one
-flat list of everything on the page at once), the precise size/opacity/
-position fields, the grid size, and the saved-layouts list.
+them holds the button-picker list (grouped under a numbered "button
+group 001," "002," … heading, the pad, the top bar, the drawer, and the
+quickbar each their own, instead of one flat list of everything on the
+page at once) and the saved-layouts list.
+
+Tapping a row in the button-picker list opens that button's own **full
+page of properties** — its own titlebar with a **‹** back button, the
+same sub-page pattern the Object Inspector and Mesh Creator already use
+— covering the list while it's open: the precise size/opacity fields,
+the exact x/y position (typed or "go to"), the grid size, and "hide this
+panel while dragging." **‹**, or the page's own **✓ done** in the
+titlebar, closes it back to the picker list without losing the
+selection — the dashed outline stays on that button, and tapping the
+same row again reopens straight back to its properties.
 
 The panel covers most of the screen, which can get in the way of seeing
 exactly where a button lands relative to everything else while dragging

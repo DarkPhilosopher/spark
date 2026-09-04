@@ -49,6 +49,28 @@ Each entry says **what** changed and, where it is not obvious, **why**.
   reference. Validated with `node --check`, a full `html.parser` pass,
   and the full existing suite, all green. Not seen on a real screen yet.
 
+- **A button's properties are their own full page now, opened and closed
+  explicitly** — requested directly: "make close and open for full page
+  properties article of button editor." Tapping a row in the
+  button-picker list still selects that button, and now also opens a
+  dedicated sub-page over the list — its own titlebar (`‹` back, plus a
+  `✓ done` on the page itself) covering the size/opacity fields, the
+  exact x/y position and "go to," the grid size, and "hide this panel
+  while dragging," the same `.modal-titlebar`/`.modal-back` sub-page
+  pattern the Object Inspector and Mesh Creator already use, rather than
+  those fields sitting exposed in the box alongside the picker list all
+  the time. Closing (`‹`, or the page's own done) never deselects —
+  reopening (tap the same row again) picks up exactly where that left
+  off, same as leaving and returning to any of Inspector's own sub-pages
+  does.
+
+  `tests/button_position.test.js` extended (+6 checks, 36 total):
+  refuses to open with nothing selected, opens and titles itself
+  correctly for a real one, closing hides it without clearing the
+  selection, and reopening after a close works again. Validated with
+  `node --check`, a full `html.parser` pass, and the full existing
+  suite, all green. Not seen on a real screen yet.
+
 ### Changed
 
 - **The button editor's own panel is eight big buttons plus a box now**,

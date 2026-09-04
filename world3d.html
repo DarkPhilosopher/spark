@@ -350,6 +350,23 @@
   #edit-panel button:not(.mkey){flex:1;font-size:12px;padding:6px 10px;min-height:36px}
   #edit-panel input[type=checkbox]{width:18px;height:18px;flex:0 0 auto}
 
+  /* The full-page Properties article a tapped #edit-list row opens --
+     covers the same inset region #edit-panel itself does (a sibling
+     fixed overlay, not sized off its parent, so it does not need
+     #edit-panel to be a positioned ancestor for this to line up), one
+     z-index higher so it sits over the eight buttons and the list
+     rather than beside them. Reuses .modal-titlebar/.modal-back as-is
+     -- same close/open-a-page idea as Inspector/Mesh Creator's own
+     sub-pages, just belonging to #edit-panel instead of a separate
+     modal. */
+  #edit-props-page{position:fixed;inset:6vh 6vw;z-index:21;display:none;
+                   flex-direction:column;
+                   background:rgba(74,80,88,.98);border:1px solid var(--line);
+                   border-radius:12px;overflow:hidden;
+                   backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+  #edit-props-page.on{display:flex}
+  #edit-props-body{flex:1 1 auto;overflow-y:auto;touch-action:pan-y;padding:14px 16px}
+
   /* "pick on screen"'s own floating readout -- deliberately not inside
      #edit-panel, since it has to stay visible while that panel is
      hidden. Bottom-centre, clear of the pad (which sits lower still, at
@@ -763,7 +780,35 @@
       <button id="edit-save-layout" class="mkey">save layout<br>as…</button>
     </div>
     <div class="mbox">
+      <!-- Tapping any row here opens the full-page Properties article
+           below for that button -- see openPropertiesPage(). Only the
+           picker and the named-layout list live here permanently; a
+           selected button's own fields used to always share this same
+           box with the eight buttons above, cramped on anything but a
+           tall screen, which is what the full page is for. -->
       <div id="edit-list"></div>
+      <!-- Named layouts: whole-screen snapshots of every button's
+           position/size/opacity, saved under a name and reloaded later
+           -- separate from the one working layout that's always live. -->
+      <div id="edit-layout-list"></div>
+    </div>
+  </div>
+
+  <!-- The full-page Properties article a tapped row above opens --
+       covers the whole panel (buttons and all) while it's open, the
+       same "close/open a full page over everything else" idea as
+       Inspector/Mesh Creator's own sub-pages, just reusing .modal-back
+       directly since this is a page of #edit-panel itself rather than a
+       separate modal. Closing (‹, or #edit-props-done) never
+       deselects -- reopening (tap the same row again) picks up exactly
+       where this left off. -->
+  <div id="edit-props-page">
+    <div class="modal-titlebar">
+      <button class="modal-back showing" id="edit-props-back" title="back">‹</button>
+      <span id="edit-props-title">Properties</span>
+      <button id="edit-props-done" title="close">✕</button>
+    </div>
+    <div id="edit-props-body">
       <!-- slider and typed decimal percent, kept in sync both ways, and
            both filled in with whatever the selected button already has. -->
       <div class="row">
@@ -799,10 +844,6 @@
       <div class="row">
         <label style="flex:2"><input id="edit-hide-dragging" type="checkbox" checked> hide this panel while dragging a button</label>
       </div>
-      <!-- Named layouts: whole-screen snapshots of every button's
-           position/size/opacity, saved under a name and reloaded later
-           -- separate from the one working layout that's always live. -->
-      <div id="edit-layout-list"></div>
     </div>
   </div>
 </div>
@@ -3116,6 +3157,27 @@ function updateMiniPopup() {
   $("#edit-mini-opacity").value = opacity;
 }
 
+// Opened by tapping a row in #edit-list -- the full-page article with
+// this button's own size/opacity/position/grid fields, covering the
+// eight buttons and the list while it's open, the same close/open-a-
+// page idea Inspector/Mesh Creator's own sub-pages already use.
+// selectEditable() already ran (see the row's own onclick) by the time
+// this does, so the fields are already showing the right button's data.
+function openPropertiesPage() {
+  if (!editSelected) return;
+  const {label} = editableButtons.get(editSelected) || {};
+  $("#edit-props-title").textContent = label || editSelected;
+  $("#edit-props-page").classList.add("on");
+}
+
+// Never deselects -- reopening (tap the same row again) picks up
+// exactly where this left off, rather than forgetting the selection the
+// way "done editing" (a real exit, not just closing this one page)
+// still deliberately does.
+function closePropertiesPage() {
+  $("#edit-props-page").classList.remove("on");
+}
+
 // The grid size input is read live rather than cached, so typing a new
 // size takes effect immediately without a separate "apply" step.
 const currentGridSize = () => Math.max(0.5, parseFloat($("#edit-grid-size").value) || 5);
@@ -3269,7 +3331,7 @@ function renderEditList() {
       const row = document.createElement("div");
       row.className = "edit-list-row" + (uid === editSelected ? " on" : "");
       row.textContent = (el.textContent || "□").trim() + "  " + (label || uid);
-      row.onclick = () => selectEditable(uid);
+      row.onclick = () => { selectEditable(uid); openPropertiesPage(); };
       box.appendChild(row);
     }
   };
@@ -3478,6 +3540,8 @@ function setupButtonEditor() {
     editPanelHidden = false;
     updateEditPanelVisibility();
   };
+  $("#edit-props-back").onclick = closePropertiesPage;
+  $("#edit-props-done").onclick = closePropertiesPage;
   $("#edit-done").onclick = () => {
     editingButtons = false;
     editPanelHidden = false;
