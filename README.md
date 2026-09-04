@@ -20,8 +20,8 @@ is a list of rows. Every row reads the same way:
 
     WHEN something is true   DO something
 
-That is the whole idea, and it is the idea Kodu and Project Spark used. Fourteen
-WHEN tiles crossed with twenty-seven DO tiles is three hundred and seventy-eight
+That is the whole idea, and it is the idea Kodu and Project Spark used. Fifteen
+WHEN tiles crossed with twenty-nine DO tiles is four hundred and thirty-five
 different sentences, and rows can hold more than one tile each, so the real
 number is much larger. One of those tiles is **your own**: fold any row up under
 a name and it joins the palette like the rest.
@@ -759,6 +759,24 @@ objects with 🧬 (Merge) armed and it combines all of them into one new
 placeable kind, at whichever geometry is left once any part sitting
 entirely inside another has been dropped.
 
+Two more tiles, `harvestable` and `give_item` (read by `has_item`), make an
+object something you gather rather than just touch.
+`harvestable` tiles make a kind harvestable: flashing this many times first.
+Set on any kind, it says what item it gives, how many, how long it takes,
+and how many times it flashes right before vanishing. Standing next to
+one — or several — brings up a small panel on its own, naming each one
+within reach, and picking one starts a countdown, ending in that flash and
+then the item landing in your own inventory.
+`has_item` checks you have at least so many of one.
+It reads straight from `give_item`, for anything that doesn't need the
+harvest panel at all — a chest a key opens, say. Each character's own
+count of an item is kept separately from the world's shared
+`remember`/`recall` values, the same way health or score are personal,
+since two players in one game must not share one inventory. What you're
+actually carrying shows in a small read-only Inventory panel — separate
+from the Backpack, which is an editor tool for saved buttons and notes,
+not a game concept.
+
 **Backpack, Properties, Mesh Creator, Build, and the Object Inspector share
 one shape**: up to six large buttons filling most of the screen, a box off
 to the side for whatever those buttons don't cover — live readouts, a
@@ -775,10 +793,12 @@ A
 world can also be marked "expanding," so its floor loads in around you as you
 wander instead of all at once, with new ground able to scatter things onto
 itself as it appears (`games/Game 008008.json` is a working example, with
-pink stone-sized cones standing in for an ore you mine by walking into it).
-Build mode, the Inspector, Merge, and expanding worlds all only work in the
-local, in-browser engine (`RUNNING HERE`, below) — they edit the live JavaScript
-world directly, which has no meaning for a game somebody else is hosting.
+pink stone-sized cones standing in as `harvestable` ore — walk up to one and
+the harvest panel appears, offering pink metal for the wait).
+Build mode, the Inspector, Merge, expanding worlds, and harvesting all only
+work in the local, in-browser engine (`RUNNING HERE`, below) — they edit the
+live JavaScript world directly, which has no meaning for a game somebody
+else is hosting.
 
 The full control reference, key by key, is in
 [MANUAL.md](MANUAL.md#controls-the-3d-view).
@@ -874,6 +894,8 @@ Once `python3 spark.py install` has been run, every one of these works as plain
 | `node tests/mesh_merge.test.js` | check the 3D view's merge-objects-into-one-mesh geometry |
 | `node tests/modal_pages.test.js` | check the 3D view's modals: page navigation, colour/shape pickers, resize/stretch |
 | `node tests/edit_groups.test.js` | check the button editor's list groups every button correctly |
+| `python3 tests/check_harvest.py` | check give_item/has_item/harvestable in the Python engine |
+| `node tests/harvest_tiles.test.js` | check give_item/has_item/harvestable in the JavaScript engine |
 | `python3 tests/check_docs.py` | check this README still matches the code |
 | `python3 tests/check_sync.py` | check the GitHub push/pull logic |
 | `python3 tests/check_permissions.py` | check guests cannot exceed their code |
@@ -977,6 +999,7 @@ inert, exactly as it would arriving any other way.
     tests/check_engines.py      plays every game twice, once per engine, and compares
     tests/check_menu.py         drives the terminal's menu through a real pty: arrow keys,
                                  digits, escape, and the fallback with no terminal at all
+    tests/check_harvest.py      checks give_item/has_item/harvestable in the Python engine
     tests/mesh_merge.test.js    checks the 3D view's merge-objects arithmetic: offsets,
                                  and dropping geometry that ends up fully hidden inside another part
     tests/modal_pages.test.js   checks the 3D view's modals: page navigation, colour/shape
@@ -984,6 +1007,8 @@ inert, exactly as it would arriving any other way.
                                  from sliders into buttons-plus-a-box
     tests/edit_groups.test.js   checks the button editor's list sorts every button into the
                                  "button group 00N" heading a person would actually expect
+    tests/harvest_tiles.test.js checks give_item/has_item/harvestable in the JavaScript engine,
+                                 against the same cases tests/check_harvest.py runs in Python
     tests/engine_trace.js       runs the JavaScript engine from a terminal, for that test
 
 Two files are **generated** — do not edit them by hand:

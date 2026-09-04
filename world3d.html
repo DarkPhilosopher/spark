@@ -393,13 +393,17 @@
      screen"), reused here rather than each modal inventing its own.
      Backpack used to be a deliberate Windows-Explorer-styled exception
      (see CHANGELOG); folded into the same shell and theme on request. */
-  #backpack-modal,#properties-modal,#mesh-modal,#palette-modal,#inspect-modal{
+  #backpack-modal,#properties-modal,#mesh-modal,#palette-modal,#inspect-modal,
+  #inventory-modal{
       position:fixed;inset:6vh 6vw;z-index:17;display:none;flex-direction:column;
       background:var(--modal-bg);border:1px solid var(--line);border-radius:12px;
       overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.35);
       backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
   #backpack-modal.on,#properties-modal.on,#mesh-modal.on,#palette-modal.on,
-  #inspect-modal.on{display:flex}
+  #inspect-modal.on,#inventory-modal.on{display:flex}
+  /* Inventory has no .mgrid/.mkeys -- nothing to act on, just a list --
+     so its box needs the margin .mgrid would otherwise have given it. */
+  #inventory-box{margin:10px;flex:1 1 auto;overflow-y:auto;touch-action:pan-y}
   .modal-titlebar{display:flex;align-items:center;gap:8px;padding:12px 14px;
                   font-weight:700;border-bottom:1px solid var(--line);flex:0 0 auto}
   .modal-titlebar span{margin-right:auto;overflow:hidden;text-overflow:ellipsis;
@@ -509,6 +513,34 @@
            border-radius:8px;border:1px solid var(--line);
            background:rgba(74,80,88,.7);display:none;pointer-events:none}
   #minimap.on{display:block}
+
+  /* Harvest -- appears on its own above the pads (see the Harvest section
+     of the script), not opened from anywhere, so centred and clear of
+     both thumb-zone pads is the one band that works in both orientations
+     the same way the drawer's own top offset was chosen -- above where
+     var(--pad) tops out. off (no .on) by default; .on is a real toggle,
+     not just a display swap, since drawHarvestList()/etc. add/remove it
+     based on whether there's currently anything to show. */
+  #harvest-panel{position:fixed;left:50%;transform:translateX(-50%);
+                 bottom:calc(var(--pad) + 16px + env(safe-area-inset-bottom));
+                 z-index:5;display:none;min-width:200px;max-width:80vw;
+                 background:var(--overlay-text);border:1px solid var(--line);
+                 border-radius:12px;padding:8px;
+                 backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+  #harvest-panel.on{display:block}
+  .harvest-row{padding:8px 10px;border-radius:8px;font-size:13px;
+              cursor:pointer;background:var(--glass-input);
+              white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .harvest-row + .harvest-row{margin-top:6px}
+  .harvest-row:active{background:var(--glass-btn)}
+  #harvest-progress-label{font-size:12px;color:var(--dim);margin-bottom:6px;
+                          text-align:center}
+  #harvest-progress-track{height:10px;border-radius:5px;overflow:hidden;
+                          background:var(--glass-input)}
+  #harvest-progress-fill{height:100%;width:0;background:var(--accent);
+                         transition:width .1s linear}
+  #harvest-cancel{width:100%;margin-top:8px;font-size:12px;padding:6px 10px;
+                  min-height:34px}
 
   /* Quickbar -- a fixed row of plain bubble slots, always visible, no tab
      to open first. Reuses the drawer's own .bubble look for consistency,
@@ -761,6 +793,38 @@
      always-on corner widget was the wrong call given how crowded the
      top of the screen already got once this session; opt-in instead. -->
 <canvas id="minimap" width="110" height="110"></canvas>
+
+<!-- Harvest: appears on its own, not opened from anywhere, whenever
+     you're standing next to a harvestable object (see the harvestable
+     tile) -- one row per one within reach, tap it to start a timed
+     harvest; the same panel then switches to a countdown for the one
+     you picked. See the Harvest section of the script for the full
+     write-up. Local play only, same reasoning as Build mode/the
+     Inspector: it writes straight into the live Thing/World, which only
+     exists for the copy of the game running in this tab. -->
+<div id="harvest-panel">
+  <div id="harvest-list"></div>
+  <div id="harvest-progress" hidden>
+    <div id="harvest-progress-label"></div>
+    <div id="harvest-progress-track"><div id="harvest-progress-fill"></div></div>
+    <button id="harvest-cancel">cancel</button>
+  </div>
+</div>
+
+<!-- Inventory: what you're carrying, from the harvestable tile above or
+     give_item directly -- a plain read-only list, not the six-buttons-
+     plus-a-box shape the other modals use, since there's nothing here to
+     act on besides looking. Deliberately separate from the Backpack (a
+     dev tool for saved buttons/notes, nothing to do with game items) --
+     see CLAUDE.md's note on why those two don't share a home. Local play
+     only, same reasoning as everything else on this list. -->
+<div id="inventory-modal">
+  <div class="modal-titlebar">
+    <span>📦 Inventory</span>
+    <button id="inventory-close" title="close">✕</button>
+  </div>
+  <div class="mbox" id="inventory-box"></div>
+</div>
 
 <!-- Mesh Creator: build a custom multi-part shape (a cube here, a sphere
      there, each offset and sized on its own) and save it as a new,
@@ -1122,6 +1186,18 @@ class Thing {
     this.maxLife = 0;
     this.maxRange = 0;
     this.controller = null;
+    // item name -> count, this Thing's own -- see the give_item/has_item
+    // tiles. Deliberately per-Thing, not the shared world memory
+    // remember/recall use (wrong for "how much do *I* have" once two
+    // players share a game).
+    this.inventory = {};
+    // Harvest config ({item, amount, seconds, flashes}) or null -- see
+    // the harvestable tile. The wait/flash/give sequence itself is
+    // local-play-only UI (see the Harvest section below), not tile
+    // logic; this is just the data half, carried here too so it
+    // survives a save/load either way and behaves the same in both
+    // engines.
+    this.harvest = template.harvest || null;
   }
 }
 
@@ -1134,6 +1210,14 @@ const SENSORS = {
   timer: (obj, world, a) => world.tick % Math.max(1, num(a.every, 4)) === 0,
   health_below: (obj, world, a) => obj.health < num(a.value, 2),
   score_at_least: (obj, world, a) => world.score >= num(a.value, 10),
+  // My own count, from give_item -- not world.memory/recall's single
+  // shared value, same reasoning as give_item itself not being built on
+  // top of remember (two players in one game must not share one
+  // inventory).
+  has_item: (obj, world, a) => {
+    const item = String(a.item === undefined ? "" : a.item).trim();
+    return (obj.inventory[item] || 0) >= num(a.amount, 1);
+  },
   chance: (obj, world, a) => world.rng.randrange(100) < num(a.percent, 25),
   at_edge: (obj, world) =>
     obj.x === 0 || obj.x === world.width - 1 ||
@@ -1230,6 +1314,23 @@ const ACTIONS = {
     const current = victim[field] === undefined ? base : victim[field];
     victim[field] = Math.max(40, Math.min(220, current + num(a.amount, 25)));
   },
+  // Stamps harvest config onto a Thing -- the data half of "walk up, pick
+  // it from a list, wait a few seconds, get an item" (see the Harvest
+  // section below, which is what actually runs the wait/flash/give
+  // sequence -- local-play-only UI, same reasoning as Build mode/the
+  // Inspector, not something a tick-driven WHEN/DO row usefully drives on
+  // its own). Harmless to call again -- last call wins, same as
+  // resize/stretch already work.
+  harvestable: (obj, world, a, it) => {
+    const victim = a.target === "it" ? it : obj;
+    if (!victim) return;
+    victim.harvest = {
+      item: String(a.item === undefined ? "" : a.item).trim() || "item",
+      amount: Math.max(1, num(a.amount, 1)),
+      seconds: Math.max(1, num(a.seconds, 5)),
+      flashes: Math.max(1, num(a.flashes, 4)),
+    };
+  },
   fly: (obj, world, a) => {
     if (!obj.flying) return;   // walking mode -- grounded, fly buttons do nothing
     const step = a.dir === "down" ? -1 : 1;
@@ -1266,6 +1367,17 @@ const ACTIONS = {
   remember: (obj, world, a) => {
     const name = String(a.name === undefined ? "" : a.name).trim();
     if (name) world.memory[name] = String(a.value === undefined ? "" : a.value);
+  },
+  // Each Thing's own count, not world.memory -- see has_item above for why.
+  // Never goes below zero; an item nobody's given at all reads the same as
+  // one explicitly given zero of.
+  give_item: (obj, world, a, it) => {
+    const victim = a.target === "it" ? it : obj;
+    if (!victim) return;
+    const item = String(a.item === undefined ? "" : a.item).trim();
+    if (!item) return;
+    const current = victim.inventory[item] || 0;
+    victim.inventory[item] = Math.max(0, current + num(a.amount, 1));
   },
   open: (obj, world, a) => {
     // The one tile that reaches outside the game. A browser tab cannot hand a
@@ -2303,7 +2415,11 @@ function unloadFarChunks(cx, cy) {
 const labelPool = [];
 
 function frame() {
-  const things = currentThings();
+  // Before things are built for rendering, not after -- harvestFlashOn
+  // (below) has to already be current for this frame, or the flash would
+  // always be a frame behind what it's actually supposed to show.
+  updateHarvest();
+  let things = currentThings();
   // The camera orbits around you, not a fixed spot over the board -- so the
   // world reads as the place you are standing in, not a box seen from
   // outside. yaw/pitch/dist stay exactly what your swipe and pinch left them.
@@ -2314,6 +2430,12 @@ function frame() {
     renderer.centre[2] = me.y + 0.5;
   }
   maybeExpandFloor(me);
+  // The flash itself: simply left out of this frame's render entirely on
+  // its "off" phases, same trick the merge highlights use for a ring
+  // that's supposed to blink.
+  if (harvestTarget && harvestFlashUntilMs && !harvestFlashOn) {
+    things = things.filter(t => t !== harvestTarget);
+  }
   renderer.buildThings(things);
   renderer.draw();
   drawGlyphs(things);
@@ -4239,6 +4361,166 @@ function drawMergeHighlights() {
   });
 }
 
+/* ---------------------------------------------------------------------
+ * Harvest -- "walk up, pick it from a list, wait a few seconds, get an
+ * item." The harvestable tile (SPARK-ENGINE section above, and
+ * engine/tiles.py) only stamps the data -- {item, amount, seconds,
+ * flashes} -- onto a Thing; everything here is what actually *runs* that
+ * once you're standing next to one, which is inherently a player-input/
+ * UI flow (pick one off a list, watch a countdown) rather than something
+ * a tick-driven WHEN/DO row can usefully express on its own -- the same
+ * reasoning Build mode and the Inspector are already "local play only"
+ * for. Timed with performance.now(), not engine ticks: this never needs
+ * to replay identically between the two engines the way gameplay itself
+ * does, only to look right in this one tab.
+ * ------------------------------------------------------------------- */
+let harvestTarget = null;       // the Thing currently mid-harvest, or null
+let harvestStartMs = 0;
+let harvestFlashUntilMs = 0;    // set once the wait is over -- flashing instead now
+let harvestFlashOn = true;      // current flash phase, read by frame() to hide/show it
+let lastHarvestListKey = "";    // skip re-rendering the list when nothing's actually changed
+const HARVEST_FLASH_MS = 800;
+
+// Within reach (range 1), same as touch/the Inspector's own pick-it-up-
+// from-the-ground reach -- anything else alive nearby that has harvest
+// config on it at all.
+function nearbyHarvestables() {
+  if (!world) return [];
+  const player = world.things.find(t => t.role === "player");
+  if (!player) return [];
+  return world.things.filter(t => t.alive && t !== player && t.harvest &&
+    Math.max(Math.abs(t.x - player.x), Math.abs(t.y - player.y)) <= 1);
+}
+
+function renderHarvestList(nearby) {
+  const panel = $("#harvest-panel");
+  if (!nearby.length) {
+    if (lastHarvestListKey !== "") { panel.classList.remove("on"); lastHarvestListKey = ""; }
+    return;
+  }
+  // A cheap fingerprint of what's actually showing -- position included,
+  // so something wandering past re-lists without needing a real diff.
+  const key = nearby.map(t => t.kind + ":" + t.x + "," + t.y).join("|");
+  if (key === lastHarvestListKey) return;
+  lastHarvestListKey = key;
+  panel.classList.add("on");
+  $("#harvest-list").hidden = false;
+  $("#harvest-progress").hidden = true;
+  const box = $("#harvest-list");
+  box.innerHTML = "";
+  for (const t of nearby) {
+    const row = document.createElement("div");
+    row.className = "harvest-row";
+    row.textContent = "harvest " + t.kind;
+    row.onclick = () => startHarvest(t);
+    box.appendChild(row);
+  }
+}
+
+function startHarvest(target) {
+  if (harvestTarget) return;   // already busy with one
+  harvestTarget = target;
+  harvestStartMs = performance.now();
+  harvestFlashUntilMs = 0;
+  harvestFlashOn = true;
+  lastHarvestListKey = "";     // so the list looks fresh whenever this ends
+  $("#harvest-list").hidden = true;
+  $("#harvest-progress").hidden = false;
+  $("#harvest-progress-label").textContent = "harvesting " + target.kind + "…";
+  $("#harvest-progress-fill").style.width = "0%";
+  $("#harvest-panel").classList.add("on");
+}
+
+function cancelHarvest() {
+  harvestTarget = null;
+  harvestFlashUntilMs = 0;
+  harvestFlashOn = true;
+  $("#harvest-progress").hidden = true;
+}
+
+function finishHarvest() {
+  const target = harvestTarget, cfg = target.harvest;
+  const player = world.things.find(t => t.role === "player");
+  if (player && cfg) {
+    const current = player.inventory[cfg.item] || 0;
+    player.inventory[cfg.item] = current + cfg.amount;
+    drawerToast("+" + cfg.amount + " " + cfg.item);
+  }
+  world.remove(target);
+  harvestTarget = null;
+  harvestFlashUntilMs = 0;
+  harvestFlashOn = true;
+  $("#harvest-progress").hidden = true;
+}
+
+// Called once a frame from frame(), before things are actually built for
+// rendering -- harvestFlashOn has to be current *before* that filtering
+// happens, or the flash would always be a frame behind.
+function updateHarvest() {
+  if (!world) { if (harvestTarget) cancelHarvest(); return; }
+  if (!harvestTarget) { renderHarvestList(nearbyHarvestables()); return; }
+  const player = world.things.find(t => t.role === "player");
+  const cfg = harvestTarget.harvest;
+  if (!harvestTarget.alive || !cfg || !player ||
+      Math.max(Math.abs(harvestTarget.x - player.x), Math.abs(harvestTarget.y - player.y)) > 1) {
+    cancelHarvest();   // it's gone, or you walked away -- no reward either way
+    return;
+  }
+  const now = performance.now();
+  if (harvestFlashUntilMs) {
+    if (now >= harvestFlashUntilMs) { finishHarvest(); return; }
+    const perPhase = HARVEST_FLASH_MS / (cfg.flashes * 2);
+    const elapsedFlash = HARVEST_FLASH_MS - (harvestFlashUntilMs - now);
+    harvestFlashOn = Math.floor(elapsedFlash / perPhase) % 2 === 0;
+    $("#harvest-progress-label").textContent = cfg.item + "!";
+    return;
+  }
+  const elapsed = (now - harvestStartMs) / 1000;
+  $("#harvest-progress-fill").style.width = Math.min(100, (elapsed / cfg.seconds) * 100) + "%";
+  if (elapsed >= cfg.seconds) { harvestFlashUntilMs = now + HARVEST_FLASH_MS; harvestFlashOn = true; }
+}
+
+function setupHarvest() {
+  $("#harvest-cancel").onclick = cancelHarvest;
+}
+
+/* ---------------------------------------------------------------------
+ * Inventory -- what you're carrying, read-only: no six-buttons-plus-a-box
+ * shape here, unlike the other modals, since there's nothing to act on
+ * besides looking. Deliberately its own thing, not folded into the
+ * Backpack (a dev tool for saved buttons/notes -- see CLAUDE.md). Local
+ * play only, same reasoning as everywhere else this file says that.
+ * ------------------------------------------------------------------- */
+function renderInventory() {
+  const box = $("#inventory-box");
+  box.innerHTML = "";
+  const player = world && world.things.find(t => t.role === "player");
+  const entries = player ? Object.entries(player.inventory).filter(([, n]) => n > 0) : [];
+  if (!entries.length) {
+    box.textContent = "(nothing yet -- harvest something first)";
+    return;
+  }
+  entries.sort(([a], [b]) => a.localeCompare(b));
+  for (const [item, count] of entries) {
+    const row = document.createElement("div");
+    row.className = "prop-row";
+    row.innerHTML = '<span class="prop-label"></span><span class="prop-value"></span>';
+    row.children[0].textContent = item;
+    row.children[1].textContent = String(count);
+    box.appendChild(row);
+  }
+}
+
+function openInventory() {
+  if (!world) { drawerToast("not available in LIVE mode"); return; }
+  renderInventory();
+  $("#inventory-modal").classList.add("on");
+}
+
+function setupInventory() {
+  $("#inventory-close").onclick = () => $("#inventory-modal").classList.remove("on");
+}
+
 /* Quickbar -- a fixed row of plain bubble slots, always visible, no tab
  * to slide open first (that's what the drawer is for). Each slot is
  * still a real [data-editable] button, so it can be dragged/resized/
@@ -4460,6 +4742,8 @@ window.addEventListener("unhandledrejection",
     // placeable kind -- see toggleMerge() and the Merge section above.
     {icon: "🧬", label: "merge: tap several objects, tap again to combine them",
      onTap: () => toggleMerge(), armed: () => mergeArmed, locked: true},
+    // read-only -- what harvesting has actually given you so far.
+    {icon: "📦", label: "inventory: what you're carrying", onTap: () => openInventory(), locked: true},
   ]});
   setupBackpack();
   setupProperties();
@@ -4467,6 +4751,8 @@ window.addEventListener("unhandledrejection",
   setupPalette();
   setupInspector();
   setupCompass();
+  setupHarvest();
+  setupInventory();
   makeQuickbar(7);
 
   // Turning the phone swaps which region is which shape, and a camera framed

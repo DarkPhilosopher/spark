@@ -66,6 +66,16 @@ class Thing:
         self.max_life = 0           # longevity, stamped on by the shoot tile
         self.max_range = 0          # reach, likewise. 0 on both means for ever
         self.controller = None      # which player drives this one, if any
+        # item name -> count, this Thing's own -- see the give_item/
+        # has_item tiles. Deliberately per-Thing, not world.memory (which
+        # `remember`/`recall` share across the whole world, wrong for
+        # "how much of this do *I* have" once two players share a game).
+        self.inventory = {}
+        # Harvest config ({item, amount, seconds, flashes}) or None -- see
+        # the `harvestable` tile. The actual wait/flash/give sequence is
+        # local-play-only UI in world3d.html; this is just the data half,
+        # carried by both engines so it survives a save/load either way.
+        self.harvest = template.get("harvest", None)
 
 
 class World:

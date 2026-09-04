@@ -347,6 +347,7 @@ of blocks, with each character's glyph floating over its own block.
 | 🎨 | Build mode: a searchable, alphabetical palette of every kind the game defines, to place where you stand — or open the Mesh Creator to design a new multi-part shape and add it to that palette. Local play only |
 | 🎯 | the Object Inspector: recolour (nineteen colours), cycle the shape (seven of them), resize uniformly or stretch width/height/depth independently ("reset stretch to size" undoes just the stretch), relocate, duplicate, or delete whatever you're touching (or a pending ghost from ▦, before it's even confirmed). **Tap anything in the world to select it directly**, without touching it on the ground first — a glowing ring marks the current selection. Local play only |
 | 🧬 | Merge: arms it (the bubble itself pulses while armed, same idea as 🗑's own pulse), then tap several objects (each gets its own green ring) and tap 🧬 again to combine all of them into one new placeable kind — you're asked for a name and a glyph, the same as saving from the Mesh Creator. Any part that ends up sitting entirely inside another is dropped from the result; parts that only partly overlap keep their full geometry. Tapping 🧬 again with fewer than two queued cancels instead, and so does closing the drawer while it's armed. Local play only |
+| 📦 | Inventory — a plain, read-only list of what you're carrying (from harvesting, or `give_item`). Nothing to do with the Backpack below; that's a dev tool, this is a game one. Local play only |
 | **restart** | starts the game again from the beginning (local play only) |
 | **recentre** | puts the camera back where it started |
 | **save** / **save as new** | quick-saves back to the file this world came from, or always asks for a new name |
@@ -355,6 +356,17 @@ of blocks, with each character's glyph floating over its own block.
 | **⚙** | Properties — grid-lock status, move speed, an opt-in minimap, and a clock, all driven by the world itself |
 | **✎** | the button editor — select, drag, resize, and fade any button here, including the drawer's own |
 | **run here** / **go live** | switches between the running game and this tab's own engine |
+
+**Harvest** is the one panel here that isn't opened from anywhere — it
+appears on its own, above the pads, the moment you're standing next to
+something `harvestable` (set with that tile, on any kind), naming
+whichever one(s) are within reach. Tap one to start a timed harvest: the
+panel switches to a countdown, ending in the target flashing the
+configured number of times and then vanishing while the item lands in
+your Inventory (📦, above). Walking out of reach mid-harvest cancels it —
+no partial reward. `games/Game 008008.json`'s pink cones are a working
+example: `harvestable`, giving ten pink metal for five seconds' wait and
+four flashes.
 
 **Backpack, Properties, Mesh Creator, Build, and the Object Inspector are
 all the same shape now** — up to six large buttons filling most of the

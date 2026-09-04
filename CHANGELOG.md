@@ -14,6 +14,73 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ## Unreleased
 
+### Added
+
+- **Harvesting: a new `harvestable` tile, an inventory (`give_item`/
+  `has_item`), and a small panel in the 3D view that appears on its own
+  whenever you're standing next to something harvestable.** Requested
+  directly, using `games/Game 008008.json`'s pink cones (previously an
+  instant touch-to-mine) as the worked example.
+
+  `harvestable` (DO, both engines) stamps `{item, amount, seconds,
+  flashes}` config onto a Thing — what it gives, how many, how long the
+  harvest takes, and how many times it flashes right before vanishing.
+  That's the whole tile; running the actual wait/flash/give sequence
+  once someone picks it is inherently an interactive, player-input flow
+  (stand near it, choose it off a list, watch a countdown) rather than
+  something a tick-driven WHEN/DO row can usefully express on its own —
+  the same reasoning Build mode and the Object Inspector are already
+  "local play only" for, so that half lives entirely in world3d.html.
+
+  `give_item`/`has_item` (DO/WHEN, both engines) are the general,
+  reusable half: each Thing keeps its own `{item: count}` inventory —
+  deliberately its own field, not built on top of `remember`/`recall`
+  (a single value shared by the *whole world*, wrong the moment two
+  players are in one game and each needs their own count). `give_item`
+  adds (or, with a negative amount, removes, floored at zero) some of a
+  named item on `self`/`it`; `has_item` checks a count is at least some
+  amount. Useful on their own too, not just from a harvest completing —
+  a chest a key opens, say.
+
+  The 3D view's own Harvest panel appears automatically (not opened
+  from anywhere) the moment you're within reach of ≥1 harvestable thing,
+  listing each one; picking one switches the same panel to a countdown,
+  ending in the target flashing (excluded from that frame's render on
+  its "off" phases, the same trick the merge-selection rings already
+  use for a blink) the configured number of times, then vanishing while
+  the item lands in your inventory. Walking out of reach mid-harvest
+  cancels it, no partial reward. A new, deliberately simple **Inventory**
+  panel (📦, in the button drawer) shows what you're actually carrying —
+  a plain read-only list, not the six-buttons-plus-a-box shape the other
+  modals share, since there's nothing here to act on besides looking.
+  Kept separate from the existing Backpack on purpose: Backpack is a dev
+  tool for saved buttons/notes, unrelated to anything a *game* means by
+  "carrying an item," and conflating the two would have confused both.
+
+  `games/Game 008008.json`'s cones now carry `"harvest": {"item": "pink
+  metal", "amount": 10, "seconds": 5, "flashes": 4}` directly in their
+  template (equivalent to the tile, just authored straight into the
+  JSON since the cone has no brain rows of its own) in place of the
+  hero's old "touch cone → score +5, vanish, say mined iron ore!" row,
+  which is removed — walking into one no longer does anything by
+  itself; standing near it does.
+
+  Validated three ways: `tests/check_harvest.py` (14 checks, Python) and
+  `tests/harvest_tiles.test.js` (15 checks, JS) run the same cases
+  against each engine's own implementation directly — deliberately
+  *not* wired into `check_engines.py`'s shared snapshot/parity harness,
+  which compares a fixed, hand-picked set of Thing fields between the
+  two engines; extending that shape is its own, riskier change to a
+  delicate piece of shared test infrastructure, so each engine gets
+  checked against the same cases in its own dedicated test instead —
+  not the same mechanism, but the same goal, catching either engine
+  quietly drifting from what the other one does. Plus `python3 -m
+  py_compile`, `node --check`, a full `html.parser` pass, loading
+  `Game 008008.json` through `engine.brain.load`/`engine.world.World`
+  and stepping it, and the full existing suite, all green. The panel
+  itself, its countdown, and the flash have not been seen running on a
+  real screen yet.
+
 ### Changed
 
 - **The button drawer moved 8px in from the true left edge of the

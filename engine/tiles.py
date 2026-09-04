@@ -481,6 +481,17 @@ def s_score(obj, world, a):
     return world.score >= a["value"]
 
 
+@sensor("has_item", "I have at least {amount} {item}",
+        Param("item", "Which item?", "text", [], "gold"),
+        Param("amount", "How many, at least?", "int", [], 1))
+def s_has_item(obj, world, a):
+    """My own count, from `give_item` -- not world.memory/`recall`'s single
+    shared value, for the same reason give_item isn't built on top of
+    `remember`: two players in one game must not share one inventory."""
+    item = str(a.get("item", "")).strip()
+    return obj.inventory.get(item, 0) >= a["amount"]
+
+
 @sensor("chance", "{percent}% of the time",
         Param("percent", "Percent chance (0-100)?", "int", [], 25))
 def s_chance(obj, world, a):
@@ -706,6 +717,34 @@ def a_stretch(obj, world, a, it):
     setattr(victim, field, max(40, min(220, current + a["amount"])))
 
 
+@action("harvestable", "make {target} harvestable: {amount} {item}, {seconds}s, flashing {flashes} times",
+        Param("target", "Make what harvestable?", "choice", ["self", "it"], "self"),
+        Param("item", "What does it give?", "text", [], "wood"),
+        Param("amount", "How many?", "int", [], 1),
+        Param("seconds", "How many seconds to harvest it?", "int", [], 5),
+        Param("flashes", "How many times does it flash before it's gone?", "int", [], 4))
+def a_harvestable(obj, world, a, it):
+    """Stamps harvest config onto a Thing -- the data half of "walk up,
+    pick it from a list, wait a few seconds, get an item" (see
+    world3d.html's harvest UI, which is what actually runs the wait/flash/
+    give sequence: that part is interactive-only, local play, the same
+    reasoning as Build mode/the Inspector, not something a WHEN/DO row on
+    a tick-driven server can usefully drive on its own). Both engines
+    carry this field regardless, so a game authored once behaves the same
+    whichever one is actually running it, and a save/load round trip
+    never drops it. Harmless to call again -- last call wins, same as
+    resize/stretch already work."""
+    victim = it if a["target"] == "it" else obj
+    if victim is None:
+        return
+    victim.harvest = {
+        "item": str(a.get("item", "")).strip() or "item",
+        "amount": max(1, a["amount"]),
+        "seconds": max(1, a["seconds"]),
+        "flashes": max(1, a["flashes"]),
+    }
+
+
 @action("fly", "fly {dir}",
         Param("dir", "Which way?", "choice", ["up", "down"], "up"))
 def a_fly(obj, world, a, it):
@@ -759,6 +798,27 @@ def a_remember(obj, world, a, it):
     name = str(a.get("name", "")).strip()
     if name:
         world.memory[name] = str(a.get("value", ""))
+
+
+@action("give_item", "give {target} {amount} {item}",
+        Param("target", "Give to whom?", "choice", ["self", "it"], "self"),
+        Param("item", "Which item?", "text", [], "gold"),
+        Param("amount", "How many? (negative to take some away)", "int", [], 1))
+def a_give_item(obj, world, a, it):
+    """Add (or, with a negative amount, remove) some of a named item from
+    whoever holds it -- each Thing keeps its own count, unlike `remember`
+    (a single value shared by the whole world, wrong for "how much of
+    this do *I* have" the moment two players are in the same game).
+    Never goes below zero; an item nobody's ever been given at all reads
+    the same as one explicitly given zero of."""
+    victim = it if a["target"] == "it" else obj
+    if victim is None:
+        return
+    item = str(a.get("item", "")).strip()
+    if not item:
+        return
+    current = victim.inventory.get(item, 0)
+    victim.inventory[item] = max(0, current + a["amount"])
 
 
 @action("open", "open {object} at {target}",

@@ -103,6 +103,26 @@
       ]
     },
     {
+      "id": "has_item",
+      "label": "I have at least {amount} {item}",
+      "params": [
+        {
+          "name": "item",
+          "prompt": "Which item?",
+          "kind": "text",
+          "choices": [],
+          "default": "gold"
+        },
+        {
+          "name": "amount",
+          "prompt": "How many, at least?",
+          "kind": "int",
+          "choices": [],
+          "default": 1
+        }
+      ]
+    },
+    {
       "id": "chance",
       "label": "{percent}% of the time",
       "params": [
@@ -454,6 +474,50 @@
       ]
     },
     {
+      "id": "harvestable",
+      "label": "make {target} harvestable: {amount} {item}, {seconds}s, flashing {flashes} times",
+      "params": [
+        {
+          "name": "target",
+          "prompt": "Make what harvestable?",
+          "kind": "choice",
+          "choices": [
+            "self",
+            "it"
+          ],
+          "default": "self"
+        },
+        {
+          "name": "item",
+          "prompt": "What does it give?",
+          "kind": "text",
+          "choices": [],
+          "default": "wood"
+        },
+        {
+          "name": "amount",
+          "prompt": "How many?",
+          "kind": "int",
+          "choices": [],
+          "default": 1
+        },
+        {
+          "name": "seconds",
+          "prompt": "How many seconds to harvest it?",
+          "kind": "int",
+          "choices": [],
+          "default": 5
+        },
+        {
+          "name": "flashes",
+          "prompt": "How many times does it flash before it's gone?",
+          "kind": "int",
+          "choices": [],
+          "default": 4
+        }
+      ]
+    },
+    {
       "id": "fly",
       "label": "fly {dir}",
       "params": [
@@ -504,6 +568,36 @@
           "kind": "text",
           "choices": [],
           "default": "com.android.chrome"
+        }
+      ]
+    },
+    {
+      "id": "give_item",
+      "label": "give {target} {amount} {item}",
+      "params": [
+        {
+          "name": "target",
+          "prompt": "Give to whom?",
+          "kind": "choice",
+          "choices": [
+            "self",
+            "it"
+          ],
+          "default": "self"
+        },
+        {
+          "name": "item",
+          "prompt": "Which item?",
+          "kind": "text",
+          "choices": [],
+          "default": "gold"
+        },
+        {
+          "name": "amount",
+          "prompt": "How many? (negative to take some away)",
+          "kind": "int",
+          "choices": [],
+          "default": 1
         }
       ]
     },
