@@ -14,6 +14,54 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ## Unreleased
 
+### Fixed
+
+- **The compass overlapped the top bar's title/badge in portrait (and
+  landscape) — it sat at a flat 8px from the top of the screen, which
+  was only ever clear of the bar while the bar had a single row.** Once
+  the bar grew a second row of buttons (`#side-tools`) nothing moved the
+  compass to match, so it rendered directly on top of the title and
+  badge instead of below everything, on every phone, in both
+  orientations. This is the *same class of bug*, not a new one, as the
+  `#hud`/`#say` fix already documented below (104px → 160px when the bar
+  grew that second row) — except the compass never got the equivalent
+  fix at all. Rather than add a third guessed pixel constant to a chain
+  that has now broken twice, the compass moved into `#bar`'s own flex
+  column as a real third row (`align-self:center`, sized the same as
+  before) instead of floating independently at a hardcoded offset — it
+  cannot drift out of sync with the bar's real height again, the same
+  reason `#side`/`#side-tools` already don't. `#hud`/`#say` (which now
+  also have to clear the compass, being below it) switched from another
+  guessed constant to a real one: a new `--bar-h` CSS variable, kept
+  current by a `syncBarHeight()` measurement (`#bar`'s own
+  `getBoundingClientRect().height`) on load and on every
+  resize/orientationchange — the exact same events the camera's own
+  re-framing already listens for. Whatever the bar grows to next, this
+  follows it automatically instead of needing another manual bump.
+  Validated with `node --check` and a full `html.parser` pass; the exact
+  pixel result is one more thing worth confirming on a real screen,
+  though the reasoning (and the arithmetic behind the fallback constant)
+  was checked by hand against the bar's actual rendered content.
+
+### Added
+
+- **The button editor (✎) can now hide itself for the length of a
+  drag.** A new checkbox, "hide this panel while dragging a button" —
+  on by default — in `#edit-panel`. The panel covers most of the screen
+  (it's inset 6vh/6vw), which is exactly what got in the way of seeing
+  where a button actually lands relative to everything else while
+  dragging it into place. With it on, the panel (not button-editor mode
+  itself — the dashed outlines, the selection, all of that stays active)
+  disappears the moment a drag starts and comes back the moment it ends,
+  via a `.peeking` class toggled in the same `pointerdown`/`endDrag`
+  handlers `registerEditable()` already had — the drag itself keeps
+  working underneath the whole time, since pointer capture is on the
+  button being dragged, not on the panel. Turning off button-editor mode
+  entirely while mid-drag (shouldn't happen, but) clears `.peeking` too,
+  so it can never get stuck hidden. Persisted the same way grid-lock
+  already is, in the same `spark3d-editor-settings` localStorage entry.
+  Validated with `node --check` and a full `html.parser` pass.
+
 ### Changed
 
 - **The 3D view's five modals — Backpack, Properties, Mesh Creator,

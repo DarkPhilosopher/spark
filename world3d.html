@@ -29,6 +29,11 @@
     --glass-btn: rgba(102,109,118,.6);     /* pad/side/tab/bubble backgrounds */
     --overlay-text: rgba(74,80,88,.85);    /* HUD/say floating text backgrounds */
     --modal-bg: rgba(74,80,88,.96);        /* Mesh Creator / Build / Inspector backgrounds */
+    /* The top bar's own real height, kept current by syncBarHeight() (JS)
+       -- see the comment on #hud below for why this is measured rather
+       than another guessed constant. This value only matters for the
+       first frame or two before JS has measured anything for real. */
+    --bar-h: 194px;
   }
   *{box-sizing:border-box}
   html,body{height:100%}
@@ -96,14 +101,24 @@
                background:var(--glass-btn);backdrop-filter:blur(6px);
                -webkit-backdrop-filter:blur(6px)}
 
-  /* 160px, not the 104px this used to be -- the top bar grew a second
-     row of buttons (#side-tools) and this has to clear both rows plus
-     the title, on the shortest phone this runs on, not just a tall one. */
-  #hud{position:absolute;top:calc(160px + env(safe-area-inset-top));left:8px;z-index:4;
+  /* Used to be a flat 160px, not measured -- and broke twice for the same
+     reason: it was fine while the bar was short, then stayed 160 while
+     the bar grew a second button row (was 104px before that), and stayed
+     160 again when the compass moved into the bar as a third row (see
+     the CSS comment on #compass), overlapping it. --bar-h is the bar's
+     own real rendered height instead, kept current by syncBarHeight()
+     (JS) on load and on resize/orientationchange, so this can't drift out
+     of sync with the bar's actual content again -- whatever the bar
+     grows to next, this follows it automatically. The fallback value
+     below only matters for the first frame or two before JS has measured
+     anything. Already includes the safe-area inset: #bar's own top:0 box
+     starts there, so its measured height already accounts for it -- no
+     second env(safe-area-inset-top) added here. */
+  #hud{position:absolute;top:calc(var(--bar-h) + 8px);left:8px;z-index:4;
        font:12px/1.7 ui-monospace,monospace;color:var(--dim);
        background:var(--overlay-text);border-radius:10px;padding:6px 10px}
   #hud b{color:var(--ink)}
-  #say{position:absolute;top:calc(160px + env(safe-area-inset-top));right:8px;z-index:4;
+  #say{position:absolute;top:calc(var(--bar-h) + 8px);right:8px;z-index:4;
        max-width:52vw;text-align:right;color:var(--accent);font-size:13px;
        background:var(--overlay-text);border-radius:10px;padding:6px 10px}
   #say:empty{display:none}
@@ -273,6 +288,12 @@
               border-radius:12px;padding:14px 16px;
               backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
   #edit-panel.on{display:flex}
+  /* "hide this panel while dragging a button", above -- an .on.peeking
+     panel goes back to display:none for the length of the drag rather
+     than the panel and the button-editor mode it belongs to actually
+     turning off, so the drag itself (pointer capture is on the button
+     being dragged, not the panel) keeps working underneath untouched. */
+  #edit-panel.on.peeking{display:none}
   #edit-panel label{display:flex;align-items:center;gap:8px;
                      font-size:12px;color:var(--dim)}
   #edit-panel input[type=range]{flex:1}
@@ -413,9 +434,17 @@
 
   /* Compass -- a meter across the top, not a dial: ticks scroll sideways
      as the camera turns (see drawCompass()), the current heading always
-     sits under the fixed centre marker, same idea as a flight HUD. */
-  #compass{position:fixed;top:calc(8px + env(safe-area-inset-top));
-           left:50%;transform:translateX(-50%);z-index:4;
+     sits under the fixed centre marker, same idea as a flight HUD.
+     A flex child of #bar itself now (below the title and both button
+     rows), not independently `position:fixed` at a hardcoded top -- it
+     used to float at a flat 8px from the top of the screen, which was
+     only ever clear of the bar while the bar had a single row; once
+     #side-tools became a second row (see the 160px note on #hud below)
+     nothing moved the compass to match, so it sat directly on top of the
+     title/badge instead of under everything. Living in the bar's own
+     flex column, it can't drift out of sync with the bar's real height
+     again -- the same reason #side/#side-tools already avoid this. */
+  #compass{align-self:center;
            width:min(94vw,480px);height:32px;overflow:hidden;
            background:rgba(74,80,88,.75);border:1px solid var(--line);
            border-radius:8px;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
@@ -520,6 +549,16 @@
       <button id="properties-toggle" data-editable title="properties">⚙</button>
       <button id="edit-toggle" title="edit buttons: select, drag, resize, fade">✎</button>
     </div>
+    <!-- Which way the camera is facing, not the character -- a meter, not
+         a dial: ticks scroll sideways as the camera turns, the current
+         heading always sits under the fixed centre marker -- built and
+         positioned in JS, see setupCompass()/drawCompass(). A flex child
+         of the bar rather than its own fixed-position float; see the CSS
+         comment on #compass for why. -->
+    <div id="compass" title="camera heading">
+      <div id="compass-tape"></div>
+      <div id="compass-marker"></div>
+    </div>
   </div>
 
   <div id="hud"></div>
@@ -580,6 +619,15 @@
   <div class="row">
     <label style="flex:2"><input id="edit-grid-on" type="checkbox"> grid lock</label>
     <input id="edit-grid-size" type="number" step="0.5" min="1" max="50" value="5" title="grid size, percent of screen">
+  </div>
+  <!-- This panel covers most of the screen (see #edit-panel below), which
+       is exactly what gets in the way of seeing where a button actually
+       lands relative to everything else while dragging it. With this on,
+       the panel itself (not button-editor mode) disappears for the
+       length of each drag and comes back the moment you let go -- see
+       the pointerdown/endDrag hook in registerEditable(). -->
+  <div class="row">
+    <label style="flex:2"><input id="edit-hide-dragging" type="checkbox" checked> hide this panel while dragging a button</label>
   </div>
   <div class="row">
     <button id="edit-reset">reset this button</button>
@@ -649,15 +697,6 @@
   </div>
 </div>
 
-<!-- Compass: which way the camera is facing, not the character -- the
-     ring rotates under a fixed pointer, same idea as a map app. -->
-<!-- A meter, not a dial: ticks scroll sideways as the camera turns, the
-     current heading always sits under the fixed centre marker -- built
-     and positioned in JS, see setupCompass()/drawCompass(). -->
-<div id="compass" title="camera heading">
-  <div id="compass-tape"></div>
-  <div id="compass-marker"></div>
-</div>
 
 <!-- Minimap: off by default (toggle in Properties) -- one more
      always-on corner widget was the wrong call given how crowded the
@@ -2240,6 +2279,17 @@ function frame() {
 const COMPASS_PX_PER_DEG = 4;
 const COMPASS_NAMES = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
 
+// Keeps #hud and #say (see their CSS, --bar-h) clear of the top bar
+// regardless of how tall the bar currently is -- its title row, both
+// button rows, and now the compass too. Called once at boot and again on
+// every resize/orientationchange, the same events the camera's own
+// re-framing already listens for, so this can't go stale the way a fixed
+// pixel guess already has twice.
+function syncBarHeight() {
+  const h = $("#bar").getBoundingClientRect().height;
+  if (h > 0) document.documentElement.style.setProperty("--bar-h", h + "px");
+}
+
 function setupCompass() {
   const tape = $("#compass-tape");
   const span = 8 * 360;
@@ -2536,6 +2586,7 @@ const editableButtons = new Map();
 let editSelected = null;      // uid, or null
 let editDragging = null;      // {uid, x, y, dx, dy}, or null
 let gridLockOn = false;       // dragging (and "go to x%, y%") snap to a grid
+let hideWhileDragging = true;  // the edit panel itself hides for the length of a drag
 
 // The grid size input is read live rather than cached, so typing a new
 // size takes effect immediately without a separate "apply" step.
@@ -2652,6 +2703,7 @@ function registerEditable(el, uid, label) {
     const entry = buttonLayout[uid] || (buttonLayout[uid] = {});
     editDragging = {uid, x: e.clientX, y: e.clientY, dx: entry.dx || 0, dy: entry.dy || 0};
     el.setPointerCapture(e.pointerId);
+    if (hideWhileDragging) $("#edit-panel").classList.add("peeking");
   });
   el.addEventListener("pointermove", e => {
     if (!editDragging || editDragging.uid !== uid) return;
@@ -2665,6 +2717,7 @@ function registerEditable(el, uid, label) {
     if (!editDragging || editDragging.uid !== uid) return;
     editDragging = null;
     saveButtonLayout();
+    $("#edit-panel").classList.remove("peeking");
   };
   el.addEventListener("pointerup", endDrag);
   el.addEventListener("pointercancel", endDrag);
@@ -2755,6 +2808,7 @@ function setupButtonEditor() {
     document.body.classList.toggle("editing-buttons", editingButtons);
     $("#edit-toggle").textContent = editingButtons ? "✓" : "✎";
     $("#edit-panel").classList.toggle("on", editingButtons);
+    $("#edit-panel").classList.remove("peeking");   // safety: never leave it stuck hidden
     updateGridOverlay();
     if (editingButtons) { renderEditList(); renderLayoutList(); }
     else selectEditable(null);
@@ -2768,11 +2822,21 @@ function setupButtonEditor() {
     gridLockOn = true;
     $("#edit-grid-on").checked = true;
   }
+  // Defaults to on (see the checkbox's own `checked` in the HTML) unless
+  // this phone has explicitly turned it off before.
+  if (savedSettings.hideWhileDragging === false) {
+    hideWhileDragging = false;
+    $("#edit-hide-dragging").checked = false;
+  }
 
   $("#edit-grid-on").addEventListener("change", () => {
     gridLockOn = $("#edit-grid-on").checked;
     syncGridLockDisplays();   // keeps the Properties toggle matching too
     saveEditorSettings({gridLockOn});
+  });
+  $("#edit-hide-dragging").addEventListener("change", () => {
+    hideWhileDragging = $("#edit-hide-dragging").checked;
+    saveEditorSettings({hideWhileDragging});
   });
   $("#edit-grid-size").addEventListener("input", () => {
     updateGridOverlay();
@@ -4212,6 +4276,7 @@ window.addEventListener("unhandledrejection",
   let wasWide = null;
   const onResize = () => {
     renderer.resize();
+    syncBarHeight();
     const wide = $("#gl").clientWidth >= $("#gl").clientHeight;
     if (wasWide !== null && wide !== wasWide) renderer.frameBoard();
     wasWide = wide;

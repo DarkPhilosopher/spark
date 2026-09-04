@@ -405,8 +405,12 @@ cases, so nothing about the fine control here was lost, only relocated:
 The **compass**, a meter across the top of the screen rather than a dial,
 scrolls sideways as the camera turns so the current heading always sits
 under the fixed centre marker — this world's own idea of "north," not a
-real one. The **quickbar** is seven empty, always-visible bubble slots with
-no drawer to open first, there to have something assigned to them later.
+real one. It lives inside the top bar itself (below the title and both
+rows of buttons), so it always sits under whatever the bar's own real
+height happens to be on your phone rather than at a fixed distance from
+the top that could land on top of the bar's own buttons. The **quickbar**
+is seven empty, always-visible bubble slots with no drawer to open first,
+there to have something assigned to them later.
 
 "Local play only" above means the feature edits the live JavaScript world
 directly, in this tab's own copy of the game — it has no effect, and does
@@ -435,6 +439,13 @@ can be dragged to a new spot, resized, and faded from the button editor
 (✎), either by touch or by typing an exact position as a decimal percent
 of the screen. Anywhere in the world you touch that is not a button turns
 the camera.
+
+The button editor's own panel covers most of the screen, which can get in
+the way of seeing exactly where a button lands relative to everything
+else while dragging it — "hide this panel while dragging a button," on by
+default, makes the panel itself disappear for the length of each drag and
+come straight back the moment you let go, so you can actually see the
+button land against the world (and every other button) underneath it.
 
 The drawer's own bubbles are a column, tallest on a tall screen — if there
 get to be enough of them (built-ins plus whatever you've added with the +

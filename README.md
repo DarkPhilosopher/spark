@@ -736,14 +736,17 @@ diorama seen from outside.
 Every button on screen — the two thumb-zone pads (movement at bottom-left,
 actions at bottom-right), the top bar, the button drawer's
 own bubbles — can be dragged, resized, and faded from a button editor built
-into the tab, and whole arrangements of them saved under a name and swapped
+into the tab (its own panel can hide itself for the length of each drag, on
+by default, so it doesn't block the view of where the button is actually
+landing), and whole arrangements of them saved under a name and swapped
 between. A Backpack (a small file system) and a Properties panel (grid-lock
 status, move speed, an opt-in minimap, and a clock driven by the world's own
-time) live in the top bar too, and a heading meter tracks which way the
-camera is facing across the top of the screen. The button drawer's own
-bubbles wrap into extra columns rather than running off the bottom of a
-shorter screen once there are enough of them (built-ins plus whatever
-you've added with its own + control).
+time) live in the top bar too, and a heading meter — part of the top bar
+itself, so it always clears whatever the bar's own real height is — tracks
+which way the camera is facing across the top of the screen. The button
+drawer's own bubbles wrap into extra columns rather than running off the
+bottom of a shorter screen once there are enough of them (built-ins plus
+whatever you've added with its own + control).
 
 Build mode turns the tab into a level editor: pick a kind from a searchable
 palette and place it where you stand, or design an entirely new multi-part
