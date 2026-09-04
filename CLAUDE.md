@@ -152,6 +152,41 @@ He tests changes himself in Chrome on-device — nothing here can be run or
 screenshotted from this session, so validate everything possible before
 saying a change is done, and be explicit about what's confirmed vs. not.
 
+## Panel formations (noted 2026-09-04) — two shapes, pick by content
+
+Two layout ideas Gabe asked to have written down here explicitly, to
+keep in mind for any future full-panel layout in `world3d.html`, not
+just the one that prompted them:
+
+1. **8 boxes, the whole screen.** His reasoning: an average smartphone
+   screen is about as close to square as phone screens get, so dividing
+   the *whole* screen (edge to edge, not inset into a smaller card the
+   way every modal here currently is) into 8 boxes suits it well —
+   stretched to fill either way, left open rather than a firm mandate.
+   Best for a panel that's pure discrete actions, nothing continuous or
+   typed to show. The button editor already moved to an eight-button
+   version of this the same day (`.mkeys` with 8 buttons instead of the
+   other modals' 6) — but still inset at `6vh 6vw` like the rest, not
+   yet edge-to-edge full-screen. Worth revisiting if a panel calls for
+   the full-screen version specifically.
+
+2. **6 buttons plus a terminal, otherwise.** The established alternative
+   — the same `.mgrid`/`.mkeys`/`.mbox` shell already used for
+   Backpack/Properties/Mesh Creator/Build/the Inspector — except Gabe's
+   own framing makes "the box" more specific than "whatever isn't a
+   button": it's a **terminal**, taking typed plain text for *both*
+   commands and human chat, the same way index.html's own deck box
+   already works (`/help`, `/pin`, plain text said to the room, etc.),
+   not just a passive readout. world3d.html's own Chat panel (added the
+   same day) is a version of this idea too, just its own separate modal
+   rather than folded into a 6-button panel's box the way index.html
+   does it in one piece.
+
+**Why:** Gabe asked explicitly to write both of these down here (and in
+my own persistent memory) so they're actually considered for future
+panel work in this project, not just remembered for the one session
+that prompted them.
+
 ## Two engines, kept deliberately in sync
 
 The game logic exists twice: `engine/*.py` (real gameplay, `spark.py play`,
