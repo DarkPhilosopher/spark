@@ -449,6 +449,16 @@ else while dragging it — "hide this panel while dragging a button," on by
 default, makes the panel itself disappear for the length of each drag and
 come straight back the moment you let go, so you can actually see the
 button land against the world (and every other button) underneath it.
+✎ (top right) itself also shows/hides the panel once you're already
+editing, the same way — tap it again any time to close the panel and see
+the screen clearly (dragging still works with the panel closed), then the
+same button brings it straight back. Actually leaving edit mode — the
+dashed outlines and all — is "✓ done editing," at the top of the panel.
+
+The panel's own list of every button groups them under a numbered
+"button group 001," "002," … heading — the pads, the top bar, the drawer,
+and the quickbar each get their own — instead of one flat list of
+everything on the page at once.
 
 The drawer's own bubbles are a column, tallest on a tall screen — if there
 get to be enough of them (built-ins plus whatever you've added with the +

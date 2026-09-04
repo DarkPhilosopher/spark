@@ -209,7 +209,7 @@
   /* Button Drawer: a row of round buttons that slides out from the left
      edge, floating translucent over the world -- see makeDrawer() below
      and ~/bubble-drawer/README.md for the full write-up. */
-  .drawer{position:fixed;z-index:6;display:flex;
+  .drawer{position:fixed;z-index:6;display:flex;gap:6px;
           transition:transform .25s cubic-bezier(.2,.8,.3,1)}
   /* A fixed offset from the top, not vertically centered or bottom-anchored
      -- centered put it right over the HUD on a short landscape screen, and
@@ -223,9 +223,19 @@
      also has a measured --hud-bottom floor under it, so a HUD grown
      taller than that budget expected can't push up underneath this tab
      unnoticed. */
+  /* left, not 0: flush against the true edge of the screen put the tab
+     (and, opened, the columns of bubbles) right where a phone's own
+     edge-swipe gesture (back navigation on Android's gesture nav, e.g.)
+     can steal the touch before the page ever sees it, on top of just
+     being an awkward reach right at the very corner. Inset instead, the
+     same 8px margin every other floating panel in this file already
+     uses (#hud/#say/#minimap). The -100%+util slide math is unaffected
+     by this -- it is relative to the drawer's own width either way, so
+     the closed sliver still ends up exactly var(--util) wide, just
+     starting 8px in from the edge instead of flush against it. */
   .drawer[data-edge="left"]{
       top:max(calc(250px + env(safe-area-inset-top)), calc(var(--hud-bottom, 0px) + 8px));
-      left:0;flex-direction:row;
+      left:calc(8px + env(safe-area-inset-left));flex-direction:row;
       transform:translate(calc(-100% + var(--util)), 0)}
   .drawer[data-edge="left"].open{transform:translate(0, 0)}
   .drawer .tab{width:var(--util);height:var(--util);flex:0 0 auto;
@@ -233,7 +243,7 @@
                background:var(--glass-btn);border:1px solid var(--line);
                color:var(--accent);font-size:20px;cursor:pointer;
                backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
-               border-radius:0 14px 14px 0}
+               border-radius:14px}
   .drawer .tab span{transition:transform .25s;display:block}
   .drawer.open .tab span{transform:rotate(180deg)}
   /* flex-direction:column *and* flex-wrap:wrap: a plain vertical list has
@@ -247,7 +257,7 @@
      column rather than ever slicing one in half, so nothing renders
      partially cut off either. */
   .drawer .bubbles{display:flex;flex-direction:column;flex-wrap:wrap;
-                   gap:10px;padding:10px;
+                   gap:10px;padding:10px;border-radius:14px;
                    background:rgba(74,80,88,.55);border:1px solid var(--line);
                    backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
   /* The cap itself: from this edge's own top offset (250px + the safe
@@ -359,6 +369,12 @@
                  background:var(--glass-input);cursor:pointer;
                  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .edit-list-row.on{background:var(--accent);color:var(--bg);font-weight:700}
+  /* "button group 001", "002", ... -- a non-clickable heading above each
+     cluster's own rows, see EDIT_GROUPS/renderEditList(). */
+  .edit-list-group{flex:0 0 auto;font-size:10px;font-weight:700;
+                   letter-spacing:.04em;text-transform:uppercase;
+                   color:var(--dim);padding:6px 2px 0}
+  .edit-list-group:first-child{padding-top:0}
   /* named layout saves -- same row look, plus a delete glyph on the right */
   #edit-layout-list{display:flex;flex-direction:column;gap:4px;
                     max-height:148px;min-height:0;overflow-y:auto;touch-action:pan-y}
@@ -630,6 +646,12 @@
      down to where you can no longer find them by tapping -- pick one here
      instead, then drag it and use the sliders. -->
 <div id="edit-panel">
+  <!-- ✎ (top right) now just shows/hides this panel once already
+       editing -- dashed outlines and dragging stay on either way. This
+       is the one that actually leaves edit mode. -->
+  <div class="row">
+    <button id="edit-done" style="flex:1">✓ done editing</button>
+  </div>
   <div id="edit-list"></div>
   <!-- slider and typed decimal percent, kept in sync both ways, and both
        filled in with whatever the selected button already has. -->
@@ -2640,6 +2662,19 @@ let editSelected = null;      // uid, or null
 let editDragging = null;      // {uid, x, y, dx, dy}, or null
 let gridLockOn = false;       // dragging (and "go to x%, y%") snap to a grid
 let hideWhileDragging = true;  // the edit panel itself hides for the length of a drag
+let editPanelHidden = false;  // manually closed via ✎ while still editing -- see updateEditPanelVisibility
+
+// The panel is hidden either because a drag is in progress (and the
+// "hide while dragging" checkbox wants that) or because ✎ closed it
+// manually while staying in edit mode -- two independent reasons that
+// both drive the same .peeking class, so neither one can clobber what
+// the other one wants: ending a drag no longer reopens a panel that was
+// manually closed first, and closing the panel manually doesn't get
+// undone the next time a drag starts and ends.
+function updateEditPanelVisibility() {
+  const hidden = editPanelHidden || (editDragging && hideWhileDragging);
+  $("#edit-panel").classList.toggle("peeking", !!hidden);
+}
 
 // The grid size input is read live rather than cached, so typing a new
 // size takes effect immediately without a separate "apply" step.
@@ -2753,16 +2788,55 @@ function selectEditable(uid) {
   renderEditList();
 }
 
+// Which on-screen cluster a button belongs to -- purely for the numbered
+// "button group 00N" headers in the edit list below, so a list of every
+// editable button/bubble/slot on the whole page (which is otherwise just
+// one flat list) at least shows which bunch of buttons a given row is
+// actually part of. Order here is the order groups are numbered in,
+// independent of editableButtons' own registration order (pad buttons
+// register before the drawer's, which rebuilds its own on every open,
+// etc.) -- each group is gathered by matching uids, not by position.
+const EDIT_GROUPS = [
+  {name: "pad (move)", match: uid => ["up", "left", "right", "down"].includes(uid)},
+  {name: "pad (actions)", match: uid => ["e", "f", "space", "s", "w"].includes(uid)},
+  {name: "top bar", match: uid => ["restart", "recentre", "fullscreen", "mode", "save",
+                                    "save-as", "backpack-toggle", "properties-toggle"].includes(uid)},
+  {name: "button drawer", match: uid => uid.startsWith("drawer:")},
+  {name: "quickbar", match: uid => uid.startsWith("quickbar:")},
+];
+
 function renderEditList() {
   const box = $("#edit-list");
   box.innerHTML = "";
-  for (const [uid, {el, label}] of editableButtons) {
-    const row = document.createElement("div");
-    row.className = "edit-list-row" + (uid === editSelected ? " on" : "");
-    row.textContent = (el.textContent || "□").trim() + "  " + (label || uid);
-    row.onclick = () => selectEditable(uid);
-    box.appendChild(row);
+  // Bucketed first, then rendered group by group -- not a single pass
+  // over editableButtons looking for the group to change, since nothing
+  // guarantees its own iteration order actually keeps a group's uids
+  // contiguous (a drawer bubble added or removed shuffles that map).
+  const buckets = EDIT_GROUPS.map(() => []);
+  const other = [];
+  for (const entry of editableButtons) {
+    const uid = entry[0];
+    const i = EDIT_GROUPS.findIndex(g => g.match(uid));
+    (i < 0 ? other : buckets[i]).push(entry);
   }
+  let groupNum = 0;
+  const renderGroup = (name, entries) => {
+    if (!entries.length) return;
+    groupNum++;
+    const header = document.createElement("div");
+    header.className = "edit-list-group";
+    header.textContent = "button group " + String(groupNum).padStart(3, "0") + " — " + name;
+    box.appendChild(header);
+    for (const [uid, {el, label}] of entries) {
+      const row = document.createElement("div");
+      row.className = "edit-list-row" + (uid === editSelected ? " on" : "");
+      row.textContent = (el.textContent || "□").trim() + "  " + (label || uid);
+      row.onclick = () => selectEditable(uid);
+      box.appendChild(row);
+    }
+  };
+  EDIT_GROUPS.forEach((g, i) => renderGroup(g.name, buckets[i]));
+  renderGroup("other", other);
 }
 
 /* Called once for the pad/side buttons at startup, and again every time
@@ -2788,7 +2862,7 @@ function registerEditable(el, uid, label) {
     const entry = buttonLayout[uid] || (buttonLayout[uid] = {});
     editDragging = {uid, x: e.clientX, y: e.clientY, dx: entry.dx || 0, dy: entry.dy || 0};
     el.setPointerCapture(e.pointerId);
-    if (hideWhileDragging) $("#edit-panel").classList.add("peeking");
+    updateEditPanelVisibility();
   });
   el.addEventListener("pointermove", e => {
     if (!editDragging || editDragging.uid !== uid) return;
@@ -2803,7 +2877,7 @@ function registerEditable(el, uid, label) {
     if (!editDragging || editDragging.uid !== uid) return;
     editDragging = null;
     saveButtonLayout();
-    $("#edit-panel").classList.remove("peeking");
+    updateEditPanelVisibility();
   };
   el.addEventListener("pointerup", endDrag);
   el.addEventListener("pointercancel", endDrag);
@@ -2889,15 +2963,40 @@ function setupButtonEditor() {
     selectEditable(null);   // clears the selection and sliders too
   };
 
+  // ✎ used to be a plain on/off toggle for edit mode -- one tap turned
+  // everything on (dashed outlines, dragging, and the panel together),
+  // the next turned all of it back off. Split in two on request: while
+  // already editing, ✎ now just shows/hides the *panel* (editingButtons,
+  // the dashed outlines, and dragging all stay on) -- so it can be tapped
+  // closed to see the screen clearly and tapped again, the same button,
+  // top right, to bring the panel straight back without losing your
+  // place. Fully leaving edit mode (dashed outlines and all) now needs
+  // "done editing" inside the panel itself instead, see below.
   $("#edit-toggle").onclick = () => {
-    editingButtons = !editingButtons;
-    document.body.classList.toggle("editing-buttons", editingButtons);
-    $("#edit-toggle").textContent = editingButtons ? "✓" : "✎";
-    $("#edit-panel").classList.toggle("on", editingButtons);
-    $("#edit-panel").classList.remove("peeking");   // safety: never leave it stuck hidden
+    if (!editingButtons) {
+      editingButtons = true;
+      editPanelHidden = false;
+      document.body.classList.add("editing-buttons");
+      $("#edit-toggle").textContent = "✓";
+      $("#edit-panel").classList.add("on");
+      updateEditPanelVisibility();
+      updateGridOverlay();
+      renderEditList();
+      renderLayoutList();
+      return;
+    }
+    editPanelHidden = !editPanelHidden;
+    updateEditPanelVisibility();
+  };
+  $("#edit-done").onclick = () => {
+    editingButtons = false;
+    editPanelHidden = false;
+    document.body.classList.remove("editing-buttons");
+    $("#edit-toggle").textContent = "✎";
+    $("#edit-panel").classList.remove("on");
+    updateEditPanelVisibility();
     updateGridOverlay();
-    if (editingButtons) { renderEditList(); renderLayoutList(); }
-    else selectEditable(null);
+    selectEditable(null);
   };
 
   // Restored once, here, rather than at the top-level -- the elements

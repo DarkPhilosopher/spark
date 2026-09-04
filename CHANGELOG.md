@@ -14,6 +14,54 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ## Unreleased
 
+### Changed
+
+- **The button drawer moved 8px in from the true left edge of the
+  screen (and picked up fully-rounded corners to match)** — requested
+  from a real phone. It used to sit flush at `left:0`, which is not
+  just an awkward reach right in the corner but can also land in the
+  strip of the screen a phone's own edge-swipe gesture (Android's
+  gesture-nav back swipe, e.g.) claims for itself before a web page
+  ever sees the touch. Inset to the same 8px margin every other
+  floating panel in this file already uses (`#hud`/`#say`/`#minimap`),
+  `env(safe-area-inset-left)` added on top for a phone that has one.
+  The closed-state slide math (`-100% + var(--util)`) is relative to
+  the drawer's own width either way, so the collapsed sliver is still
+  exactly the tab's own width, just starting 8px in instead of flush
+  against the edge. The tab's border-radius went from rounded-on-the-
+  right-only (which made sense flush against the edge, not floating
+  clear of it) to rounded on all four corners, matching the tab; a 6px
+  gap now separates the tab from the bubbles panel when open, since the
+  two are independently rounded floating pieces now rather than one
+  flush block.
+
+- **✎ now shows/hides the button editor's own panel once already
+  editing, instead of only ever turning the whole of edit mode on or
+  off.** Requested from a real phone: tap ✎ to enter edit mode as
+  before, but a second tap no longer leaves edit mode entirely — it
+  just closes the panel (dashed outlines, selection, and dragging all
+  stay active), and the same button, top right, brings it straight back
+  open without losing your place. Actually leaving edit mode moved to a
+  new "✓ done editing" button at the top of the panel itself. Shares its
+  visibility flag with "hide this panel while dragging" (`updateEditPanelVisibility()`,
+  reconciling the two so neither can clobber the other — ending a drag
+  no longer reopens a panel closed manually first, and closing it
+  manually survives the next drag starting and ending).
+
+- **The button editor's list now groups every editable button/bubble/
+  slot under a numbered "button group 001", "002", … heading**, instead
+  of one flat list of everything on the page — the pads, the top bar,
+  the button drawer, and the quickbar each get their own, gathered by
+  matching each entry's uid (`EDIT_GROUPS`) rather than relying on
+  whatever order they happened to register in, so a drawer bubble added
+  or removed can't shuffle a later group's numbering. Anything that
+  matches no known group (there is nothing that currently doesn't,
+  short of a future button nobody's added to the list yet) falls into a
+  final "other" group rather than vanishing or crashing.
+  `tests/edit_groups.test.js` (new, 41 checks): every real uid in the
+  app lands in the group a person would expect, an unrecognised one
+  falls into "other", and no uid matches more than one group.
+
 ### Fixed
 
 - **A button could be dragged (or end up saved) off the edge of the

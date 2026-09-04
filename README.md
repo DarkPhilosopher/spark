@@ -873,6 +873,7 @@ Once `python3 spark.py install` has been run, every one of these works as plain
 | `node tests/deck.test.js` | check the deck's screens and what the box understands |
 | `node tests/mesh_merge.test.js` | check the 3D view's merge-objects-into-one-mesh geometry |
 | `node tests/modal_pages.test.js` | check the 3D view's modals: page navigation, colour/shape pickers, resize/stretch |
+| `node tests/edit_groups.test.js` | check the button editor's list groups every button correctly |
 | `python3 tests/check_docs.py` | check this README still matches the code |
 | `python3 tests/check_sync.py` | check the GitHub push/pull logic |
 | `python3 tests/check_permissions.py` | check guests cannot exceed their code |
@@ -981,6 +982,8 @@ inert, exactly as it would arriving any other way.
     tests/modal_pages.test.js   checks the 3D view's modals: page navigation, colour/shape
                                  pickers, and that resize/stretch/move lost no precision moving
                                  from sliders into buttons-plus-a-box
+    tests/edit_groups.test.js   checks the button editor's list sorts every button into the
+                                 "button group 00N" heading a person would actually expect
     tests/engine_trace.js       runs the JavaScript engine from a terminal, for that test
 
 Two files are **generated** — do not edit them by hand:
