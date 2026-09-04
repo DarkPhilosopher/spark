@@ -16,6 +16,57 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ### Fixed
 
+- **A mental playthrough of the 3D view's controls, tool by tool, turned
+  up three more ergonomic gaps beyond the compass fix below — fixed all
+  three, not just written down:**
+
+  1. **Both thumb-zone pads had dead zones.** `.pad` (the shared grid
+     both `#pad-move` and `#pad-actions` sit in) had `pointer-events:auto`
+     on the whole 3×3 grid, not just its buttons — and neither pad fills
+     all nine cells (pad-move uses 4, pad-actions 5). A swipe starting in
+     one of the empty cells was swallowed by the grid instead of passing
+     through to turn the camera, contradicting the file's own stated
+     design ("the empty space around the pad still passes a swipe
+     straight through"). Moved `pointer-events:auto` onto `.pad button`
+     itself; the empty cells fall through correctly now.
+
+  2. **`#quickbar` and the button drawer's tab could end up under the
+     HUD.** Their 245px/250px top offsets were budgeted against the
+     HUD's size *at the time they were written* (a real number, but a
+     guessed one) rather than measured — the same kind of guess that
+     already broke for `#hud`/`#say` and the compass above once
+     something upstream changed and nobody remembered to bump these
+     too. `syncBarHeight()` (already added for `--bar-h`) now also
+     measures `#hud`/`#say`'s real bottom edge into a `--hud-bottom`
+     custom property, re-measured on resize/orientationchange and
+     whenever the HUD's own line count changes (score/health/tick, plus
+     an optional "near" line) — `#quickbar`/the drawer's `top` is now
+     `max(245px/250px, --hud-bottom + 8px)`, so a HUD grown taller than
+     the original budget expected pushes them down instead of sitting
+     under it unnoticed.
+
+  3. **Merge (🧬) armed was invisible once you closed the drawer, and
+     wasn't cancelled by closing it either — inconsistent with Remove
+     (🗑), which is both.** Tapping 🧬 to arm it, then closing the
+     drawer without tapping 🧬 again, left `mergeArmed` silently true:
+     the *next* object tapped anywhere would still queue for merging
+     instead of opening the Inspector, with only a small green ring (if
+     any objects were already queued) to explain why. Fixed two ways:
+     closing the drawer now cancels an armed merge the same way it
+     already cancelled an armed remove (a plain reset, not
+     `toggleMerge()` — that would try to *complete* the merge instead of
+     cancel it); and while the drawer is open, the 🧬 bubble itself now
+     pulses (a new, generalized `.bubble.armed` style, reusing remove's
+     existing `.control.remove.armed` pulse *idea* without redefining
+     its red colouring) for as long as `mergeArmed` is true, the same
+     immediate feedback Remove's own bubble already had and Merge did
+     not.
+
+  All three found and fixed by reasoning through the actual DOM/CSS/JS,
+  not from a screenshot — validated with `node --check` and a full
+  `html.parser` pass; not one of them has been seen working on a real
+  screen yet.
+
 - **The compass overlapped the top bar's title/badge in portrait (and
   landscape) — it sat at a flat 8px from the top of the screen, which
   was only ever clear of the bar while the bar had a single row.** Once

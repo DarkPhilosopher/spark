@@ -29,11 +29,14 @@
     --glass-btn: rgba(102,109,118,.6);     /* pad/side/tab/bubble backgrounds */
     --overlay-text: rgba(74,80,88,.85);    /* HUD/say floating text backgrounds */
     --modal-bg: rgba(74,80,88,.96);        /* Mesh Creator / Build / Inspector backgrounds */
-    /* The top bar's own real height, kept current by syncBarHeight() (JS)
-       -- see the comment on #hud below for why this is measured rather
-       than another guessed constant. This value only matters for the
-       first frame or two before JS has measured anything for real. */
+    /* The top bar's own real height, and the real bottom edge of whichever
+       of #hud/#say is currently taller, both kept current by
+       syncBarHeight() (JS) -- see the comment on #hud below, and on
+       #quickbar/.drawer, for why these are measured rather than more
+       guessed constants. These starting values only matter for the first
+       frame or two before JS has measured anything for real. */
     --bar-h: 194px;
+    --hud-bottom: 0px;
   }
   *{box-sizing:border-box}
   html,body{height:100%}
@@ -152,10 +155,18 @@
      combined one's per-key size was). Half transparent and blurred, so
      each reads as floating over the environment rather than a solid panel
      sitting beside it. */
+  /* pointer-events:auto on the buttons themselves, not the grid -- neither
+     pad fills all nine cells (pad-move uses 4, pad-actions 5), and the
+     grid container used to catch pointer-events across its own empty
+     cells too, turning them into dead zones a swipe could not pass
+     through -- exactly what "the empty space passes a swipe straight
+     through to the camera" (see #controls above) already promised
+     everywhere else on screen, just not actually true here. */
   .pad{display:grid;width:var(--pad);height:var(--pad);
        grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);
-       gap:3%;pointer-events:auto}
+       gap:3%}
   .pad button{width:100%;height:100%;min-width:0;min-height:0;padding:0;
+              pointer-events:auto;
               border-radius:18%;font-size:calc(var(--pad) * 0.115);
               background:rgba(102,109,118,.55);border-color:rgba(131,138,148,.6);
               backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
@@ -206,10 +217,16 @@
      "low-left" isn't actually clear of it either. This band -- below the
      HUD, above where a portrait pad's top edge lands -- is clear in both
      orientations (landscape keeps the whole left half free of the pad,
-     which sits on the right there, regardless of height). */
-  .drawer[data-edge="left"]{top:calc(250px + env(safe-area-inset-top));left:0;
-                             flex-direction:row;
-                             transform:translate(calc(-100% + var(--util)), 0)}
+     which sits on the right there, regardless of height). 250px, like
+     #quickbar's 245px, was budgeted against the HUD's size at the time
+     rather than measured -- see the long comment there for why this now
+     also has a measured --hud-bottom floor under it, so a HUD grown
+     taller than that budget expected can't push up underneath this tab
+     unnoticed. */
+  .drawer[data-edge="left"]{
+      top:max(calc(250px + env(safe-area-inset-top)), calc(var(--hud-bottom, 0px) + 8px));
+      left:0;flex-direction:row;
+      transform:translate(calc(-100% + var(--util)), 0)}
   .drawer[data-edge="left"].open{transform:translate(0, 0)}
   .drawer .tab{width:var(--util);height:var(--util);flex:0 0 auto;
                display:flex;align-items:center;justify-content:center;
@@ -253,6 +270,14 @@
           transition:transform .12s,background .12s}
   .bubble:active{transform:scale(.88)}
   .bubble.selected{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent) inset}
+  /* Same "waiting, not acting yet" idea as remove's own .armed below,
+     generalized to any bubble whose onTap arms an ongoing mode rather
+     than acting immediately (🧬 merge, currently) -- .selected alone
+     already fades to looking like "whichever bubble I tapped last",
+     which does not actually say a mode is still open and taps in the
+     world are being routed differently right now. */
+  .bubble.armed{background:var(--accent);color:var(--bg);border-color:var(--accent);
+               animation:pulse 1s ease-in-out infinite}
   .bubble.control{margin-top:6px;font-weight:700}
   .bubble.control.add{color:var(--good);border-color:var(--good)}
   .bubble.control.remove{color:var(--bad);border-color:var(--bad)}
@@ -471,9 +496,21 @@
 
   /* Quickbar -- a fixed row of plain bubble slots, always visible, no tab
      to open first. Reuses the drawer's own .bubble look for consistency,
-     but is not a drawer: nothing here slides. 245px clears the HUD (which
-     itself starts at 160px, now that the top bar has two button rows). */
-  #quickbar{position:fixed;top:calc(245px + env(safe-area-inset-top));
+     but is not a drawer: nothing here slides. 245px was chosen to clear
+     the HUD as it stood at the time (160px start, budgeted for up to
+     about four lines of content) -- a real number, but a guessed one,
+     the same kind of guess that already broke twice elsewhere in this
+     file (see #hud/#say and #compass above) once something upstream
+     changed and nobody remembered to also bump this. --hud-bottom is
+     measured instead (syncBarHeight() below, which despite the name
+     -- kept for history, not renamed for one more variable -- now also
+     measures this): the real bottom edge of whichever of #hud/#say is
+     taller, right now. max() keeps 245px as the floor so this never
+     rises above its intended resting spot on a short, ordinary HUD, but
+     lets it drop lower on demand the moment the HUD actually grows
+     past where 245px assumed it would stop. */
+  #quickbar{position:fixed;
+           top:max(calc(245px + env(safe-area-inset-top)), calc(var(--hud-bottom, 0px) + 8px));
            left:50%;transform:translateX(-50%);z-index:4;
            display:flex;gap:8px;padding:6px}
   #quickbar .bubble{font-size:16px}
@@ -2279,15 +2316,22 @@ function frame() {
 const COMPASS_PX_PER_DEG = 4;
 const COMPASS_NAMES = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
 
-// Keeps #hud and #say (see their CSS, --bar-h) clear of the top bar
-// regardless of how tall the bar currently is -- its title row, both
-// button rows, and now the compass too. Called once at boot and again on
-// every resize/orientationchange, the same events the camera's own
-// re-framing already listens for, so this can't go stale the way a fixed
-// pixel guess already has twice.
+// Keeps #hud/#say clear of the top bar (--bar-h), and #quickbar/the
+// drawer clear of #hud/#say in turn (--hud-bottom) -- regardless of how
+// tall the bar currently is (title row, both button rows, the compass),
+// or how many lines the HUD currently has (score/health/tick, plus an
+// optional "near" line -- see drawHud()). Called on load and on every
+// resize/orientationchange (the same events the camera's own re-framing
+// already listens for), and again from drawHud() itself whenever the
+// HUD's own line count changes, so none of this can go stale the way a
+// fixed pixel guess already has more than once in this file.
 function syncBarHeight() {
   const h = $("#bar").getBoundingClientRect().height;
   if (h > 0) document.documentElement.style.setProperty("--bar-h", h + "px");
+  const hudBottom = $("#hud").getBoundingClientRect().bottom;
+  const sayBottom = $("#say").getBoundingClientRect().bottom;
+  document.documentElement.style.setProperty(
+    "--hud-bottom", Math.max(hudBottom, sayBottom, 0) + "px");
 }
 
 function setupCompass() {
@@ -2342,6 +2386,12 @@ function drawGlyphs(things) {
     labelPool[i].style.display = "none";
 }
 
+// How many lines #hud/#say last had -- drawHud() runs every tick, but
+// re-measuring their real height (a forced layout reflow) is only worth
+// doing when that could actually have changed, not 60 times a second for
+// nothing. See syncBarHeight()'s own comment for what this feeds.
+let lastHudShape = "";
+
 function drawHud() {
   const hud = currentHud();
   if (!hud) return;
@@ -2355,6 +2405,9 @@ function drawHud() {
   $("#say").textContent = hud.status
     ? (hud.status === "win" ? "YOU WON" : "YOU LOST")
     : (hud.message || "");
+
+  const shape = bits.length + "|" + ($("#say").textContent ? "1" : "0");
+  if (shape !== lastHudShape) { lastHudShape = shape; syncBarHeight(); }
 }
 
 // What's within touch range right now -- the same range-1 reach the touch
@@ -4111,6 +4164,7 @@ function makeDrawer({edge = "left", buttons = []}) {
     list.forEach((b, i) => {
       const el = bubbleEl(b.icon || "?", b.label || "");
       el.classList.toggle("selected", i === selected);
+      el.classList.toggle("armed", !!(b.armed && b.armed()));
       el.addEventListener("click", (e) => {
         e.stopPropagation();
         if (editingButtons) return;   // the button editor owns taps for now
@@ -4130,6 +4184,12 @@ function makeDrawer({edge = "left", buttons = []}) {
         selected = i;
         render();
         if (b.onTap) b.onTap();
+        // Rendered again after onTap() runs, not just before -- the first
+        // render is for instant tap feedback (the selected ring); this
+        // one is so a bubble whose onTap arms an ongoing mode (b.armed,
+        // e.g. 🧬 merge) picks up its pulsing state right away instead of
+        // only on whatever bubble happens to be tapped next.
+        render();
       });
       // Registered on every render, not just once -- the drawer rebuilds
       // this element from scratch each time, and registerEditable both
@@ -4176,6 +4236,14 @@ function makeDrawer({edge = "left", buttons = []}) {
     drawerOpen = v;
     root.classList.toggle("open", drawerOpen);
     if (!v && removing) { removing = false; render(); }   // closing cancels it
+    // Merge armed (🧬) the same way -- was only handled for remove above,
+    // so closing the drawer used to leave merge silently armed: the next
+    // object tapped anywhere, drawer closed or not, would still queue for
+    // merging instead of opening the Inspector, with nothing on screen
+    // but a small green ring to explain why. A plain reset, not
+    // toggleMerge() -- that would try to *complete* the merge (prompting
+    // for a name) rather than cancel it.
+    if (!v && mergeArmed) { mergeArmed = false; mergeSelection = []; render(); }
   };
   tab.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -4259,7 +4327,7 @@ window.addEventListener("unhandledrejection",
     // arm it, tap several objects, tap again to combine them into one
     // placeable kind -- see toggleMerge() and the Merge section above.
     {icon: "🧬", label: "merge: tap several objects, tap again to combine them",
-     onTap: () => toggleMerge(), locked: true},
+     onTap: () => toggleMerge(), armed: () => mergeArmed, locked: true},
   ]});
   setupBackpack();
   setupProperties();
