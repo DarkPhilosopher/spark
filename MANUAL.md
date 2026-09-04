@@ -462,6 +462,15 @@ wrong spot after rotating between portrait and landscape, since a couple
 of these layouts are genuinely different shapes rather than just smaller
 or larger versions of one another.
 
+**Portrait and landscape each keep their own arrangement**, not one
+shared between them — customize a button while upright, rotate, and
+whatever you'd set up sideways (or the plain default, the first time)
+is what's there instead; rotate back and portrait's own arrangement is
+exactly as you left it. Nothing extra to do for this — dragging already
+saves, same as always, just into whichever orientation you're actually
+in at the time. "Reset ALL buttons" clears both; "reset this button"
+(singular) only clears the one you're looking at right now.
+
 👁, its own small button at the top right below the bar (not itself
 draggable, on purpose — the one control that should never get lost or
 hidden), hides every other button and panel on screen for an

@@ -67,8 +67,8 @@ function makeNodeRegistry() {
   return nodes;
 }
 
-function load() {
-  const store = {};
+function load(presetStore) {
+  const store = presetStore || {};
   const nodes = makeNodeRegistry();
   const globals = {
     $: sel => nodes[sel] || {value: "", textContent: "", classList: {toggle() {}, add() {}, remove() {}}},
@@ -84,6 +84,8 @@ function load() {
       applyButtonStyle, syncButtonPositions, clampToScreen, snapElementToGrid,
       currentPercent, editableButtons, buttonLayout,
       exitPickMode, updateMiniPopup,
+      currentOrientation, allButtonLayouts, checkOrientationSwitch,
+      getButtonLayout: () => buttonLayout,   // buttonLayout itself gets reassigned on a switch
       setGridLock: v => { gridLockOn = v; },
       setPickMode: v => { pickModeOn = v; },
       getPickMode: () => pickModeOn,
@@ -202,6 +204,62 @@ console.log("\n\"pick on screen\": the floating readout tracks whatever's select
   api.exitPickMode();
   ok("exitPickMode turns pick mode off", api.getPickMode() === false);
   ok("...and hides the readout", !nodes["#edit-mini"].classList.contains("on"));
+}
+
+console.log("\none preset per rotation: portrait and landscape stay independent");
+{
+  const {api} = load();   // window starts at 400x800 -- portrait
+  ok("starts in portrait", api.currentOrientation() === "portrait");
+
+  const uid = "restart";
+  api.editableButtons.set(uid, {el: new FakeButton(0, 0, 40, 40), label: "restart"});
+  // Customize it in portrait.
+  api.getButtonLayout()[uid] = {xPercent: 10, yPercent: 10};
+
+  api.setWindow(800, 400);   // rotate
+  api.checkOrientationSwitch();
+  ok("checkOrientationSwitch flips currentOrientation", api.currentOrientation() === "landscape");
+  ok("buttonLayout now points at the landscape preset, not portrait's",
+     api.getButtonLayout() === api.allButtonLayouts.landscape);
+  ok("landscape has no preset for this button yet -- it's not carried over from portrait",
+     api.getButtonLayout()[uid] === undefined);
+  ok("the element itself was reset (no leftover portrait transform)",
+     api.editableButtons.get(uid).el.style.transform === "");
+
+  // Customize it differently in landscape.
+  api.getButtonLayout()[uid] = {xPercent: 90, yPercent: 90};
+
+  api.setWindow(400, 800);   // rotate back
+  api.checkOrientationSwitch();
+  ok("back to portrait", api.currentOrientation() === "portrait");
+  ok("portrait's own customization is exactly as it was left, untouched by landscape's",
+     api.getButtonLayout()[uid].xPercent === 10 && api.getButtonLayout()[uid].yPercent === 10,
+     api.getButtonLayout()[uid]);
+  ok("landscape's customization is still there too, independently",
+     api.allButtonLayouts.landscape[uid].xPercent === 90);
+}
+
+console.log("\ncheckOrientationSwitch: a plain resize within the same orientation is a no-op");
+{
+  const {api} = load();
+  const before = api.getButtonLayout();
+  api.setWindow(420, 900);   // still portrait, just a different height (address bar, e.g.)
+  api.checkOrientationSwitch();
+  ok("still portrait", api.currentOrientation() === "portrait");
+  ok("buttonLayout is the exact same object, not swapped for nothing",
+     api.getButtonLayout() === before);
+}
+
+console.log("\nan old, pre-preset save (one flat {uid: entry}) migrates into both, once");
+{
+  const oldFlatSave = {"restart": {xPercent: 33, yPercent: 66}};
+  const {api} = load({"spark3d-button-layout": JSON.stringify(oldFlatSave)});
+  ok("portrait picks up the old save", api.allButtonLayouts.portrait.restart.xPercent === 33,
+     api.allButtonLayouts.portrait);
+  ok("landscape picks up the same old save too, not left empty",
+     api.allButtonLayouts.landscape.restart.xPercent === 33, api.allButtonLayouts.landscape);
+  ok("the two are separate copies, not the same object (editing one can't leak into the other)",
+     api.allButtonLayouts.portrait.restart !== api.allButtonLayouts.landscape.restart);
 }
 
 console.log("\n" + pass + " passed, " + fail + " failed");

@@ -14,6 +14,41 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ## Unreleased
 
+### Added
+
+- **Portrait and landscape now keep their own remembered button
+  arrangement, not one shared between them** — requested directly,
+  right after the position-drift fix below: "one [preset] for each
+  screen rotation." Nothing new to press for this: every existing "drag
+  a button" already saved into `buttonLayout`; that's now one of two
+  objects (`allButtonLayouts.portrait`/`.landscape`), and dragging just
+  writes into whichever the device is in *right now*. Rotating swaps
+  which one is active (`checkOrientationSwitch()`, called from the same
+  `onResize()` the position-drift fix's own `syncButtonPositions()`
+  already runs from, on a genuine orientation flip rather than every
+  resize — Chrome's address bar sliding away, e.g., fires plenty of
+  those within the same orientation) and resets every button to that
+  orientation's own preset, or its plain default if nothing's been
+  customized there yet — not the other orientation's arrangement
+  recomputed against the new screen, which would be a different, wrong
+  thing. A pre-existing save (one flat `{uid: entry}`, from before this)
+  migrates into *both* once, so nobody's already-customized position
+  silently vanishes the first time this runs; from there the two drift
+  independently, same as any other button editor change. "Reset ALL
+  buttons" now clears both presets, not just the one on screen (its
+  confirm text says so); "reset this button" (singular) still only
+  touches whichever orientation you're looking at, on purpose — the
+  narrower reset for anyone who wants that instead.
+
+  `tests/button_position.test.js` extended (+13 checks, 30 total): a
+  rotation swaps to the other preset (not carrying the first
+  orientation's customization over, and not losing it either — it's
+  still there on rotating back), a same-orientation resize is a no-op
+  (same object, not needlessly reset), and the old-save migration
+  copies into both as two genuinely separate objects, not one shared
+  reference. Validated with `node --check`, a full `html.parser` pass,
+  and the full existing suite, all green. Not seen on a real screen yet.
+
 ### Changed
 
 - **The button editor's own panel is eight big buttons plus a box now**,

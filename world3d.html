@@ -2889,14 +2889,64 @@ function bindControls() {
  * ------------------------------------------------------------------- */
 const BUTTON_LAYOUT_KEY = "spark3d-button-layout";
 
-function loadButtonLayout() {
-  try { return JSON.parse(localStorage.getItem(BUTTON_LAYOUT_KEY) || "{}"); }
-  catch (err) { return {}; }
+// Portrait and landscape keep their own remembered arrangement, not one
+// shared between them -- requested directly: "one [preset] for each
+// screen rotation." Nothing extra to press for this: every existing
+// "drag a button" already calls saveButtonLayout() below, which now
+// just writes into whichever of the two the device is in *right now*
+// (see currentOrientation()/checkOrientationSwitch()), so customizing a
+// button while upright never has to fight with (or get silently
+// overwritten by) whatever's customized for sideways, and vice versa.
+const currentOrientation = () =>
+  (window.innerWidth || 0) >= (window.innerHeight || 0) ? "landscape" : "portrait";
+
+function loadAllButtonLayouts() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(BUTTON_LAYOUT_KEY) || "{}");
+    // A save from before per-orientation presets existed is one flat
+    // {uid: entry} object, not {portrait, landscape} -- migrated into
+    // *both*, once, rather than silently discarded, so nobody's existing
+    // customization vanishes the first time this runs. (Each orientation
+    // then drifts independently from there, same as any other button
+    // editor change -- there is no ongoing link between the two.)
+    if (!raw.portrait && !raw.landscape && Object.keys(raw).length) {
+      const copy = JSON.parse(JSON.stringify(raw));
+      return {portrait: raw, landscape: copy};
+    }
+    return {portrait: raw.portrait || {}, landscape: raw.landscape || {}};
+  } catch (err) { return {portrait: {}, landscape: {}}; }
 }
-const buttonLayout = loadButtonLayout();
+const allButtonLayouts = loadAllButtonLayouts();
+// The one actually read/written everywhere else in the button editor --
+// always an alias for one of allButtonLayouts' two objects, swapped by
+// checkOrientationSwitch() on an actual rotation, so nothing else in
+// this file has to know per-orientation presets exist at all.
+let buttonLayout = allButtonLayouts[currentOrientation()];
 function saveButtonLayout() {
-  try { localStorage.setItem(BUTTON_LAYOUT_KEY, JSON.stringify(buttonLayout)); }
+  try { localStorage.setItem(BUTTON_LAYOUT_KEY, JSON.stringify(allButtonLayouts)); }
   catch (err) { /* private mode or storage full -- edits just won't stick */ }
+}
+
+// Called from onResize() -- swaps which of the two preset objects
+// buttonLayout points at the moment the device's own orientation
+// actually flips (not on every resize; Chrome's address bar sliding
+// away fires plenty of those within the same orientation, and those
+// should keep using syncButtonPositions()'s ordinary percent recompute
+// instead, same as always). Every registered button is reset to
+// whatever the *new* orientation's own preset says -- or its plain
+// default, if nothing has been customized for that orientation yet --
+// rather than continuing to show the other orientation's arrangement
+// recomputed against the new screen, which is a different, wrong thing.
+let lastOrientation = currentOrientation();
+function checkOrientationSwitch() {
+  const now = currentOrientation();
+  if (now === lastOrientation) return;
+  lastOrientation = now;
+  buttonLayout = allButtonLayouts[now];
+  for (const [uid, {el}] of editableButtons) {
+    if (buttonLayout[uid]) applyButtonStyle(el, buttonLayout[uid]);
+    else { el.style.transform = ""; el.style.opacity = ""; }
+  }
 }
 
 // Named snapshots of the whole layout, separate from buttonLayout itself
@@ -3370,9 +3420,16 @@ function setupButtonEditor() {
   };
 
   $("#edit-reset-all").onclick = () => {
-    if (!confirm("Reset every button back to its default size, position, "
-                + "and opacity? This cannot be undone.")) return;
-    for (const key of Object.keys(buttonLayout)) delete buttonLayout[key];
+    if (!confirm("Reset every button back to its default size, position, and "
+                + "opacity, in BOTH portrait and landscape? This cannot be undone."))
+      return;
+    // Both presets, not just the one currently on screen -- "reset ALL"
+    // read literally, and #edit-reset (singular, above) already covers
+    // "just this button, just this orientation" for anyone who wants that
+    // narrower reset instead.
+    for (const layout of [allButtonLayouts.portrait, allButtonLayouts.landscape]) {
+      for (const key of Object.keys(layout)) delete layout[key];
+    }
     for (const {el} of editableButtons.values()) {
       el.style.transform = "";
       el.style.opacity = "";
@@ -5207,7 +5264,8 @@ window.addEventListener("unhandledrejection",
   const onResize = () => {
     renderer.resize();
     syncBarHeight();
-    syncButtonPositions();   // re-anchor every custom position to the new screen shape
+    checkOrientationSwitch();   // swap to the other preset first, if this is a real rotation
+    syncButtonPositions();      // then re-anchor every custom position to the new screen shape
     const wide = $("#gl").clientWidth >= $("#gl").clientHeight;
     if (wasWide !== null && wide !== wasWide) renderer.frameBoard();
     wasWide = wide;
