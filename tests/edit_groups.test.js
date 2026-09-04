@@ -38,7 +38,7 @@ console.log("every real uid in the app lands in the group a person would expect"
     ["e", "pad"], ["f", "pad"], ["space", "pad"], ["s", "pad"], ["w", "pad"],
     ["restart", "top bar"], ["recentre", "top bar"], ["fullscreen", "top bar"], ["mode", "top bar"],
     ["save", "top bar"], ["save-as", "top bar"], ["backpack-toggle", "top bar"],
-    ["properties-toggle", "top bar"],
+    ["properties-toggle", "top bar"], ["chat-toggle", "top bar"],
     ["drawer:left:add", "button drawer"], ["drawer:left:remove", "button drawer"],
     ["drawer:left:bub7f3ac21", "button drawer"],
     ["quickbar:0", "quickbar"], ["quickbar:6", "quickbar"],

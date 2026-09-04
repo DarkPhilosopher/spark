@@ -354,6 +354,7 @@ of blocks, with each character's glyph floating over its own block.
 | **⛶** | fullscreen |
 | **🎒** | Backpack, a small virtual file system |
 | **⚙** | Properties — grid-lock status, move speed, an opt-in minimap, and a clock, all driven by the world itself |
+| **💬** | Chat — the exact same conversation the browser editor's own box has, one per hosted game. `/who`, `/clear`, `/help`; anything else is said to the others. `LIVE` mode only — there's nobody else to talk to in a local, single-tab copy |
 | **✎** | the button editor — select, drag, resize, and fade any button here, including the drawer's own |
 | **run here** / **go live** | switches between the running game and this tab's own engine |
 
@@ -453,8 +454,19 @@ can be dragged to a new spot, resized, and faded from the button editor
 of the screen. Anywhere in the world you touch that is not a button turns
 the camera. A drag can never leave a button entirely past an edge of the
 screen with no way back to it — it always keeps a small margin of itself
-reachable, correcting on its own if it ever ends up otherwise (a screen
-resized or rotated after a position was saved, say).
+reachable, correcting on its own if it ever ends up otherwise. A moved
+button's saved position is that percent of the screen, recomputed fresh
+against whatever the screen actually is each time — not a fixed distance
+from wherever it started, which used to leave a customized button in the
+wrong spot after rotating between portrait and landscape, since a couple
+of these layouts are genuinely different shapes rather than just smaller
+or larger versions of one another.
+
+👁, its own small button at the top right below the bar (not itself
+draggable, on purpose — the one control that should never get lost or
+hidden), hides every other button and panel on screen for an
+unobstructed view of the world; tap it again, same button, to bring
+everything back. Doesn't persist — always starts shown again next time.
 
 The button editor's own panel covers most of the screen, which can get in
 the way of seeing exactly where a button lands relative to everything

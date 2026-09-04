@@ -804,7 +804,30 @@ the harvest panel appears, offering pink metal for the wait).
 Build mode, the Inspector, Merge, expanding worlds, and harvesting all only
 work in the local, in-browser engine (`RUNNING HERE`, below) — they edit the
 live JavaScript world directly, which has no meaning for a game somebody
-else is hosting.
+else is hosting. Chat (💬) is the one exception that runs the other way:
+it only means anything in `LIVE` mode, since a local, single-tab copy of
+the game has nobody else in it to talk to. It talks to the exact same
+`api/chat` the browser editor's own box already uses — one shared chat
+per hosted game, not a separate one per client — with a small set of
+text commands (`/who`, `/clear`; `/help` lists them) rather than the
+browser editor's full navigation set, since there is nothing here for
+`/play` or `/editor` to navigate to.
+
+👁, its own small button that always stays put regardless (top right,
+below the bar), hides every other button and panel on screen at once for
+an unobstructed view of the world — tap it again, same button, to bring
+everything back. Not a saved preference: it always starts shown again on
+the next visit rather than a reload looking like every button vanished
+for no reason.
+
+A saved custom button position (dragged in the button editor) is stored
+as a percent of the screen, not a fixed pixel offset, and is recomputed
+against the *current* screen every time it's applied — reported from a
+real phone: every customized button used to drift to the wrong spot on
+rotating between portrait and landscape, since a couple of these layouts
+are genuinely different shapes, not just smaller/larger versions of each
+other, and a fixed pixel offset computed for one made no sense applied to
+the other.
 
 The full control reference, key by key, is in
 [MANUAL.md](MANUAL.md#controls-the-3d-view).
@@ -904,6 +927,8 @@ Once `python3 spark.py install` has been run, every one of these works as plain
 | `node tests/harvest_tiles.test.js` | check give_item/has_item/harvestable in the JavaScript engine |
 | `python3 tests/check_draw_line.py` | check draw_line/world.lines in the Python engine |
 | `node tests/draw_line.test.js` | check draw_line/world.lines and pushLine's own geometry |
+| `node tests/button_position.test.js` | check saved button positions survive a resize/rotation |
+| `node tests/chat.test.js` | check the 3D view's own chat: dedup and command dispatch |
 | `python3 tests/check_docs.py` | check this README still matches the code |
 | `python3 tests/check_sync.py` | check the GitHub push/pull logic |
 | `python3 tests/check_permissions.py` | check guests cannot exceed their code |
@@ -1020,6 +1045,10 @@ inert, exactly as it would arriving any other way.
                                  against the same cases tests/check_harvest.py runs in Python
     tests/draw_line.test.js     checks draw_line/world.lines against check_draw_line.py's own
                                  cases, plus pushLine's own vertex/normal geometry
+    tests/button_position.test.js  checks a saved custom button position lands at the same
+                                 percent of the screen after a simulated resize/rotation
+    tests/chat.test.js          checks the 3D view's own chat: dedup (never your own line
+                                 twice) and /word command dispatch
     tests/engine_trace.js       runs the JavaScript engine from a terminal, for that test
 
 Two files are **generated** — do not edit them by hand:

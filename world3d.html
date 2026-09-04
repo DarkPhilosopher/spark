@@ -225,6 +225,30 @@
                border-radius:14px}
   .drawer .tab span{transition:transform .25s;display:block}
   .drawer.open .tab span{transform:rotate(180deg)}
+
+  /* Same safe vertical band the drawer's own tab uses (below the bar/HUD,
+     above the pad, clear in both orientations), mirrored onto the right
+     edge instead of the left -- a dedicated, always-visible spot nothing
+     else claims. Not part of #bar, so body.ui-hidden (below) can hide
+     every *other* button/panel without hiding the one control that
+     brings them all back. */
+  #ui-toggle{position:fixed;
+      top:max(calc(250px + env(safe-area-inset-top)), calc(var(--hud-bottom, 0px) + 8px));
+      right:calc(8px + env(safe-area-inset-right));z-index:8;
+      width:var(--util);height:var(--util);min-width:0;min-height:0;padding:0;
+      display:flex;align-items:center;justify-content:center;
+      background:var(--glass-btn);border:1px solid var(--line);
+      color:var(--accent);font-size:18px;border-radius:14px;
+      backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+  #ui-toggle.on{color:var(--bad);border-color:var(--bad)}
+  /* Everything else -- every other floating panel/overlay in the file --
+     hidden while body carries this class. #ui-toggle itself is
+     deliberately not in this list. #bar takes the compass with it,
+     nested inside it (see its own CSS comment for why it lives there). */
+  body.ui-hidden #bar, body.ui-hidden #controls, body.ui-hidden .drawer,
+  body.ui-hidden #quickbar, body.ui-hidden #hud, body.ui-hidden #say,
+  body.ui-hidden #minimap, body.ui-hidden #harvest-panel,
+  body.ui-hidden #select-highlight, body.ui-hidden #merge-highlights{display:none}
   /* flex-direction:column *and* flex-wrap:wrap: a plain vertical list has
      no limit on how tall it gets, so a handful of custom bubbles (added
      with the + control) used to push the bottom ones -- often literally
@@ -373,16 +397,32 @@
      Backpack used to be a deliberate Windows-Explorer-styled exception
      (see CHANGELOG); folded into the same shell and theme on request. */
   #backpack-modal,#properties-modal,#mesh-modal,#palette-modal,#inspect-modal,
-  #inventory-modal{
+  #inventory-modal,#chat-modal{
       position:fixed;inset:6vh 6vw;z-index:17;display:none;flex-direction:column;
       background:var(--modal-bg);border:1px solid var(--line);border-radius:12px;
       overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.35);
       backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
   #backpack-modal.on,#properties-modal.on,#mesh-modal.on,#palette-modal.on,
-  #inspect-modal.on,#inventory-modal.on{display:flex}
+  #inspect-modal.on,#inventory-modal.on,#chat-modal.on{display:flex}
   /* Inventory has no .mgrid/.mkeys -- nothing to act on, just a list --
      so its box needs the margin .mgrid would otherwise have given it. */
   #inventory-box{margin:10px;flex:1 1 auto;overflow-y:auto;touch-action:pan-y}
+
+  /* Chat: a scrolling log filling most of the modal, a typed line and a
+     send button pinned under it -- the one panel here shaped like a
+     conversation instead of a tool. */
+  #chat-log{flex:1 1 auto;margin:10px 10px 0;overflow-y:auto;touch-action:pan-y;
+            display:flex;flex-direction:column;gap:4px;font-size:13px}
+  .chat-line{padding:4px 2px;word-break:break-word}
+  .chat-line .who{color:var(--accent);font-weight:700;margin-right:6px}
+  .chat-line.mine .who{color:var(--good)}
+  .chat-line.sys{color:var(--dim);font-style:italic}
+  .chat-line.bad{color:var(--bad)}
+  #chat-input-row{flex:0 0 auto;display:flex;gap:8px;padding:10px}
+  #chat-input{flex:1;min-width:0;font:inherit;color:var(--ink);
+             background:var(--glass-input);border:1px solid var(--line);
+             border-radius:8px;padding:8px 10px;min-height:40px}
+  #chat-send{flex:0 0 auto;min-height:40px;padding:8px 16px}
   .modal-titlebar{display:flex;align-items:center;gap:8px;padding:12px 14px;
                   font-weight:700;border-bottom:1px solid var(--line);flex:0 0 auto}
   .modal-titlebar span{margin-right:auto;overflow:hidden;text-overflow:ellipsis;
@@ -611,6 +651,7 @@
       <button id="save-as" data-editable title="save as a new 3d world file">new</button>
       <button id="backpack-toggle" data-editable title="backpack">🎒</button>
       <button id="properties-toggle" data-editable title="properties">⚙</button>
+      <button id="chat-toggle" data-editable title="chat">💬</button>
       <button id="edit-toggle" title="edit buttons: select, drag, resize, fade">✎</button>
     </div>
     <!-- Which way the camera is facing, not the character -- a meter, not
@@ -628,6 +669,14 @@
   <div id="hud"></div>
   <div id="say"></div>
 </div>
+
+<!-- Hides every other button/panel on screen for a clean, unobstructed
+     view of the world -- this one stays put and visible regardless (not
+     data-editable, on purpose: the one thing that should never itself
+     get lost or hidden), tap it again to bring everything back. Not
+     data-editable and not affected by body.ui-hidden itself -- see its
+     own CSS and setupUiToggle(). -->
+<button id="ui-toggle" title="hide/show all buttons">👁</button>
 
 <div id="controls">
   <!-- One pad again, not two -- back to a single combined block on
@@ -804,6 +853,26 @@
     <button id="inventory-close" title="close">✕</button>
   </div>
   <div class="mbox" id="inventory-box"></div>
+</div>
+
+<!-- Chat -- the opposite of everything else on this list: only makes
+     sense in LIVE mode (there is nobody else to talk to in a local,
+     single-tab copy of the game), where every other panel here is local
+     play only. Same api/chat the browser editor's own box already talks
+     to (see index.html's runSaid/sendChat) -- one shared chat per hosted
+     game, not a separate one per client. A handful of text commands,
+     not the browser editor's full navigation set (there is nothing here
+     for /play or /editor to navigate to). -->
+<div id="chat-modal">
+  <div class="modal-titlebar">
+    <span>💬 Chat</span>
+    <button id="chat-close" title="close">✕</button>
+  </div>
+  <div id="chat-log"></div>
+  <div id="chat-input-row">
+    <input id="chat-input" type="text" placeholder="/help, or say something…" maxlength="300">
+    <button id="chat-send">send</button>
+  </div>
 </div>
 
 <!-- Mesh Creator: build a custom multi-part shape (a cube here, a sphere
@@ -2376,6 +2445,7 @@ async function poll() {
     if (!live || (liveSnapshot &&
         (liveSnapshot.w !== snap.w || liveSnapshot.h !== snap.h))) startLive(snap);
     else liveSnapshot = snap;
+    showNewChat();   // chat rides along with the world snapshot, same as index.html
     if (pressed.size) {
       const keys = [...pressed];
       pressed.clear();
@@ -2844,19 +2914,55 @@ function loadButtonLayoutByName(name) {
   drawerToast('loaded "' + name + '"');
 }
 
+// A saved custom position is a target percent of the *viewport* (0,0 top
+// left, 100,100 bottom right -- the same numbers "go to x%, y%" already
+// shows), not a fixed pixel offset the way this used to work. Reported
+// from a real phone: every button drifted to the wrong spot on rotating
+// the screen, because the old dx/dy was computed once, in pixels, from
+// wherever the button's plain grid/flex position happened to be *that*
+// orientation -- rotating changes both the viewport size and, for
+// several of these buttons, that plain position outright (the pad's
+// own justify-content flips between portrait and landscape, e.g.), so
+// the same fixed pixel offset landed on top of a completely different
+// starting point. Recomputed fresh every time this runs instead: clear
+// any existing transform, measure where the button's plain position
+// actually is *right now*, then set exactly the offset needed to reach
+// the saved percent from there. Costs a forced layout read each call,
+// the same trade every other position helper in this file (clampToScreen,
+// snapElementToGrid, currentPercent) already makes, and only runs on
+// discrete events -- a drag, a load, a resize -- never every frame.
 function applyButtonStyle(btn, entry) {
-  const dx = entry.dx || 0, dy = entry.dy || 0;
   const scale = entry.scale || 1;
   const opacity = entry.opacity === undefined ? 1 : entry.opacity;
-  btn.style.transform = `translate(${dx}px, ${dy}px) scale(${scale})`;
   btn.style.opacity = String(opacity);
+  if (entry.xPercent === undefined || entry.yPercent === undefined) {
+    btn.style.transform = `scale(${scale})`;
+    return;
+  }
+  btn.style.transform = "";
+  const rect = btn.getBoundingClientRect();
+  const w = window.innerWidth || 1, h = window.innerHeight || 1;
+  const dx = (entry.xPercent / 100) * w - (rect.left + rect.width / 2);
+  const dy = (entry.yPercent / 100) * h - (rect.top + rect.height / 2);
+  btn.style.transform = `translate(${dx}px, ${dy}px) scale(${scale})`;
+}
+
+// Re-applies every saved custom position -- see applyButtonStyle's own
+// comment for why this has to happen again, not just once at load, on
+// every resize/orientationchange (the same events the camera's own
+// re-framing and syncBarHeight() already listen for).
+function syncButtonPositions() {
+  for (const [uid, entry] of Object.entries(buttonLayout)) {
+    const known = editableButtons.get(uid);
+    if (known) applyButtonStyle(known.el, entry);
+  }
 }
 
 // uid -> {el, label}. Every currently-existing editable button, kept in
 // sync as the drawer adds/removes/rebuilds its own -- see registerEditable.
 const editableButtons = new Map();
 let editSelected = null;      // uid, or null
-let editDragging = null;      // {uid, x, y, dx, dy}, or null
+let editDragging = null;      // {uid, x, y, startCx, startCy}, or null
 let gridLockOn = false;       // dragging (and "go to x%, y%") snap to a grid
 let hideWhileDragging = true;  // the edit panel itself hides for the length of a drag
 let editPanelHidden = false;  // manually closed via ✎ while still editing -- see updateEditPanelVisibility
@@ -2901,47 +3007,40 @@ function updateGridOverlay() {
   overlay.style.backgroundSize = size + " " + size;
 }
 
-// Whatever put a button here -- its own normal grid/flex position, a
-// dx/dy saved from a previous session, or mid-drag right now -- keeps at
-// least a corner of it reachable rather than letting it end up entirely
-// past an edge of the screen with no way back to it short of "reset all
-// buttons" below (which throws away every other customization too, not
-// just this one button's). Same "measure the real rect, correct dx/dy by
-// however far off that is" approach as snapElementToGrid just below.
+// Keeps the saved target percent itself a safe distance from every edge,
+// so a button's centre can never end up past an edge of the screen with
+// no way back to it short of "reset all buttons" below (which throws
+// away every other customization too, not just this one button's).
 // Applied both live while dragging (so a button can't be dragged fully
 // off in the first place) and once on every load (so a position saved
-// off-screen before this existed -- or from a screen this button's
-// current position has never actually been seen on -- self-corrects the
-// next time the page opens, instead of staying stuck there forever).
+// off-screen before this existed self-corrects the next time the page
+// opens, instead of staying stuck there forever) -- recomputed against
+// the current window size either way, so it's exactly as
+// orientation-safe as applyButtonStyle's own percent-based positioning.
 function clampToScreen(el, entry) {
-  const rect = el.getBoundingClientRect();
+  if (entry.xPercent === undefined) return;
+  const margin = 24;   // the centre stays at least this many px from any edge
   const w = window.innerWidth || 1, h = window.innerHeight || 1;
-  const margin = 24;   // this much of the button always stays on screen
-  let ddx = 0, ddy = 0;
-  if (rect.right < margin) ddx = margin - rect.right;
-  else if (rect.left > w - margin) ddx = (w - margin) - rect.left;
-  if (rect.bottom < margin) ddy = margin - rect.bottom;
-  else if (rect.top > h - margin) ddy = (h - margin) - rect.top;
-  if (ddx || ddy) {
-    entry.dx = (entry.dx || 0) + ddx;
-    entry.dy = (entry.dy || 0) + ddy;
+  const minXP = (margin / w) * 100, maxXP = 100 - minXP;
+  const minYP = (margin / h) * 100, maxYP = 100 - minYP;
+  const x = Math.max(minXP, Math.min(maxXP, entry.xPercent));
+  const y = Math.max(minYP, Math.min(maxYP, entry.yPercent));
+  if (x !== entry.xPercent || y !== entry.yPercent) {
+    entry.xPercent = x; entry.yPercent = y;
     applyButtonStyle(el, entry);
     saveButtonLayout();   // so a correction on load doesn't need re-earning on every reload
   }
 }
 
-// After a drag moves a button, nudge it the rest of the way to the
-// nearest grid intersection -- same "measure the real rect, work out how
-// far off target that is, add the difference to dx/dy" approach as
-// "go to x%, y%", just run continuously while dragging instead of once.
+// After a drag moves a button, nudge the saved target percent the rest
+// of the way to the nearest grid intersection -- direct now (both are
+// already percent), not the "measure the real rect, work out how far
+// off target that is" math this needed back when the stored value was a
+// pixel offset instead.
 function snapElementToGrid(el, entry) {
-  if (!gridLockOn) return;
-  const pos = currentPercent(el);
-  const targetXPercent = snapVal(pos.x), targetYPercent = snapVal(pos.y);
-  const rect = el.getBoundingClientRect();
-  const w = window.innerWidth || 1, h = window.innerHeight || 1;
-  entry.dx += (targetXPercent / 100) * w - (rect.left + rect.width / 2);
-  entry.dy += (targetYPercent / 100) * h - (rect.top + rect.height / 2);
+  if (!gridLockOn || entry.xPercent === undefined) return;
+  entry.xPercent = snapVal(entry.xPercent);
+  entry.yPercent = snapVal(entry.yPercent);
   applyButtonStyle(el, entry);
 }
 
@@ -3000,7 +3099,8 @@ const EDIT_GROUPS = [
   {name: "pad", match: uid =>
     ["up", "left", "right", "down", "e", "f", "space", "s", "w"].includes(uid)},
   {name: "top bar", match: uid => ["restart", "recentre", "fullscreen", "mode", "save",
-                                    "save-as", "backpack-toggle", "properties-toggle"].includes(uid)},
+                                    "save-as", "backpack-toggle", "properties-toggle",
+                                    "chat-toggle"].includes(uid)},
   {name: "button drawer", match: uid => uid.startsWith("drawer:")},
   {name: "quickbar", match: uid => uid.startsWith("quickbar:")},
 ];
@@ -3059,16 +3159,28 @@ function registerEditable(el, uid, label) {
     e.preventDefault();
     e.stopPropagation();
     selectEditable(uid);
-    const entry = buttonLayout[uid] || (buttonLayout[uid] = {});
-    editDragging = {uid, x: e.clientX, y: e.clientY, dx: entry.dx || 0, dy: entry.dy || 0};
+    buttonLayout[uid] || (buttonLayout[uid] = {});
+    // Where this button's centre actually renders right now (already
+    // wherever any earlier custom position put it, if anywhere) -- the
+    // drag adds screen-pixel movement to this starting point and turns
+    // the running total into a percent on every move (see pointermove),
+    // percent being what's actually saved.
+    const rect = el.getBoundingClientRect();
+    editDragging = {
+      uid, x: e.clientX, y: e.clientY,
+      startCx: rect.left + rect.width / 2, startCy: rect.top + rect.height / 2,
+    };
     el.setPointerCapture(e.pointerId);
     updateEditPanelVisibility();
   });
   el.addEventListener("pointermove", e => {
     if (!editDragging || editDragging.uid !== uid) return;
     const entry = buttonLayout[uid];
-    entry.dx = editDragging.dx + (e.clientX - editDragging.x);
-    entry.dy = editDragging.dy + (e.clientY - editDragging.y);
+    const w = window.innerWidth || 1, h = window.innerHeight || 1;
+    const cx = editDragging.startCx + (e.clientX - editDragging.x);
+    const cy = editDragging.startCy + (e.clientY - editDragging.y);
+    entry.xPercent = (cx / w) * 100;
+    entry.yPercent = (cy / h) * 100;
     applyButtonStyle(el, entry);
     snapElementToGrid(el, entry);
     clampToScreen(el, entry);   // can't be dragged fully past an edge, either
@@ -3125,15 +3237,8 @@ function setupButtonEditor() {
     if (!editSelected) return;
     const el = editableButtons.get(editSelected).el;
     const entry = buttonLayout[editSelected] || (buttonLayout[editSelected] = {});
-    const xPercent = snapVal(Math.max(0, Math.min(100, parseFloat($("#edit-x").value) || 0)));
-    const yPercent = snapVal(Math.max(0, Math.min(100, parseFloat($("#edit-y").value) || 0)));
-    const rect = el.getBoundingClientRect();
-    const curCentreX = rect.left + rect.width / 2;
-    const curCentreY = rect.top + rect.height / 2;
-    const targetX = (xPercent / 100) * window.innerWidth;
-    const targetY = (yPercent / 100) * window.innerHeight;
-    entry.dx = (entry.dx || 0) + (targetX - curCentreX);
-    entry.dy = (entry.dy || 0) + (targetY - curCentreY);
+    entry.xPercent = snapVal(Math.max(0, Math.min(100, parseFloat($("#edit-x").value) || 0)));
+    entry.yPercent = snapVal(Math.max(0, Math.min(100, parseFloat($("#edit-y").value) || 0)));
     applyButtonStyle(el, entry);
     saveButtonLayout();
     const pos = currentPercent(el);   // read back the real result, not just echo the typed numbers
@@ -4610,6 +4715,126 @@ function setupInventory() {
   $("#inventory-close").onclick = () => $("#inventory-modal").classList.remove("on");
 }
 
+/* Hides every other button/panel on screen (see body.ui-hidden's own CSS)
+ * for a clean, unobstructed view of the world -- a screenshot mode, in
+ * effect, not a persisted preference: always starts shown again on the
+ * next load rather than leaving a reload looking like every button
+ * vanished for no visible reason. */
+function setupUiToggle() {
+  $("#ui-toggle").onclick = () => {
+    if (editingButtons) return;   // the button editor owns taps for now
+    const hidden = document.body.classList.toggle("ui-hidden");
+    $("#ui-toggle").classList.toggle("on", hidden);
+    $("#ui-toggle").textContent = hidden ? "🙈" : "👁";
+  };
+}
+
+/* ---------------------------------------------------------------------
+ * Chat -- the opposite of everything else in this file: only makes
+ * sense in LIVE mode, since a local, single-tab copy of the game has
+ * nobody else in it to talk to. Talks to the exact same api/chat the
+ * browser editor's own box already uses (see index.html's runSaid/
+ * sendChat/showNewChat, which this deliberately mirrors) -- one shared
+ * chat per hosted game, arriving already folded into the same snapshot
+ * poll() already polls for everything else, so this needs no polling of
+ * its own. A handful of text commands, not the browser editor's full
+ * navigation set -- there is nothing here for /play or /editor to
+ * navigate to.
+ * ------------------------------------------------------------------- */
+let seenChat = 0;   // the highest chat line "n" already shown
+
+function chatLine(who, text, cls) {
+  const log = $("#chat-log");
+  const line = document.createElement("div");
+  line.className = "chat-line" + (cls ? " " + cls : "");
+  if (who) {
+    const whoEl = document.createElement("span");
+    whoEl.className = "who";
+    whoEl.textContent = who + ":";
+    line.appendChild(whoEl);
+    line.appendChild(document.createTextNode(" " + text));
+  } else {
+    line.textContent = text;
+  }
+  log.appendChild(line);
+  log.scrollTop = log.scrollHeight;
+  while (log.children.length > 200) log.firstChild.remove();
+}
+
+// Called every poll() -- chat rides along with the world snapshot the
+// same way index.html's own showNewChat() already works from, so this
+// needs no separate fetch of its own, live mode or not.
+function showNewChat() {
+  if (!live || !liveSnapshot) return;
+  const myName = (liveSnapshot.you && liveSnapshot.you.name) || "";
+  for (const line of liveSnapshot.chat || []) {
+    if (line.n <= seenChat) continue;
+    seenChat = line.n;
+    if (line.who === myName) continue;   // already shown when we sent it
+    chatLine(line.who, line.text);
+  }
+}
+
+async function sendChatText(text) {
+  if (!live) { chatLine("", "chat needs the server running", "bad sys"); return; }
+  const res = await fetch("api/chat", {
+    method: "POST",
+    headers: {"Content-Type": "application/json", ...authHeaders()},
+    body: JSON.stringify({text}),
+  }).catch(() => null);
+  if (!res || !res.ok) { chatLine("", "could not say that", "bad sys"); return; }
+  const myName = (liveSnapshot && liveSnapshot.you && liveSnapshot.you.name) || "you";
+  chatLine(myName, text, "mine");
+}
+
+const CHAT_COMMANDS = {
+  help() {
+    chatLine("", "/who — who is connected.  /clear — empty this log", "sys");
+    chatLine("", "anything else is said to the others, if the server is running", "sys");
+  },
+  who() {
+    const people = (liveSnapshot && liveSnapshot.people) || [];
+    if (!people.length) { chatLine("", "nobody else is connected", "sys"); return; }
+    for (const p of people) chatLine("", p.name + " — " + p.role, "sys");
+  },
+  clear() { $("#chat-log").textContent = ""; },
+};
+
+async function runChatSaid(said) {
+  said = said.trim();
+  if (!said) return;
+  if (!said.startsWith("/")) { await sendChatText(said); return; }
+  const cut = said.indexOf(" ");
+  const word = (cut < 0 ? said.slice(1) : said.slice(1, cut)).toLowerCase();
+  const fn = CHAT_COMMANDS[word];
+  if (!fn) { chatLine("", "no such command: /" + word + " — try /help", "bad sys"); return; }
+  await fn();
+}
+
+function openChat() {
+  $("#chat-modal").classList.add("on");
+  if (!live) chatLine("", "chat needs the server running -- switch to \"go live\" first", "sys");
+  $("#chat-input").focus();
+}
+
+function setupChat() {
+  $("#chat-toggle").onclick = () => {
+    if (editingButtons) return;   // the button editor owns taps for now
+    openChat();
+  };
+  $("#chat-close").onclick = () => $("#chat-modal").classList.remove("on");
+  const send = () => {
+    const input = $("#chat-input");
+    const text = input.value;
+    input.value = "";
+    runChatSaid(text);
+  };
+  $("#chat-send").onclick = send;
+  $("#chat-input").addEventListener("keydown", e => {
+    if (e.key === "Enter") send();
+  });
+}
+
 /* Quickbar -- a fixed row of plain bubble slots, always visible, no tab
  * to slide open first (that's what the drawer is for). Each slot is
  * still a real [data-editable] button, so it can be dragged/resized/
@@ -4842,6 +5067,8 @@ window.addEventListener("unhandledrejection",
   setupCompass();
   setupHarvest();
   setupInventory();
+  setupUiToggle();
+  setupChat();
   makeQuickbar(7);
 
   // Turning the phone swaps which region is which shape, and a camera framed
@@ -4852,6 +5079,7 @@ window.addEventListener("unhandledrejection",
   const onResize = () => {
     renderer.resize();
     syncBarHeight();
+    syncButtonPositions();   // re-anchor every custom position to the new screen shape
     const wide = $("#gl").clientWidth >= $("#gl").clientHeight;
     if (wasWide !== null && wide !== wasWide) renderer.frameBoard();
     wasWide = wide;

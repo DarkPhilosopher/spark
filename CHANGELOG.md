@@ -14,7 +14,79 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ## Unreleased
 
+### Fixed
+
+- **A customized button's position drifted to the wrong spot on rotating
+  the phone between portrait and landscape** — reported directly ("all
+  buttons are shifting to incorrect screen position"). The button
+  editor's saved positions were a fixed *pixel* offset from wherever a
+  button's plain grid/flex position happened to be at the moment it was
+  dragged — fine as long as the screen never changed shape afterward,
+  wrong the moment it did, since several of these layouts aren't just
+  smaller/larger versions of each other (the pad's own `#controls`
+  switches from centred to right-anchored between orientations, e.g.):
+  the same fixed pixel offset landed on top of a completely different
+  starting point. `buttonLayout` entries now store `xPercent`/`yPercent`
+  — a target position as percent of the *viewport*, the same numbers "go
+  to x%, y%" already showed — and `applyButtonStyle()` recomputes the
+  actual pixel transform fresh every time: momentarily clear whatever
+  transform is already there, measure the button's real plain position
+  with `getBoundingClientRect()`, then set exactly the offset needed to
+  reach the saved percent from there. `clampToScreen()`/
+  `snapElementToGrid()` simplified to match — clamping/snapping the
+  percent directly instead of computing pixel deltas. New
+  `syncButtonPositions()` re-applies every saved position on
+  resize/orientationchange (the same events the camera's own re-framing
+  and `syncBarHeight()` already listen for), so a button doesn't wait
+  for its next drag to land back in the right place. An old save with
+  only the previous pixel `dx`/`dy` (no `xPercent`) is treated as having
+  no custom position at all rather than migrated forward — that data was
+  already wrong for at least one orientation, so there was nothing
+  correct in it worth preserving; the button just returns to its plain
+  position, ready to be repositioned properly. `tests/button_position.test.js`
+  (new, 10 checks) simulates the actual bug: a saved position, then a
+  resize *and* a changed plain position (not just smaller/larger, a
+  different layout, matching what an orientation flip really does),
+  confirming the button lands at the same percent afterward — the case
+  that was broken before this. Validated with `node --check`, a full
+  `html.parser` pass, and the full existing suite. Not seen fixed on a
+  real screen yet.
+
 ### Added
+
+- **👁: one button that hides every other button and panel on screen at
+  once, for an unobstructed view of the world.** Requested directly. Its
+  own small always-visible control (top right, below the bar) — not
+  itself draggable, so it can never be the one thing that gets lost or
+  hidden — toggling a `body.ui-hidden` class that hides the top bar, the
+  pad, the drawer, the quickbar, the HUD/say text, the minimap, and the
+  Harvest panel all at once via CSS. Tap it again, same button, to bring
+  everything back. Not a persisted preference: always starts shown again
+  on the next visit, rather than a reload looking like every button
+  vanished for no reason. Disabled (like everything else in the top bar)
+  while the button editor owns taps.
+
+- **💬 Chat, talking to the exact same `api/chat` the browser editor's
+  own box already uses.** Requested directly, with text commands. One
+  shared chat per hosted game — chat rides along with the same world
+  snapshot `poll()` was already fetching for everything else, so this
+  needed no polling of its own, just reading `liveSnapshot.chat`
+  (`showNewChat()`, deliberately mirroring index.html's own function of
+  the same name and job). `LIVE` mode only, the *opposite* of every
+  other panel in this file (all local-play-only) — a local, single-tab
+  copy of the game has nobody else in it to talk to, so opening it
+  without a live game just says so rather than pretending to work.
+  `/who` (who's connected), `/clear` (empty the log), `/help` — a
+  smaller command set than the browser editor's own box, since there's
+  nothing here for `/play` or `/editor` to navigate to; anything else
+  typed is said to the others, the same `/word` parsing as index.html's
+  `runSaid`. `tests/chat.test.js` (new, 10 checks): the dedup logic
+  (never shows your own line twice, only lines newer than the last one
+  seen) and the command dispatch (each command, an unknown one, and
+  plain text routing to chat instead), against the same kind of stub
+  DOM/fetch this file's other JS tests already use. Validated with
+  `node --check`, a full `html.parser` pass, and the full existing
+  suite. Not seen running against a real server from this tab yet.
 
 - **`draw_line`: a new tile that draws a real beam between two targets,
   used to connect the harvester and whatever they're harvesting for the
