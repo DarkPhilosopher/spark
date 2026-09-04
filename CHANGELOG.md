@@ -14,6 +14,43 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ## Unreleased
 
+### Changed
+
+- **The button editor's own panel is eight big buttons plus a box now**,
+  the same "buttons plus a box" shape every other modal in this file
+  already uses, requested directly ("make the whole thing 8 buttons...
+  scroll the large 8 button formation"). Done editing, grid lock, pick
+  on screen (new, see below), size −10%/+10%, reset this button, reset
+  ALL buttons, and save layout as… are the eight; the button-picker
+  list, the exact size/opacity/position fields, the grid size, and the
+  saved-layouts list all live in the box, scrolling in the same
+  portrait-2-column/landscape-3-column formation the other modals'
+  button grids already do. Grid lock changed from a checkbox to a
+  button+state pair (matching Properties' own grid-lock button exactly)
+  to fit the new shape; every other field kept its id, so nothing about
+  how they're read or written changed underneath.
+
+  **New: 👆 "pick on screen"**, requested directly right after ("a new
+  button... to hide editor page while editor is yet enabled to select
+  any button on screen than show only meter and text box for button
+  properties"). Hides the full panel — the same way ✎ itself already
+  can — but unlike a plain hide, keeps a small floating readout
+  (`#edit-mini`, deliberately outside `#edit-panel` so it can stay
+  visible while that panel is hidden) in sync with whatever gets
+  selected next: a size meter, an opacity box, and the button's own
+  label — so tapping around the screen to check or nudge several
+  buttons doesn't mean reopening the full panel each time. ✎, or the
+  readout's own small ✎, leaves pick mode and brings the full panel
+  back; "done editing" leaves it too, along with edit mode itself.
+
+  `tests/button_position.test.js` extended (+7 checks, 17 total): the
+  readout tracks the selected button's real saved size/opacity, says so
+  rather than showing stale data with nothing selected, does nothing
+  at all while pick mode is off, and `exitPickMode()` genuinely turns
+  both the mode and the readout off. Validated with `node --check`, a
+  full `html.parser` pass, and the full existing suite, all green. Not
+  seen on a real screen yet.
+
 ### Fixed
 
 - **A customized button's position drifted to the wrong spot on rotating

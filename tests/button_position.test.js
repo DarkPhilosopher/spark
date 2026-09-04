@@ -50,11 +50,28 @@ class FakeButton {
   }
 }
 
+// A persistent, stateful stand-in for a handful of real elements --
+// #edit-grid-size and everything #edit-mini holds -- so a value set() on
+// one $() call is still there to read back on the next one, the way a
+// real DOM element (one object, however many times you re-select it) is.
+function makeNodeRegistry() {
+  const nodes = {};
+  for (const id of ["edit-grid-size", "edit-mini-label", "edit-mini-size", "edit-mini-opacity"]) {
+    nodes["#" + id] = {value: "", textContent: ""};
+  }
+  const classes = new Set();
+  nodes["#edit-mini"] = {classList: {
+    add: c => classes.add(c), remove: c => classes.delete(c), contains: c => classes.has(c),
+  }};
+  nodes["#edit-grid-size"].value = "5";
+  return nodes;
+}
+
 function load() {
   const store = {};
-  const gridSizeEl = {value: "5"};
+  const nodes = makeNodeRegistry();
   const globals = {
-    $: sel => (sel === "#edit-grid-size" ? gridSizeEl : {value: "", textContent: "", classList: {toggle() {}}}),
+    $: sel => nodes[sel] || {value: "", textContent: "", classList: {toggle() {}, add() {}, remove() {}}},
     localStorage: {
       getItem: k => (k in store ? store[k] : null),
       setItem: (k, v) => { store[k] = String(v); },
@@ -66,13 +83,17 @@ function load() {
     module.exports = {
       applyButtonStyle, syncButtonPositions, clampToScreen, snapElementToGrid,
       currentPercent, editableButtons, buttonLayout,
+      exitPickMode, updateMiniPopup,
       setGridLock: v => { gridLockOn = v; },
+      setPickMode: v => { pickModeOn = v; },
+      getPickMode: () => pickModeOn,
+      setSelected: uid => { editSelected = uid; },
       setWindow: (w, h) => { window.innerWidth = w; window.innerHeight = h; },
     };
   `;
   new Function("module", "$", "localStorage", "window", body)(
     mod, globals.$, globals.localStorage, globals.window);
-  return {api: mod.exports, window: globals.window};
+  return {api: mod.exports, window: globals.window, nodes};
 }
 
 console.log("applyButtonStyle: lands the button at the saved percent of the CURRENT window");
@@ -148,6 +169,39 @@ console.log("\nsnapElementToGrid: rounds the saved percent to the nearest grid l
   const entry2 = {xPercent: 47, yPercent: 53};
   api.snapElementToGrid(btn, entry2);
   ok("grid lock off leaves it alone", entry2.xPercent === 47 && entry2.yPercent === 53);
+}
+
+console.log("\n\"pick on screen\": the floating readout tracks whatever's selected");
+{
+  const {api, nodes} = load();
+  const uid = "restart";
+  api.editableButtons.set(uid, {el: new FakeButton(0, 0, 40, 40), label: "restart"});
+  api.buttonLayout[uid] = {scale: 1.2, opacity: 0.5};
+
+  api.setPickMode(false);
+  api.setSelected(uid);
+  api.updateMiniPopup();
+  ok("does nothing while pick mode is off", nodes["#edit-mini-label"].textContent === "");
+
+  api.setPickMode(true);
+  api.setSelected(null);
+  api.updateMiniPopup();
+  ok("with nothing selected, says so rather than showing stale data",
+     nodes["#edit-mini-label"].textContent === "tap a button…");
+
+  api.setSelected(uid);
+  api.updateMiniPopup();
+  ok("shows the selected button's own label", nodes["#edit-mini-label"].textContent === "restart");
+  ok("the meter reads that button's saved size (scale 1.2 -> 120%)",
+     Math.abs(parseFloat(nodes["#edit-mini-size"].value) - 120) < 0.01,
+     nodes["#edit-mini-size"].value);
+  ok("the text box reads that button's saved opacity (0.5 -> 50%)",
+     Math.abs(parseFloat(nodes["#edit-mini-opacity"].value) - 50) < 0.01,
+     nodes["#edit-mini-opacity"].value);
+
+  api.exitPickMode();
+  ok("exitPickMode turns pick mode off", api.getPickMode() === false);
+  ok("...and hides the readout", !nodes["#edit-mini"].classList.contains("on"));
 }
 
 console.log("\n" + pass + " passed, " + fail + " failed");

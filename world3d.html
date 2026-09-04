@@ -321,7 +321,7 @@
      how it ended up overflowing off the top of a short screen; a fixed
      inset can't do that, and there's room for everything to breathe. */
   #edit-panel{position:fixed;inset:6vh 6vw;z-index:20;display:none;
-              flex-direction:column;gap:8px;overflow-y:auto;touch-action:pan-y;
+              flex-direction:column;
               background:rgba(74,80,88,.94);border:1px solid var(--line);
               border-radius:12px;padding:14px 16px;
               backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
@@ -339,9 +339,39 @@
                                  color:var(--ink);background:var(--glass-input);
                                  border:1px solid var(--line);border-radius:6px;
                                  padding:6px 8px;min-height:32px}
-  #edit-panel .row{display:flex;flex-wrap:wrap;gap:8px}
-  #edit-panel button{flex:1;font-size:12px;padding:6px 10px;min-height:36px}
+  #edit-panel .row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+  /* :not(.mkey) -- the eight big buttons above (#edit-panel .mkeys)
+     already get their sizing from the shared .mkey rule every other
+     modal's own button grid uses; without this exclusion, this rule's
+     own #edit-panel-scoped specificity (an id beats a lone class) would
+     win over .mkey's and squash them back down to a plain small row
+     button. Still applies as before to the one plain button left in the
+     box itself ("go to x%, y%"). */
+  #edit-panel button:not(.mkey){flex:1;font-size:12px;padding:6px 10px;min-height:36px}
   #edit-panel input[type=checkbox]{width:18px;height:18px;flex:0 0 auto}
+
+  /* "pick on screen"'s own floating readout -- deliberately not inside
+     #edit-panel, since it has to stay visible while that panel is
+     hidden. Bottom-centre, clear of the pad (which sits lower still, at
+     the very bottom) and everything else this file already anchors to a
+     corner or edge. */
+  #edit-mini{position:fixed;left:50%;transform:translateX(-50%);
+             bottom:calc(8px + env(safe-area-inset-bottom));z-index:21;
+             display:none;align-items:center;gap:8px;
+             max-width:92vw;padding:8px 10px;
+             background:rgba(74,80,88,.94);border:1px solid var(--line);
+             border-radius:12px;
+             backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+  #edit-mini.on{display:flex}
+  #edit-mini-label{font-size:12px;color:var(--dim);white-space:nowrap;
+                   overflow:hidden;text-overflow:ellipsis;max-width:30vw}
+  #edit-mini input[type=range]{width:88px}
+  #edit-mini input[type=number]{width:56px;font:inherit;color:var(--ink);
+                                background:var(--glass-input);
+                                border:1px solid var(--line);border-radius:6px;
+                                padding:4px 6px;min-height:32px}
+  #edit-mini button{min-height:32px;min-width:32px;padding:4px 8px;font-size:14px}
+
   /* faint lines across the whole screen at the grid spacing, so grid lock
      has something to actually align to, not just invisible snapping.
      background-size in % is relative to this element's own box, which is
@@ -707,59 +737,85 @@
      down to where you can no longer find them by tapping -- pick one here
      instead, then drag it and use the sliders. -->
 <div id="edit-panel">
-  <!-- ✎ (top right) now just shows/hides this panel once already
-       editing -- dashed outlines and dragging stay on either way. This
-       is the one that actually leaves edit mode. -->
-  <div class="row">
-    <button id="edit-done" style="flex:1">✓ done editing</button>
+  <!-- Eight big buttons, same "buttons plus a box" shape as every other
+       modal -- the box below holds everything continuous/exact (the
+       button-picker list, precise size/opacity/position, grid size, the
+       saved-layouts list) plus the two rarer checkboxes; these eight are
+       the actions actually worth a full-size tap target. -->
+  <div class="mgrid">
+    <div class="mkeys">
+      <!-- ✎ (top right) shows/hides this panel once already editing --
+           dashed outlines and dragging stay on either way. This is the
+           one that actually leaves edit mode (and pick mode, below). -->
+      <button id="edit-done" class="mkey">✓<br>done editing</button>
+      <button id="edit-grid-toggle" class="mkey">grid lock<br><small id="edit-grid-state">OFF</small></button>
+      <!-- Hides this whole panel (like ✎ already can) but, unlike ✎'s
+           own hide, keeps updating a small floating readout -- just a
+           size meter and an opacity box -- for whatever you tap next,
+           so picking something on screen doesn't require the full panel
+           back open just to see or nudge it. ✎, or the readout's own
+           small ✎, brings the full panel back and leaves this mode. -->
+      <button id="edit-pick-mode" class="mkey">👆<br>pick on screen</button>
+      <button id="edit-size-dn" class="mkey">size<br>−10%</button>
+      <button id="edit-size-up" class="mkey">size<br>+10%</button>
+      <button id="edit-reset" class="mkey">reset this<br>button</button>
+      <button id="edit-reset-all" class="mkey">reset ALL<br>buttons</button>
+      <button id="edit-save-layout" class="mkey">save layout<br>as…</button>
+    </div>
+    <div class="mbox">
+      <div id="edit-list"></div>
+      <!-- slider and typed decimal percent, kept in sync both ways, and
+           both filled in with whatever the selected button already has. -->
+      <div class="row">
+        <label style="flex:2">size <input id="edit-size" type="range" min="50" max="150" step="0.1" value="100"></label>
+        <input id="edit-size-num" type="number" step="0.1" min="50" max="150" value="100">
+      </div>
+      <div class="row">
+        <label style="flex:2">opacity <input id="edit-opacity" type="range" min="20" max="100" step="0.1" value="100"></label>
+        <input id="edit-opacity-num" type="number" step="0.1" min="20" max="100" value="100">
+      </div>
+      <!-- typed position, as a decimal percent of the whole screen --
+           0,0 is the top-left corner, 100,100 the bottom-right. Shows
+           where the selected button is right now; type new numbers and
+           press "go". -->
+      <div class="row">
+        <label style="flex:1">x% <input id="edit-x" type="number" step="0.1" min="0" max="100"></label>
+        <label style="flex:1">y% <input id="edit-y" type="number" step="0.1" min="0" max="100"></label>
+      </div>
+      <div class="row">
+        <button id="edit-goto-xy">go to x%, y%</button>
+      </div>
+      <div class="row">
+        <input id="edit-grid-size" type="number" step="0.5" min="1" max="50" value="5" title="grid size, percent of screen" style="flex:0 0 72px">
+        <span class="prop-label" style="align-self:center">grid size (same lock as the button above)</span>
+      </div>
+      <!-- This panel covers most of the screen (see #edit-panel's own
+           CSS), which is exactly what gets in the way of seeing where a
+           button actually lands relative to everything else while
+           dragging it. With this on, the panel itself (not button-editor
+           mode) disappears for the length of each drag and comes back
+           the moment you let go -- see the pointerdown/endDrag hook in
+           registerEditable(). -->
+      <div class="row">
+        <label style="flex:2"><input id="edit-hide-dragging" type="checkbox" checked> hide this panel while dragging a button</label>
+      </div>
+      <!-- Named layouts: whole-screen snapshots of every button's
+           position/size/opacity, saved under a name and reloaded later
+           -- separate from the one working layout that's always live. -->
+      <div id="edit-layout-list"></div>
+    </div>
   </div>
-  <div id="edit-list"></div>
-  <!-- slider and typed decimal percent, kept in sync both ways, and both
-       filled in with whatever the selected button already has. -->
-  <div class="row">
-    <label style="flex:2">size <input id="edit-size" type="range" min="50" max="150" step="0.1" value="100"></label>
-    <input id="edit-size-num" type="number" step="0.1" min="50" max="150" value="100">
-  </div>
-  <div class="row">
-    <label style="flex:2">opacity <input id="edit-opacity" type="range" min="20" max="100" step="0.1" value="100"></label>
-    <input id="edit-opacity-num" type="number" step="0.1" min="20" max="100" value="100">
-  </div>
-  <!-- typed position, as a decimal percent of the whole screen -- 0,0 is
-       the top-left corner, 100,100 the bottom-right. Shows where the
-       selected button is right now; type new numbers and press "go". -->
-  <div class="row">
-    <label style="flex:1">x% <input id="edit-x" type="number" step="0.1" min="0" max="100"></label>
-    <label style="flex:1">y% <input id="edit-y" type="number" step="0.1" min="0" max="100"></label>
-  </div>
-  <div class="row">
-    <button id="edit-goto-xy">go to x%, y%</button>
-  </div>
-  <!-- grid lock: dragging (and "go to x%, y%") snap to the nearest
-       multiple of the grid size instead of landing anywhere exact. -->
-  <div class="row">
-    <label style="flex:2"><input id="edit-grid-on" type="checkbox"> grid lock</label>
-    <input id="edit-grid-size" type="number" step="0.5" min="1" max="50" value="5" title="grid size, percent of screen">
-  </div>
-  <!-- This panel covers most of the screen (see #edit-panel below), which
-       is exactly what gets in the way of seeing where a button actually
-       lands relative to everything else while dragging it. With this on,
-       the panel itself (not button-editor mode) disappears for the
-       length of each drag and comes back the moment you let go -- see
-       the pointerdown/endDrag hook in registerEditable(). -->
-  <div class="row">
-    <label style="flex:2"><input id="edit-hide-dragging" type="checkbox" checked> hide this panel while dragging a button</label>
-  </div>
-  <div class="row">
-    <button id="edit-reset">reset this button</button>
-    <button id="edit-reset-all">reset all buttons</button>
-  </div>
-  <!-- Named layouts: whole-screen snapshots of every button's position/
-       size/opacity, saved under a name and reloaded later -- separate
-       from the one working layout that's always live. -->
-  <div class="row">
-    <button id="edit-save-layout">save layout as…</button>
-  </div>
-  <div id="edit-layout-list"></div>
+</div>
+
+<!-- The floating readout "pick on screen" (above) switches to -- just
+     enough to see and nudge whatever you just tapped without the full
+     panel back open. Not part of #edit-panel: it has to stay visible
+     while that panel is hidden. -->
+<div id="edit-mini">
+  <span id="edit-mini-label">tap a button…</span>
+  <input id="edit-mini-size" type="range" min="50" max="150" step="0.1" value="100" title="size %">
+  <input id="edit-mini-opacity" type="number" min="20" max="100" step="0.1" value="100" title="opacity %">
+  <button id="edit-mini-done" title="back to the full panel">✎</button>
 </div>
 
 <!-- Backpack: a small virtual file system, styled like Windows File
@@ -2966,17 +3022,48 @@ let editDragging = null;      // {uid, x, y, startCx, startCy}, or null
 let gridLockOn = false;       // dragging (and "go to x%, y%") snap to a grid
 let hideWhileDragging = true;  // the edit panel itself hides for the length of a drag
 let editPanelHidden = false;  // manually closed via ✎ while still editing -- see updateEditPanelVisibility
+let pickModeOn = false;       // "pick on screen" -- panel hidden, #edit-mini tracks selection instead
 
 // The panel is hidden either because a drag is in progress (and the
-// "hide while dragging" checkbox wants that) or because ✎ closed it
-// manually while staying in edit mode -- two independent reasons that
-// both drive the same .peeking class, so neither one can clobber what
-// the other one wants: ending a drag no longer reopens a panel that was
-// manually closed first, and closing the panel manually doesn't get
-// undone the next time a drag starts and ends.
+// "hide while dragging" checkbox wants that), because pick mode wants it
+// hidden for as long as that mode is on, or because ✎ closed it manually
+// while staying in edit mode -- independent reasons that all drive the
+// same .peeking class, so none of them can clobber what another wants:
+// ending a drag no longer reopens a panel that was manually closed
+// first, and closing the panel manually doesn't get undone the next
+// time a drag starts and ends.
 function updateEditPanelVisibility() {
-  const hidden = editPanelHidden || (editDragging && hideWhileDragging);
+  const hidden = editPanelHidden || pickModeOn || (editDragging && hideWhileDragging);
   $("#edit-panel").classList.toggle("peeking", !!hidden);
+}
+
+// Leaves "pick on screen" (whether by ✎, "done editing", or #edit-mini's
+// own small ✎) -- always both of these together, so the floating
+// readout can never linger after the mode it belongs to is gone.
+function exitPickMode() {
+  pickModeOn = false;
+  $("#edit-mini").classList.remove("on");
+}
+
+// What #edit-mini switches to while "pick on screen" is on -- a name, a
+// size meter, and an opacity box for whatever selectEditable() most
+// recently selected (a tap on any editable button while pick mode is on
+// selects it exactly the same way it always has; this just also updates
+// what the floating readout shows, since the full panel isn't there to
+// show it instead).
+function updateMiniPopup() {
+  if (!pickModeOn) return;
+  if (!editSelected || !editableButtons.has(editSelected)) {
+    $("#edit-mini-label").textContent = "tap a button…";
+    return;
+  }
+  const {label} = editableButtons.get(editSelected);
+  $("#edit-mini-label").textContent = label || editSelected;
+  const entry = buttonLayout[editSelected] || {};
+  const size = Math.round((entry.scale || 1) * 1000) / 10;
+  const opacity = Math.round((entry.opacity === undefined ? 1 : entry.opacity) * 1000) / 10;
+  $("#edit-mini-size").value = size;
+  $("#edit-mini-opacity").value = opacity;
 }
 
 // The grid size input is read live rather than cached, so typing a new
@@ -3082,6 +3169,7 @@ function selectEditable(uid) {
     $("#edit-y").value = pos.y;
   }
   renderEditList();
+  updateMiniPopup();
 }
 
 // Which on-screen cluster a button belongs to -- purely for the numbered
@@ -3230,6 +3318,31 @@ function setupButtonEditor() {
     $("#edit-opacity").value = $("#edit-opacity-num").value;
     applySizeOpacity($("#edit-size").value, $("#edit-opacity-num").value);
   });
+  // Quick jumps, same idea as Properties' own speed ±1/±5 -- the exact
+  // slider/typed field above still takes any value in between.
+  for (const [id, delta] of [["edit-size-dn", -10], ["edit-size-up", 10]]) {
+    $("#" + id).onclick = () => {
+      if (!editSelected) return;
+      const size = Math.max(50, Math.min(150, (parseFloat($("#edit-size-num").value) || 100) + delta));
+      $("#edit-size").value = size; $("#edit-size-num").value = size;
+      applySizeOpacity(size, $("#edit-opacity-num").value);
+      updateMiniPopup();
+    };
+  }
+  // The floating readout "pick on screen" switches to -- a size meter and
+  // an opacity box, same underlying entry.scale/opacity applySizeOpacity
+  // above already writes, just read from #edit-mini's own fields instead
+  // of the full panel's.
+  $("#edit-mini-size").addEventListener("input", () => {
+    $("#edit-size").value = $("#edit-mini-size").value;
+    $("#edit-size-num").value = $("#edit-mini-size").value;
+    applySizeOpacity($("#edit-mini-size").value, $("#edit-opacity-num").value);
+  });
+  $("#edit-mini-opacity").addEventListener("input", () => {
+    $("#edit-opacity").value = $("#edit-mini-opacity").value;
+    $("#edit-opacity-num").value = $("#edit-mini-opacity").value;
+    applySizeOpacity($("#edit-size-num").value, $("#edit-mini-opacity").value);
+  });
 
   // Typed exact position: move the button so its centre lands at that
   // decimal percent of the screen, whatever position it is at now.
@@ -3281,6 +3394,7 @@ function setupButtonEditor() {
     if (!editingButtons) {
       editingButtons = true;
       editPanelHidden = false;
+      pickModeOn = false;
       document.body.classList.add("editing-buttons");
       $("#edit-toggle").textContent = "✓";
       $("#edit-panel").classList.add("on");
@@ -3290,12 +3404,27 @@ function setupButtonEditor() {
       renderLayoutList();
       return;
     }
-    editPanelHidden = !editPanelHidden;
+    // Returning to the full panel always leaves pick mode too, not just
+    // whatever the plain hidden/shown toggle was already doing.
+    if (pickModeOn || editPanelHidden) { exitPickMode(); editPanelHidden = false; }
+    else editPanelHidden = true;
+    updateEditPanelVisibility();
+  };
+  $("#edit-pick-mode").onclick = () => {
+    pickModeOn = true;
+    updateEditPanelVisibility();
+    $("#edit-mini").classList.add("on");
+    updateMiniPopup();
+  };
+  $("#edit-mini-done").onclick = () => {
+    exitPickMode();
+    editPanelHidden = false;
     updateEditPanelVisibility();
   };
   $("#edit-done").onclick = () => {
     editingButtons = false;
     editPanelHidden = false;
+    exitPickMode();
     document.body.classList.remove("editing-buttons");
     $("#edit-toggle").textContent = "✎";
     $("#edit-panel").classList.remove("on");
@@ -3308,10 +3437,8 @@ function setupButtonEditor() {
   // themselves need to exist first, and this runs after they're in the DOM.
   const savedSettings = loadEditorSettings();
   if (savedSettings.gridSize) $("#edit-grid-size").value = savedSettings.gridSize;
-  if (savedSettings.gridLockOn) {
-    gridLockOn = true;
-    $("#edit-grid-on").checked = true;
-  }
+  if (savedSettings.gridLockOn) gridLockOn = true;
+  syncGridLockDisplays();   // sets #edit-grid-toggle/#edit-grid-state to match, either way
   // Defaults to on (see the checkbox's own `checked` in the HTML) unless
   // this phone has explicitly turned it off before.
   if (savedSettings.hideWhileDragging === false) {
@@ -3319,11 +3446,11 @@ function setupButtonEditor() {
     $("#edit-hide-dragging").checked = false;
   }
 
-  $("#edit-grid-on").addEventListener("change", () => {
-    gridLockOn = $("#edit-grid-on").checked;
+  $("#edit-grid-toggle").onclick = () => {
+    gridLockOn = !gridLockOn;
     syncGridLockDisplays();   // keeps the Properties toggle matching too
     saveEditorSettings({gridLockOn});
-  });
+  };
   $("#edit-hide-dragging").addEventListener("change", () => {
     hideWhileDragging = $("#edit-hide-dragging").checked;
     saveEditorSettings({hideWhileDragging});
@@ -3605,7 +3732,8 @@ function worldClockText() {
 function syncGridLockDisplays() {
   $("#prop-gridlock-state").textContent = gridLockOn ? "ON" : "OFF";
   $("#prop-gridlock-toggle").classList.toggle("on", gridLockOn);
-  $("#edit-grid-on").checked = gridLockOn;
+  $("#edit-grid-state").textContent = gridLockOn ? "ON" : "OFF";
+  $("#edit-grid-toggle").classList.toggle("on", gridLockOn);
   updateGridOverlay();
 }
 

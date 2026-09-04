@@ -468,22 +468,34 @@ hidden), hides every other button and panel on screen for an
 unobstructed view of the world; tap it again, same button, to bring
 everything back. Doesn't persist — always starts shown again next time.
 
-The button editor's own panel covers most of the screen, which can get in
-the way of seeing exactly where a button lands relative to everything
-else while dragging it — "hide this panel while dragging a button," on by
-default, makes the panel itself disappear for the length of each drag and
-come straight back the moment you let go, so you can actually see the
-button land against the world (and every other button) underneath it.
-✎ (top right) itself also shows/hides the panel once you're already
-editing, the same way — tap it again any time to close the panel and see
-the screen clearly (dragging still works with the panel closed), then the
-same button brings it straight back. Actually leaving edit mode — the
-dashed outlines and all — is "✓ done editing," at the top of the panel.
+The button editor's own panel is eight big buttons and a box, the same
+shape every other modal in this file uses: **done editing**, **grid
+lock**, **pick on screen**, **size −10%**/**+10%**, **reset this
+button**, **reset ALL buttons**, and **save layout as…**. The box below
+them holds everything continuous or exact — the button-picker list
+(grouped under a numbered "button group 001," "002," … heading, the pad,
+the top bar, the drawer, and the quickbar each their own, instead of one
+flat list of everything on the page at once), the precise size/opacity/
+position fields, the grid size, and the saved-layouts list.
 
-The panel's own list of every button groups them under a numbered
-"button group 001," "002," … heading — the pads, the top bar, the drawer,
-and the quickbar each get their own — instead of one flat list of
-everything on the page at once.
+The panel covers most of the screen, which can get in the way of seeing
+exactly where a button lands relative to everything else while dragging
+it — "hide this panel while dragging a button," on by default, makes the
+panel itself disappear for the length of each drag and come straight
+back the moment you let go. ✎ (top right) itself also shows/hides the
+panel once you're already editing — tap it any time to close the panel
+and see the screen clearly (dragging still works with the panel closed),
+then the same button brings it straight back.
+
+**👆 pick on screen** goes further: it hides the panel the same way, but
+keeps a small floating readout on screen — a size meter, an opacity box,
+and the tapped button's own name — in sync with whatever you tap next,
+so checking or nudging several buttons in a row doesn't mean reopening
+the full panel each time. ✎, or the readout's own small ✎, brings the
+full panel back and leaves this mode.
+
+Actually leaving edit mode — the dashed outlines and all — is "✓ done
+editing," which also leaves pick on screen if it was on.
 
 The drawer's own bubbles are a column, tallest on a tall screen — if there
 get to be enough of them (built-ins plus whatever you've added with the +
