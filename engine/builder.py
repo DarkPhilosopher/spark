@@ -203,6 +203,21 @@ def _window_size(total):
     return max(3, min(total, rows - 6))
 
 
+def _fit(text, width):
+    """Truncate plain text to at most `width` visible columns, marking it
+    with an ellipsis if anything was cut. Every line _render_menu prints
+    goes through this -- see its own docstring for why a wrapped line is
+    not just a cosmetic overflow here but breaks the cursor-up redraw
+    below it for as long as that menu stays open."""
+    if width < 1:
+        return ""
+    if len(text) <= width:
+        return text
+    if width == 1:
+        return "…"
+    return text[:width - 1] + "…"
+
+
 def _render_menu(options, selected, allow_back, back_label, first, window):
     """Prints the list the first time; every call after that rewrites it in
     place, moving the cursor back up over exactly what it printed rather
@@ -213,22 +228,33 @@ def _render_menu(options, selected, allow_back, back_label, first, window):
     in view -- centred where there is room to centre it, otherwise pinned
     to whichever end it is closest to. `window` is fixed for the whole
     menu (see _window_size), so every redraw moves the cursor up by
-    exactly what the previous one printed, never more or less."""
+    exactly what the previous one printed -- which only holds if every
+    line printed is exactly one terminal row. A line long enough to wrap
+    (a long option label, or the footer hint below, on a phone-width
+    terminal) breaks that: the next redraw moves up by one row too few,
+    landing mid-block instead of at its top, and everything below where
+    it landed is old and new text overlaid on each other -- reported
+    directly as "text is doubling." _fit() above keeps every line inside
+    the terminal's actual width so it can never wrap in the first place.
+    """
     items = list(options) + ([back_label] if allow_back else [])
     total = len(items)
     offset = max(0, min(selected - window // 2, total - window))
     visible = items[offset:offset + window]
+    cols = shutil.get_terminal_size(fallback=(80, 24)).columns
     if not first:
         sys.stdout.write("\033[%dA" % (window + 2))   # +2: blank line, footer
     for i, label in enumerate(visible):
         real_i = offset + i
+        label = _fit(label, max(1, cols - 3))   # 3: the " > "/"   " prefix
         arrow = HILITE + " > " + RESET if real_i == selected else "   "
         text = (HILITE + label + RESET) if real_i == selected else label
         sys.stdout.write("%s%s\033[K\n" % (arrow, text))
     sys.stdout.write("\033[K\n")
     scrolled = " (%d/%d)" % (selected + 1, total) if total > window else ""
-    sys.stdout.write(DIM + " ↑↓ move . enter pick . 1-9 jump . "
-                      "b browser . w who's here" + scrolled + RESET + "\033[K\n")
+    hint = _fit(" ↑↓ move . enter pick . 1-9 jump . b browser . w who's here" + scrolled,
+                cols)
+    sys.stdout.write(DIM + hint + RESET + "\033[K\n")
     sys.stdout.flush()
 
 

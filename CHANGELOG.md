@@ -14,6 +14,35 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ## Unreleased
 
+### Fixed
+
+- **Text doubling on the terminal selection menu** — reported directly
+  ("text is doubling on termux selection menu first of spark"). The
+  big-picture menu (`builder.menu()`'s arrow-key mode) redraws itself in
+  place by moving the cursor up a fixed number of rows and overwriting
+  them — correct only as long as every row it writes is exactly one
+  physical terminal row. Two of the lines it always writes are wide
+  enough to wrap on an ordinary phone-width terminal: the built-in
+  control hint ("↑↓ move . enter pick . 1-9 jump . b browser . w who's
+  here", 59 characters) shows on *every* menu, and the very first
+  screen's own "learn how (guided, about ten minutes)" option (38
+  characters plus the arrow) is wider still. Once a line wraps, the next
+  redraw moves the cursor up one row too few and overwrites only part of
+  the previous render — the untouched leftover sits next to the new
+  render, which reads as the reported doubled text. Fixed with a new
+  `_fit()` that truncates (with a trailing "…") every line `_render_menu`
+  prints to the real terminal's own current width first, so none of them
+  can wrap regardless of how long an option's label is or how narrow the
+  screen is.
+
+  `tests/check_menu.py` extended (+1 case): a narrow (32-column) real pty
+  with a deliberately long option label, checking that no rendered row —
+  ANSI styling and the pty's own `\r` stripped back off first — is ever
+  wider than the terminal actually is. Confirmed this fails against the
+  unfixed code (with exactly the two wide lines named above) before
+  confirming it passes fixed. Validated with `python3 -m py_compile` and
+  the rest of the existing suite, all green.
+
 ### Added
 
 - **Portrait and landscape now keep their own remembered button

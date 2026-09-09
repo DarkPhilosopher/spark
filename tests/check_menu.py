@@ -249,5 +249,49 @@ m = re.search(r"RESULT=(\d+|None)", final)
 check("...and the option actually landed on is still picked correctly",
       m is not None, final[-80:])
 
+# -- text doubling: no rendered row may be wider than the real terminal ---
+#
+# Reported directly: "text is doubling on termux selection menu." Root
+# cause: _render_menu's redraw moves the cursor up by a fixed number of
+# ROWS IT PRINTED, not rows actually consumed on screen -- correct only
+# as long as every row it writes is one physical terminal row. A row
+# wide enough to wrap (the built-in hint line is 59 visible characters;
+# a long option label, like the title screen's own "learn how (guided,
+# about ten minutes)" when nothing is open yet, is another way there) eats
+# two physical rows instead of one, so the next redraw moves up too few
+# rows and lands mid-block -- the tail of the old render is left sitting
+# next to the new one, which is exactly what "doubling" looks like.
+# Fixed with _fit(), which truncates every line _render_menu prints to
+# the terminal's own actual width first.
+
+print("\nno rendered row is ever wider than the real terminal (the doubling bug)")
+ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
+
+
+def visible_lines(text):
+    # the pty turns our "\n" into "\r\n" on the wire (ONLCR) -- strip that
+    # \r back off first, it's not a visible column, just an artifact of
+    # capturing raw bytes instead of watching a real screen render them.
+    return [ANSI.sub("", line).rstrip("\r") for line in text.split("\n")]
+
+
+narrow_probe = (
+    "import sys; sys.path.insert(0, %r)\n"
+    "from engine import builder\n"
+    "opts = ['a very long option label that would wrap on a narrow phone screen', 'short']\n"
+    "builder.menu(opts)\n"
+) % str(ROOT)
+s = Session(narrow_probe, rows=24, cols=32)
+out = s.drain(0.5)
+s.send(DOWN)
+out += s.drain(0.4)
+s.send(UP)
+out += s.drain(0.4)
+s.close()
+too_wide = [ln for ln in visible_lines(out) if len(ln) > 32]
+check("every rendered row fits inside the terminal's actual width (32 cols), "
+      "long option label and the built-in hint line included",
+      not too_wide, too_wide)
+
 print("\n%d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)
