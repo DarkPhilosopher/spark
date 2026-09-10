@@ -423,6 +423,24 @@
       ]
     },
     {
+      "id": "set_frame",
+      "label": "show frame {index} of myself",
+      "params": [
+        {
+          "name": "index",
+          "prompt": "Which frame? (0 is the first)",
+          "kind": "int",
+          "choices": [],
+          "default": 0
+        }
+      ]
+    },
+    {
+      "id": "next_frame",
+      "label": "show my next frame",
+      "params": []
+    },
+    {
       "id": "shape",
       "label": "cycle {target}'s shape: cube, sphere, cone, and onward",
       "params": [

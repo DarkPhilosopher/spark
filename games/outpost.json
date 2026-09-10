@@ -1,6 +1,6 @@
 {
   "name": "outpost",
-  "help": "Outpost -- a small frontier camp.\nMove: arrow keys.\nRecruit: touch a companion (c), press e -- it follows you and fights/gathers on its own.\nRelease: touch a recruited companion, press r.\nHire: with enough ore, press 1 for a worker (w, 8 ore, gathers fast) or\n2 for a soldier (s, 15 ore, fights hard) -- it appears at your side, already yours.\nFight: walk into a bandit (x) -- yours and theirs both do it automatically once adjacent.\nGather: stand next to an ore vein (o) and it trickles into your own count over time --\na recruited companion or worker standing next to one gathers it too, on its own.\nMine on demand: press m while touching an ore vein for 1 ore right away.\nMake ore: press space -- a fresh ore vein appears somewhere on the map.\nAt a distance in chat (still within one square, just not walked to blind): /mine x y,\n/attack x y, /recruit x y, /dismiss x y -- same rules as touching each in person.\nChat stays open for as many commands in a row as you like; a blank line closes it.\n/units lists everything you own or possess and where it is; /name x y <name> renames it.\n/help commands lists every command by type; add \"description\" too for what each does.\nBuild: open Build mode (top bar) to place walls (#) or turrets (T) around the camp --\na turret shoots any bandit within 5 squares on its own, no crew needed.\nType /help any time to see this again.",
+  "help": "Outpost -- a small frontier camp.\nMove: arrow keys.\nRecruit: touch a companion (c), press e -- it follows you and fights/gathers on its own.\nRelease: touch a recruited companion, press r.\nHire: with enough ore, press 1 for a worker (w, 8 ore, gathers fast) or\n2 for a soldier (s, 15 ore, fights hard) -- it appears at your side, already yours.\nFight: walk into a bandit (x) -- yours and theirs both do it automatically once adjacent.\nGather: stand next to an ore vein (o) and it trickles into your own count over time --\na recruited companion or worker standing next to one gathers it too, on its own.\nMine on demand: press m while touching an ore vein for 1 ore right away.\nMake ore: press space -- a fresh ore vein appears somewhere on the map.\nAt a distance in chat (still within one square, just not walked to blind): /mine x y,\n/attack x y, /recruit x y, /dismiss x y -- same rules as touching each in person.\nChat stays open for as many commands in a row as you like; a blank line closes it.\n/units lists everything you own or possess and where it is; /name x y <name> renames it.\n/help commands lists every command by type; add \"description\" too for what each does.\nBuild: open Build mode (top bar) to place walls (#) or turrets (T) around the camp --\na turret shoots any bandit within 5 squares on its own, no crew needed --\nits own scanning light blinks silver/yellow, a real WHEN/DO-authored animation.\nType /help any time to see this again.",
   "world": {
     "width": 50,
     "height": 30,
@@ -732,7 +732,41 @@
               }
             }
           ]
+        },
+        {
+          "when": [
+            {
+              "tile": "timer",
+              "args": {
+                "every": 10
+              }
+            }
+          ],
+          "do": [
+            {
+              "tile": "next_frame",
+              "args": {}
+            }
+          ]
         }
+      ],
+      "frames": [
+        [
+          {
+            "dx": 0,
+            "dy": 0,
+            "glyph": "T",
+            "color": "silver"
+          }
+        ],
+        [
+          {
+            "dx": 0,
+            "dy": 0,
+            "glyph": "T",
+            "color": "yellow"
+          }
+        ]
       ]
     }
   ]

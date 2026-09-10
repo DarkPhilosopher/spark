@@ -1352,6 +1352,14 @@ class Thing {
     // A custom display name, or null -- purely cosmetic bookkeeping for
     // the chat's /units and /name commands, never read by any tile.
     this.label = null;
+    // A multi-cell ASCII sprite: frames[i] is one frame, a list of
+    // {dx, dy, glyph, color} pixels relative to my own (x, y). Only the
+    // terminal engine's own render() actually draws these -- carried
+    // here too, for a save/load round trip, and so set_frame/
+    // next_frame run the same in both engines, but this 3D view has
+    // its own shape/parts system already and doesn't interpret it.
+    this.frames = template.frames || null;
+    this.frameIndex = 0;
   }
 }
 
@@ -1452,6 +1460,12 @@ const ACTIONS = {
     const fresh = world.spawn(a.kind, obj.x, obj.y);
     if (fresh) fresh.leader = obj;
   },
+  // Only the terminal engine's own render() actually draws frames --
+  // these two just keep frameIndex itself in sync, the same as the
+  // Python twin, so a save/load round trip always agrees on which
+  // frame a Thing is showing.
+  set_frame: (obj, world, a) => { obj.frameIndex = Math.max(0, num(a.index, 0)); },
+  next_frame: (obj) => { obj.frameIndex += 1; },
   shape: (obj, world, a, it) => {
     const victim = a.target === "self" ? obj : it;
     if (victim) {

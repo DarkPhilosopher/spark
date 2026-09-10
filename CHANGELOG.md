@@ -16,6 +16,79 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ### Added
 
+- **Multi-cell ASCII sprites and a real animation system — `set_frame`/
+  `next_frame`, a Frames screen in the terminal builder, and a saved-
+  game example** — requested directly: "make a list of saved frames
+  and animations i can make as a new option menu of sparks whole
+  program and make it in when and do code wholw thing as a game save
+  file also besides a built in utility... i want to add each grid
+  locked pixel of the entity on one single frame than the next frame
+  to follow the same way... what latter i choose than what colour."
+
+  A character can now carry `frames`: a list of frames, each one a
+  list of `{dx, dy, glyph, color}` pixels relative to its own `(x, y)`
+  — a real multi-cell ASCII sprite instead of one plain letter, the
+  same "offsets from my own spot" idea `parts` already is for
+  world3d.html's own 3D shapes, just for the terminal's own ASCII grid
+  instead. `World.render()` draws every pixel of a Thing's current
+  frame (`frame_index`, wrapped by modulo, not clamped — so
+  `next_frame` never needs to know how many frames actually exist to
+  stay safe) in place of its plain glyph; a Thing with no frames at
+  all (the overwhelming majority, still) renders exactly as it always
+  did, byte for byte. Two new tiles, both engines: `set_frame <index>`
+  jumps straight to one; `next_frame` just counts up by one, meant to
+  be paired with the existing `timer` sensor for a real, tile-authored
+  animation loop — `WHEN timer 10 DO next_frame` — rather than adding
+  a third, redundant "animate automatically" tile of its own.
+
+  **The built-in utility**: a new "edit its frames" option on the
+  terminal builder's own Character screen opens a numbered-menu Frames
+  editor — add a frame, or pick one to edit; inside one frame, add a
+  pixel (typed grid position, a letter, a colour from the same picker
+  every other colour choice already uses) or remove one, with a small
+  coloured preview of the frame so far shown above the list. Backing
+  out having added nothing leaves no empty `"frames": []` behind in
+  the saved file — normalized back to "absent," the same as never
+  having opened the screen at all.
+
+  **The game-file half**: `games/outpost.json`'s own `turret` now
+  actually uses this — two frames (a plain silver `T`, then a yellow
+  one) and `WHEN timer 10 DO next_frame` on its own brain, blinking a
+  scanning light for real, saved right in the game's own JSON, not
+  just a capability sitting unused.
+
+  `tests/check_frames.py` (new, 11 checks) and `tests/frames_tiles.test.js`
+  (new, 9 checks) cover `set_frame`/`next_frame` and (Python only,
+  since world3d.html never renders this) the multi-cell `render()`
+  drawing directly — deliberately not folded into `check_engines.py`'s
+  shared snapshot harness, same reasoning as `check_harvest.py`'s own
+  long comment gives. `tests/check_frames_screen.py` (new, 15 checks)
+  drives the actual terminal builder through a real pty end to end:
+  opening Frames, adding a frame and a pixel, backing all the way out,
+  saving, and reading the saved file back to confirm the pixel is
+  really there — not just on screen — plus the "leaves no empty list
+  behind" case, confirmed against the file on disk both times.
+  `check_engines.py` confirms the updated `outpost.json` — turret
+  animation included — is still bit-for-bit identical between the two
+  engines across four seeds.
+
+  One real mistake made and caught while building this, worth naming
+  honestly: early hand-testing of the Frames screen saved directly
+  over the shared `games/chase.json` fixture twice, since
+  `editor_screen`'s own "save" always writes to
+  `games/<the project's own "name" field>.json` — not whatever file it
+  was loaded from — and a quick scratch copy that kept the original
+  `"name"` inside it saved right back over the real file both times.
+  Caught by `git diff` showing a file this session never meant to
+  touch, restored with `git checkout` immediately both times, and
+  `check_frames_screen.py`'s own `scratch_game()` now renames the
+  copy's internal `"name"` too, specifically so this can't happen
+  again, to this fixture or any other.
+
+  Validated with `node --check`, a full `html.parser` pass, `python3
+  -m py_compile`, and the full existing suite, all green. Not seen
+  running on a real device yet.
+
 - **`m` mines whatever ore you're touching, on demand** — requested
   directly: "make so i can press M key to mine." A new row on
   `outpost.json`'s hero: `WHEN key m AND touch ore DO give_item(self,

@@ -21,7 +21,7 @@ is a list of rows. Every row reads the same way:
     WHEN something is true   DO something
 
 That is the whole idea, and it is the idea Kodu and Project Spark used. Sixteen
-WHEN tiles crossed with thirty-three DO tiles is five hundred and twenty-eight
+WHEN tiles crossed with thirty-five DO tiles is five hundred and sixty
 different sentences, and rows can hold more than one tile each, so the real
 number is much larger. One of those tiles is **your own**: fold any row up under
 a name and it joins the palette like the rest.
@@ -802,6 +802,19 @@ own, `recruit` just spawns the new one at the buyer's own spot instead of
 a random empty square, already led by them. `games/outpost.json`'s hero
 can hire a `worker` or a `soldier` this way, for ore.
 
+A character's own look can be more than one plain glyph, too: `set_frame` and `next_frame` show frame `<n>` of myself, or the next one along, picking one of a list of
+**frames** on that character — each frame a list of pixels, a grid
+position plus its own letter and colour, all relative to that
+character's own spot. Authored with the terminal menus' own Frames
+screen (`character_screen` → "edit its frames"), one pixel and then
+the next frame the same way; pair `next_frame` with `timer` for a real
+tile-authored animation loop, `WHEN timer 10 DO next_frame`, the way
+`games/outpost.json`'s own turret blinks its scanning light. Only the
+terminal engine actually draws a `frames` list — world3d.html carries
+the field for a save/load round trip and keeps `set_frame`/`next_frame`
+running the same in both engines, but has its own 3D shape/`parts`
+system already and doesn't interpret this one.
+
 **Backpack, Properties, Mesh Creator, Build, and the Object Inspector share
 one shape**: up to six large buttons filling most of the screen, a box off
 to the side for whatever those buttons don't cover — live readouts, a
@@ -953,6 +966,9 @@ Once `python3 spark.py install` has been run, every one of these works as plain
 | `node tests/draw_line.test.js` | check draw_line/world.lines and pushLine's own geometry |
 | `python3 tests/check_lead.py` | check lead/dismiss/has_leader/recruit in the Python engine |
 | `node tests/lead.test.js` | check lead/dismiss/has_leader/recruit in the JavaScript engine |
+| `python3 tests/check_frames.py` | check set_frame/next_frame and multi-cell sprite rendering |
+| `node tests/frames_tiles.test.js` | check set_frame/next_frame in the JavaScript engine |
+| `python3 tests/check_frames_screen.py` | check the terminal builder's own Frames screen |
 | `python3 tests/check_chat_break.py` | check the terminal's "/" command line: every command, and that it stays open |
 | `python3 tests/check_status_line.py` | check the terminal's own score/health/tick/position status line |
 | `node tests/button_position.test.js` | check saved button positions survive a resize/rotation |

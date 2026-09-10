@@ -693,6 +693,30 @@ def a_recruit(obj, world, a, it):
         new.leader = obj
 
 
+@action("set_frame", "show frame {index} of myself",
+        Param("index", "Which frame? (0 is the first)", "int", [], 0))
+def a_set_frame(obj, world, a, it):
+    """Jump straight to one of my own sprite frames (see the terminal
+    builder's own Frames screen for authoring them) -- only the
+    terminal engine's render() actually draws the result, but this
+    tile itself runs the same in both engines, so a save/load round
+    trip always agrees on which frame a Thing is showing. Safe to call
+    even with no frames at all yet (or an index past however many
+    there are) -- render() falls back to the plain glyph, or wraps the
+    index around, either way."""
+    obj.frame_index = max(0, a["index"])
+
+
+@action("next_frame", "show my next frame")
+def a_next_frame(obj, world, a, it):
+    """Pair with the `timer` sensor for a real, tile-authored animation
+    loop: "WHEN timer 4 DO next_frame" cycles a Thing's own sprite
+    every 4 ticks. Always just counts up -- render() is what wraps it
+    back to frame 0 once it runs past however many frames actually
+    exist, so this never needs to know that count itself."""
+    obj.frame_index += 1
+
+
 # Same list, same order, as world.SHAPES and world3d.html's own SHAPES --
 # not imported from world.py to avoid a circular import (world.py already
 # imports this module), so this one is kept in sync by hand instead.

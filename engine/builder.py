@@ -652,6 +652,109 @@ def brain_screen(project, char):
                 rows[index - 1], rows[index] = rows[index], rows[index - 1]
 
 
+def _frame_preview(frame):
+    """A small colourised look at one frame, the pixels placed exactly
+    where they'll actually draw relative to each other -- not the game
+    world, just this frame on its own."""
+    if not frame:
+        return ["  (empty -- the plain glyph shows until you add a pixel)"]
+    xs = [p["dx"] for p in frame]
+    ys = [p["dy"] for p in frame]
+    x0, y0 = min(xs), min(ys)
+    w, h = max(xs) - x0 + 1, max(ys) - y0 + 1
+    grid = [[" "] * w for _ in range(h)]
+    for p in frame:
+        grid[p["dy"] - y0][p["dx"] - x0] = ("\033[%dm%s\033[0m"
+                                             % (COLORS.get(p["color"], 37), p["glyph"]))
+    return ["  " + "".join(row) for row in grid]
+
+
+def edit_frame_screen(project, char, frame):
+    """One frame of a multi-cell ASCII sprite: a list of pixels, each its
+    own grid position (relative to the character's own spot), letter,
+    and colour -- add one, or the next one, the same way, to build up
+    the whole picture; a later frame the same way again is what makes
+    the `next_frame` tile (paired with `timer`) into a real animation.
+    """
+    while True:
+        header("One frame of '%s' -- %d pixel%s"
+               % (char["kind"], len(frame), "" if len(frame) == 1 else "s"))
+        for line in _frame_preview(frame):
+            print(line)
+        print()
+        for i, p in enumerate(frame, 1):
+            print(" %2d. (%d,%d) '%s' %s" % (i, p["dx"], p["dy"], p["glyph"], p["color"]))
+        print()
+        options = ["add a pixel"]
+        if frame:
+            options.append("remove a pixel")
+        choice = menu(options, back_label="done")
+        if choice is None:
+            return
+        if choice == 0:
+            dx = ask_int("How far right of centre? (negative = left)", 0)
+            dy = ask_int("How far below centre? (negative = up)", 0)
+            glyph = (ask("Which letter or symbol?", char["glyph"]) or "?")[:1]
+            names = list(COLORS)
+            ci = menu(names, "pick a colour", allow_back=False)
+            color = names[ci]
+            remember(project)
+            # One pixel per grid spot -- a new one placed over an
+            # existing spot replaces it, the same as a real grid would.
+            frame[:] = [p for p in frame if (p["dx"], p["dy"]) != (dx, dy)]
+            frame.append({"dx": dx, "dy": dy, "glyph": glyph, "color": color})
+        elif choice == 1 and frame:
+            header("Remove which pixel?")
+            index = menu(["(%d,%d) '%s' %s" % (p["dx"], p["dy"], p["glyph"], p["color"])
+                          for p in frame])
+            if index is not None:
+                remember(project)
+                frame.pop(index)
+
+
+def frames_screen(project, char):
+    """The character's own list of sprite frames -- see edit_frame_screen
+    for what's actually inside one. Only the terminal engine draws
+    these (world3d.html has its own 3D shape/parts system already), so
+    this lives in the terminal menus, not the browser editor."""
+    frames = char.setdefault("frames", [])
+    while True:
+        header("Frames for '%s' (%d saved)" % (char["kind"], len(frames)))
+        if frames:
+            for i, f in enumerate(frames, 1):
+                print(" %2d. %d pixel%s" % (i, len(f), "" if len(f) == 1 else "s"))
+        else:
+            print(" (none yet -- the plain '%s' in %s still shows until you add one)"
+                  % (char["glyph"], char["color"]))
+        print()
+        options = ["add a new frame"]
+        if frames:
+            options.append("edit a frame")
+            options.append("remove a frame")
+        choice = menu(options, back_label="done")
+        if choice is None:
+            if not frames:
+                # Nothing was ever actually added -- don't leave an
+                # empty list cluttering this character's own JSON.
+                char.pop("frames", None)
+            return
+        if choice == 0:
+            remember(project)
+            frames.append([])
+            edit_frame_screen(project, char, frames[-1])
+        elif choice == 1:
+            header("Edit which frame?")
+            index = menu(["%d. %d pixels" % (i + 1, len(f)) for i, f in enumerate(frames)])
+            if index is not None:
+                edit_frame_screen(project, char, frames[index])
+        elif choice == 2:
+            header("Remove which frame?")
+            index = menu(["%d. %d pixels" % (i + 1, len(f)) for i, f in enumerate(frames)])
+            if index is not None:
+                remember(project)
+                frames.pop(index)
+
+
 def character_screen(project, char):
     while True:
         header("Character '%s'" % char["kind"])
@@ -660,9 +763,10 @@ def character_screen(project, char):
               % (char["health"], char["count"]))
         print(" role       : %s   solid (blocks others): %s"
               % (char["role"], "yes" if char["solid"] else "no"))
-        print(" brain rows : %d\n" % len(char["brain"]))
-        choice = menu(["edit its brain", "change how it looks",
-                       "change its colour", "change its health",
+        print(" brain rows : %d   sprite frames: %d\n"
+              % (len(char["brain"]), len(char.get("frames") or [])))
+        choice = menu(["edit its brain", "edit its frames (a multi-cell sprite/animation)",
+                       "change how it looks", "change its colour", "change its health",
                        "change how many start", "player or prop",
                        "solid or walk-through", "delete this character"],
                       back_label="done")
@@ -672,24 +776,26 @@ def character_screen(project, char):
             if brain_screen(project, char) is UNDONE:
                 return UNDONE          # `char` is now a dangling reference
         elif choice == 1:
-            char["glyph"] = (ask("One letter or symbol", char["glyph"]) or "?")[:1]
+            frames_screen(project, char)
         elif choice == 2:
+            char["glyph"] = (ask("One letter or symbol", char["glyph"]) or "?")[:1]
+        elif choice == 3:
             names = list(COLORS)
             index = menu(names, "pick a colour", allow_back=False)
             char["color"] = names[index]
-        elif choice == 3:
-            char["health"] = max(1, ask_int("How much health", char["health"]))
         elif choice == 4:
-            char["count"] = max(0, ask_int("How many at the start", char["count"]))
+            char["health"] = max(1, ask_int("How much health", char["health"]))
         elif choice == 5:
+            char["count"] = max(0, ask_int("How many at the start", char["count"]))
+        elif choice == 6:
             index = menu(["player (the game ends if all of them die)",
                           "prop (scenery, enemies, pickups)"],
                          "pick", allow_back=False)
             char["role"] = ["player", "prop"][index]
-        elif choice == 6:
+        elif choice == 7:
             char["solid"] = ask_yes("Should it block others from walking through",
                                     char["solid"])
-        elif choice == 7:
+        elif choice == 8:
             if ask_yes("Really delete '%s'" % char["kind"]):
                 # Deleting a character throws away every brain row it had, so
                 # this one is worth an undo mark even though the other settings

@@ -86,6 +86,18 @@ class Thing:
         # engine/runner.py), never read by any tile or sensor. Not part
         # of the template; nothing sets this at spawn time.
         self.label = None
+        # A multi-cell ASCII sprite: frames[i] is one frame, a list of
+        # {dx, dy, glyph, color} pixels relative to my own (x, y) --
+        # None (the default) means "just my plain glyph/color at my own
+        # spot", exactly as every character worked before frames
+        # existed. Authored with the terminal builder's own Frames
+        # screen (character_screen), or by the set_frame/next_frame
+        # tiles at runtime. Only the terminal's own render() below
+        # actually draws these -- world3d.html carries the field too,
+        # for a save/load round trip, but has its own 3D shape/parts
+        # system already and doesn't interpret this one.
+        self.frames = template.get("frames", None)
+        self.frame_index = 0
 
 
 class World:
@@ -285,12 +297,32 @@ class World:
     def render(self, color=True):
         grid = [[" "] * self.width for _ in range(self.height)]
         for thing in self.things:
-            if self.in_bounds(thing.x, thing.y):
-                cell = thing.glyph
-                if color:
-                    cell = "\033[%dm%s\033[0m" % (COLORS.get(thing.color, 37), cell)
-                grid[thing.y][thing.x] = cell
+            for x, y, glyph, thing_color in self._pixels(thing):
+                if self.in_bounds(x, y):
+                    cell = glyph
+                    if color:
+                        cell = "\033[%dm%s\033[0m" % (COLORS.get(thing_color, 37), cell)
+                    grid[y][x] = cell
         lines = ["+" + "-" * self.width + "+"]
         lines += ["|" + "".join(row) + "|" for row in grid]
         lines.append("+" + "-" * self.width + "+")
         return lines
+
+    def _pixels(self, thing):
+        """Every (x, y, glyph, color) `render` should draw for this Thing
+        this frame -- its own multi-cell sprite frame if it has any,
+        otherwise just its plain single glyph/color at its own spot,
+        exactly as before `frames` existed. frame_index wraps around
+        (modulo) rather than clamping, so a `next_frame` tile that just
+        keeps counting up forever never needs to know how many frames
+        there actually are -- it can't go "out of range" to begin with."""
+        frames = thing.frames
+        if not frames:
+            return [(thing.x, thing.y, thing.glyph, thing.color)]
+        frame = frames[thing.frame_index % len(frames)]
+        if not frame:
+            return [(thing.x, thing.y, thing.glyph, thing.color)]
+        return [(thing.x + p.get("dx", 0), thing.y + p.get("dy", 0),
+                 (str(p.get("glyph", thing.glyph)) or thing.glyph)[:1],
+                 p.get("color", thing.color))
+                for p in frame]

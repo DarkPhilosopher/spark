@@ -218,12 +218,28 @@ The screens, in order of depth:
    characters and their brains, your own tiles, world settings, save, rename,
    send to GitHub, invite someone to play.
 3. **Characters** — add a character, or pick one to edit.
-4. **One character** — its brain, its letter, colour, health, how many start,
-   player or prop, solid or walk-through, delete.
+4. **One character** — its brain, its frames, its letter, colour, health, how
+   many start, player or prop, solid or walk-through, delete.
 5. **Its brain** — the list of `WHEN ... DO ...` rows: add, change, delete, move
    a row up.
 6. **One row** — add or remove WHEN tiles and DO tiles.
 7. **One tile** — answer its questions, one per screen.
+8. **Its frames** — a multi-cell ASCII sprite: add a frame, or pick one to
+   edit; remove one. Only the terminal engine draws these — see below.
+9. **One frame** — a list of pixels: add one (a grid position relative to the
+   character's own spot, a letter, a colour), or remove one. A small
+   coloured preview of the frame so far shows above the list.
+
+A character with frames draws every one of that frame's own pixels instead
+of its plain single letter — a real multi-cell ASCII sprite. `set_frame`
+and `next_frame` (both engines) switch which frame is currently showing;
+pair `next_frame` with `timer` for a real animation loop, e.g. `WHEN timer
+10 DO next_frame`. `games/outpost.json`'s own turret does exactly that —
+its scanning light blinks silver/yellow every 10 ticks. Only the terminal
+engine actually draws frames; world3d.html carries the field (so a
+save/load round trip never loses it, and `set_frame`/`next_frame` still
+run identically in both engines) but has its own 3D shape/parts system
+already and doesn't interpret this one.
 
 ---
 
