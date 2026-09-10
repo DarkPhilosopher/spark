@@ -168,6 +168,41 @@ check("missing a name gives a usage line, not a crash", "try: /name" in lines[0]
 kind, lines = run_local_command("/name x y Bob", w.project, w)
 check("non-numeric coordinates say so, not a crash", "plain numbers" in lines[0], lines)
 
+print("\n/log [n] and /forget <n>: a real, paginated log -- \"consistent log history\"")
+
+history = []
+kind, lines = run_local_command("/log", {}, None, history)
+check("nothing logged yet, says so", "nothing logged yet" in lines[0], lines)
+
+history = ["line %d" % i for i in range(25)]
+kind, lines = run_local_command("/log", {}, None, history)
+check("with no page given, shows the LATEST page, titled with its own number",
+      lines[0] == "-- page 3 of 3 --" and lines[-1] == "line 24", lines)
+kind, lines = run_local_command("/log 1", {}, None, history)
+check("an explicit page number shows that one instead",
+      lines[0] == "-- page 1 of 3 --" and lines[1] == "line 0", lines)
+kind, lines = run_local_command("/log 99", {}, None, history)
+check("an out-of-range page says so", "no page 99" in lines[0], lines)
+kind, lines = run_local_command("/log x", {}, None, history)
+check("a non-numeric page says so, not a crash", "plain number" in lines[0], lines)
+check("none of the above actually changed the log itself",
+      len(history) == 25 and history[0] == "line 0", history)
+
+history = ["line %d" % i for i in range(25)]
+kind, lines = run_local_command("/forget 2", {}, None, history)
+check("its own confirmation names the page and how many lines",
+      "page 2 forgotten (10 lines removed)" in lines[0], lines)
+check("those exact 10 lines are actually gone from the log",
+      "line 10" not in history and "line 19" not in history, history)
+check("earlier pages are untouched", history[0] == "line 0", history)
+check("later pages shift down and renumber -- what was page 3 is now page 2",
+      len(history) == 15 and history[10] == "line 20", history)
+
+kind, lines = run_local_command("/forget 99", {}, None, history)
+check("forgetting a page that never existed says so", "no page 99" in lines[0], lines)
+kind, lines = run_local_command("/forget x", {}, None, history)
+check("a non-numeric page says so, not a crash", "plain number" in lines[0], lines)
+
 print("\n%d passed, %d failed (pure logic)\n" % (passed, failed))
 
 # -- end to end, through a real pty ----------------------------------------

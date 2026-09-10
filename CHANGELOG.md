@@ -16,6 +16,61 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ### Added
 
+- **Chat gets a real, paginated log — `/log`/`/forget`, no more silent
+  history loss** — requested directly: "i need chat to have consistent
+  log hiistory but title each [page] of chat by [page] numbwr and make
+  command in chat to remove from history after submited... which part
+  of [chat] hiatory."
+
+  world3d.html's `#chat-log` used to silently drop its oldest line past
+  200 (`while (log.children.length > 200) log.firstChild.remove();`) —
+  gone now, nothing is ever silently lost. Every line `chatLine()`
+  writes lands inside a page wrapper instead of directly in the log, a
+  new one starting automatically every 10 lines with its own "`-- page
+  N --`" header — the titling asked for directly. A page's number is
+  stamped once and never reused, even across `/clear` or a `/forget` —
+  addressed by that permanent number, not by its position among
+  whatever pages still happen to exist, so removing one never shifts
+  anyone else's number under it. New `/log [n]` scrolls the log to a
+  given page (latest if left off) rather than replacing the view — this
+  log is a live scrollback, not a single screen; new `/forget <n>`
+  removes one page's own wrapper for good.
+
+  The plain terminal player got the same two commands, adapted to how
+  it actually works: `engine/runner.py` had no persistent log of any
+  kind before this at all (every `/mine`/`/units`/`/name` result was
+  strictly one-off, gone the moment the next screen replaced it) — a
+  new flat `chat_history` list, created once per `play()` call and
+  threaded through every `chat_break()`, now collects those three
+  commands' own results. `/log [n]` there *replaces* the current screen
+  with a titled page (the terminal has no scrollback to scroll), and
+  `/forget <n>` deletes that page's own slice of the list outright —
+  since it's a flat list rather than independently stamped wrappers,
+  later pages shift down and renumber the way deleting a page from any
+  plain paginated list would; documented as a deliberate difference
+  from world3d.html's own gap-preserving behavior, not a parity miss.
+  Both engines default to 10 lines per page.
+
+  `tests/chat.test.js` extended (+16 checks, 49 total): nothing is ever
+  silently dropped across 25 lines (3 pages, correctly titled), `/log`
+  scrolls without adding a line, an out-of-range or non-numeric page
+  says so, `/forget` actually removes a page's own wrapper, confirms
+  the line count removed, leaves neighboring pages' own numbers alone
+  (no shifting), refuses a page already forgotten or never existing,
+  and writing again after forgetting the currently-open page (or after
+  `/clear`) starts a correctly-numbered fresh page rather than silently
+  writing into a detached, invisible one — a real bug this exact case
+  caught and fixed before it shipped (`/clear` wasn't resetting the
+  open-page tracking, so the very next line after clearing would have
+  vanished into the removed DOM node). `tests/check_chat_break.py`
+  extended (+12 checks, 45 total): the same page/forget logic against
+  the terminal's own flat-list model, including its own renumbering
+  behavior specifically (what was page 3 becomes page 2 once page 2 is
+  forgotten). `check_engines.py` unaffected (no game-data changes this
+  round). Validated with `node --check`, a full `html.parser` pass,
+  `python3 -m py_compile`, and the full existing suite, all green. Not
+  seen running on a real device yet.
+
 - **A placeable turret, and `/units`/`/name` — a roster of everything
   you own or possess, named and located** — requested directly: "place
   also a turret into spark outpost," and "make so all things purchased

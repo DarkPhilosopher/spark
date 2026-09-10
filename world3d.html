@@ -5024,8 +5024,32 @@ function setupUiToggle() {
  * ------------------------------------------------------------------- */
 let seenChat = 0;   // the highest chat line "n" already shown
 
+// Consistent log history, requested directly: every line ever shown
+// stays (no more silent 200-line trim), grouped into numbered pages --
+// "title each [page] of chat by page number." A page's own number is
+// stamped once, permanently, and never reused or renumbered even after
+// /forget removes one -- pageNumber is the real identity a page is
+// addressed by (see CHAT_COMMANDS.log/forget below), not its position
+// among whatever pages still happen to exist.
+const CHAT_PAGE_SIZE = 10;
+let chatPageCount = 0;      // highest page number ever stamped
+let chatPageEl = null;      // the currently-open page's own wrapper element
+let chatPageLineCount = 0;  // lines already in that open page
+
 function chatLine(who, text, cls) {
   const log = $("#chat-log");
+  if (!chatPageEl || chatPageLineCount >= CHAT_PAGE_SIZE) {
+    chatPageCount++;
+    chatPageLineCount = 0;
+    chatPageEl = document.createElement("div");
+    chatPageEl.className = "chat-page";
+    chatPageEl.pageNumber = chatPageCount;
+    const header = document.createElement("div");
+    header.className = "chat-line sys";
+    header.textContent = "-- page " + chatPageCount + " --";
+    chatPageEl.appendChild(header);
+    log.appendChild(chatPageEl);
+  }
   const line = document.createElement("div");
   line.className = "chat-line" + (cls ? " " + cls : "");
   if (who) {
@@ -5037,9 +5061,9 @@ function chatLine(who, text, cls) {
   } else {
     line.textContent = text;
   }
-  log.appendChild(line);
+  chatPageEl.appendChild(line);
+  chatPageLineCount++;
   log.scrollTop = log.scrollHeight;
-  while (log.children.length > 200) log.firstChild.remove();
 }
 
 // Called every poll() -- chat rides along with the world snapshot the
@@ -5105,6 +5129,8 @@ const CHAT_COMMANDS = {
     chatLine("", "/mine <x> <y> — mine the ore at that spot, if you're next to it", "sys");
     chatLine("", "/units — list everything you own or possess, and where it is", "sys");
     chatLine("", "/name <x> <y> <new name> — rename whatever's yours at that spot", "sys");
+    chatLine("", "/log [n] — scroll to a numbered page of this log; latest if n is left off", "sys");
+    chatLine("", "/forget <n> — remove page n from this log for good", "sys");
     chatLine("", "anything else is said to the others, if the server is running", "sys");
   },
   who() {
@@ -5112,7 +5138,52 @@ const CHAT_COMMANDS = {
     if (!people.length) { chatLine("", "nobody else is connected", "sys"); return; }
     for (const p of people) chatLine("", p.name + " — " + p.role, "sys");
   },
-  clear() { $("#chat-log").textContent = ""; },
+  clear() {
+    $("#chat-log").textContent = "";
+    // The wrapper chatLine() was still writing into is gone now -- start
+    // the next line fresh rather than appending into a detached, now
+    // invisible page. Numbering itself keeps climbing (page numbers are
+    // permanent labels, never reused, even across a /clear).
+    chatPageEl = null;
+    chatPageLineCount = 0;
+  },
+  // Scrolls to a numbered page rather than replacing the view -- this
+  // log is a live scrollback, not a single screen the way the
+  // terminal's own /log is. Pages are addressed by their own stamped
+  // number, not by position, so a /forget-ten gap never shifts anyone
+  // else's number.
+  log(rest) {
+    if (!chatPageCount) { chatLine("", "nothing logged yet", "sys"); return; }
+    rest = String(rest || "").trim();
+    let n = chatPageCount;
+    if (rest) {
+      n = parseInt(rest, 10);
+      if (!Number.isFinite(n)) { chatLine("", "page number needs to be a plain number: /log [n]", "sys"); return; }
+    }
+    if (n < 1 || n > chatPageCount) {
+      chatLine("", "no page " + n + " -- there are " + chatPageCount, "sys"); return;
+    }
+    const target = [...$("#chat-log").children].find(p => p.pageNumber === n);
+    if (!target) { chatLine("", "page " + n + " was already forgotten", "sys"); return; }
+    $("#chat-log").scrollTop = target.offsetTop || 0;
+  },
+  // Removes one page's own wrapper outright -- requested directly,
+  // "remove from history after submited." Its own confirmation lands
+  // in whatever page is current, same as any other command's output.
+  forget(rest) {
+    const n = parseInt(String(rest || "").trim(), 10);
+    if (!Number.isFinite(n)) { chatLine("", "page number needs to be a plain number: /forget <n>", "sys"); return; }
+    if (!chatPageCount || n < 1 || n > chatPageCount) {
+      chatLine("", "no page " + n + " -- there are " + chatPageCount, "sys"); return;
+    }
+    const log = $("#chat-log");
+    const target = [...log.children].find(p => p.pageNumber === n);
+    if (!target) { chatLine("", "page " + n + " was already forgotten", "sys"); return; }
+    const removed = Math.max(0, target.children.length - 1);   // minus its own header
+    if (target.remove) target.remove(); else log.removeChild(target);
+    if (target === chatPageEl) { chatPageEl = null; chatPageLineCount = 0; }
+    chatLine("", "page " + n + " forgotten (" + removed + " line" + (removed === 1 ? "" : "s") + " removed)", "sys");
+  },
   // Same idea as outpost's own touch(ore)+give_item brain row -- gather
   // from the ore at an exact spot rather than walking up to it blind.
   // Still one-square range, the same as `touch` itself always means;

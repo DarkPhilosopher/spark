@@ -151,6 +151,12 @@ name, which is what shows in `/units` from then on instead of its bare
 kind; unlike `/mine`, naming isn't range-limited — it's bookkeeping,
 not a physical act.
 
+`/mine`, `/units`, and `/name` results are kept, not just shown once —
+a real log, paginated 10 to a page. `/log [n]` shows one page (the
+latest if you leave the number off), titled by its own page number;
+`/forget <n>` deletes a page for good, and later pages shift down and
+renumber to fill the gap.
+
 ---
 
 ## Controls: the terminal menus
@@ -381,7 +387,7 @@ of blocks, with each character's glyph floating over its own block.
 | **⛶** | fullscreen |
 | **🎒** | Backpack, a small virtual file system |
 | **⚙** | Properties — grid-lock status, move speed, an opt-in minimap, and a clock, all driven by the world itself |
-| **💬** | Chat — the exact same conversation the browser editor's own box has, one per hosted game; anything typed without a leading `/` is said to the others, which only means anything in `LIVE` mode — there's nobody else to talk to in a local, single-tab copy. `/who` and `/clear` work either way. `/help` too, and — if the game itself carries its own "how to play" — shows that first: `games/outpost.json` is the one game so far that does. `/mine x y` gathers from the ore at that exact spot (one square away at most), `/units` lists everything you own or possess with its location, `/name x y <new name>` renames whatever's yours there — all local-play only like Build/Harvest above |
+| **💬** | Chat — the exact same conversation the browser editor's own box has, one per hosted game; anything typed without a leading `/` is said to the others, which only means anything in `LIVE` mode — there's nobody else to talk to in a local, single-tab copy. `/who` and `/clear` work either way. `/help` too, and — if the game itself carries its own "how to play" — shows that first: `games/outpost.json` is the one game so far that does. `/mine x y` gathers from the ore at that exact spot (one square away at most), `/units` lists everything you own or possess with its location, `/name x y <new name>` renames whatever's yours there — all local-play only like Build/Harvest above. Nothing here is ever silently lost — the whole log is kept, titled into numbered pages of 10; `/log n` scrolls to one, `/forget n` removes one for good, its own number never reused even after |
 | **✎** | the button editor — select, drag, resize, and fade any button here, including the drawer's own |
 | **run here** / **go live** | switches between the running game and this tab's own engine |
 

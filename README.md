@@ -953,9 +953,9 @@ Once `python3 spark.py install` has been run, every one of these works as plain
 | `node tests/draw_line.test.js` | check draw_line/world.lines and pushLine's own geometry |
 | `python3 tests/check_lead.py` | check lead/dismiss/has_leader/recruit in the Python engine |
 | `node tests/lead.test.js` | check lead/dismiss/has_leader/recruit in the JavaScript engine |
-| `python3 tests/check_chat_break.py` | check the terminal's "/" command line: /help, /mine, /units, /name |
+| `python3 tests/check_chat_break.py` | check the terminal's "/" command line: /help, /mine, /units, /name, /log, /forget |
 | `node tests/button_position.test.js` | check saved button positions survive a resize/rotation |
-| `node tests/chat.test.js` | check the 3D view's own chat: dedup and command dispatch |
+| `node tests/chat.test.js` | check the 3D view's own chat: dedup, command dispatch, paginated log |
 | `python3 tests/check_docs.py` | check this README still matches the code |
 | `python3 tests/check_sync.py` | check the GitHub push/pull logic |
 | `python3 tests/check_permissions.py` | check guests cannot exceed their code |
@@ -1075,7 +1075,8 @@ inert, exactly as it would arriving any other way.
     tests/button_position.test.js  checks a saved custom button position lands at the same
                                  percent of the screen after a simulated resize/rotation
     tests/chat.test.js          checks the 3D view's own chat: dedup (never your own line
-                                 twice) and /word command dispatch
+                                 twice), /word command dispatch, and the paginated log itself
+    tests/check_chat_break.py   checks the terminal's own "/" command line and /log/etc.
     tests/engine_trace.js       runs the JavaScript engine from a terminal, for that test
 
 Two files are **generated** — do not edit them by hand:

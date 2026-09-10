@@ -121,8 +121,80 @@ def _local_help_lines(project):
     lines.append("/mine <x> <y> -- mine the ore at that spot, if you're next to it")
     lines.append("/units -- list everything you own or possess, and where it is")
     lines.append("/name <x> <y> <new name> -- rename whatever's yours at that spot")
+    lines.append("/log [n] -- a numbered page of the log (mine/units/name results); "
+                  "latest if n is left off")
+    lines.append("/forget <n> -- remove page n from the log for good")
     lines.append("/quit -- leave the game (same as pressing q)")
     return lines
+
+
+# How many lines make up one page of /log -- small enough that a page
+# plus draw_chat_result's own header/footer still fits MANUAL.md's
+# documented 20-row minimum terminal.
+PAGE_SIZE = 10
+
+
+def _history_add(history, lines):
+    """Append a command's own result to the running log -- requested
+    directly, "consistent log history": mine/units/name results used to
+    be purely one-off, gone the moment the next screen replaced them.
+    `history` is a plain flat list (None is fine, and skips this, for
+    any caller that doesn't care about logging -- most direct tests of
+    a single command in isolation)."""
+    if history is not None:
+        history.extend(lines)
+
+
+def _history_pages(history):
+    if not history:
+        return 0
+    return (len(history) + PAGE_SIZE - 1) // PAGE_SIZE
+
+
+def _do_log(history, rest):
+    """/log [n]: one page of everything /mine, /units, and /name have
+    shown so far, titled by its own page number -- requested directly,
+    "title each [page] of chat by page number." Defaults to the most
+    recent page. /help, /log, and /forget themselves are deliberately
+    NOT logged -- navigating the log shouldn't itself grow the log."""
+    total = _history_pages(history)
+    if total == 0:
+        return ["nothing logged yet"]
+    rest = rest.strip()
+    if rest:
+        try:
+            n = int(rest)
+        except ValueError:
+            return ["page number needs to be a plain number: /log [n]"]
+    else:
+        n = total
+    if n < 1 or n > total:
+        return ["no page %d -- there are %d" % (n, total)]
+    start = (n - 1) * PAGE_SIZE
+    lines = ["-- page %d of %d --" % (n, total)]
+    lines.extend(history[start:start + PAGE_SIZE])
+    return lines
+
+
+def _do_forget(history, rest):
+    """/forget <n>: remove one page's lines from the log for good --
+    requested directly, "remove from history after submited." Pages
+    after the removed one shift down and renumber, the same as deleting
+    a page from any paginated list would."""
+    total = _history_pages(history)
+    if total == 0:
+        return ["nothing logged yet"]
+    try:
+        n = int(rest.strip())
+    except ValueError:
+        return ["page number needs to be a plain number: /forget <n>"]
+    if n < 1 or n > total:
+        return ["no page %d -- there are %d" % (n, total)]
+    start = (n - 1) * PAGE_SIZE
+    removed = len(history[start:start + PAGE_SIZE])
+    del history[start:start + PAGE_SIZE]
+    return ["page %d forgotten (%d line%s removed)"
+            % (n, removed, "" if removed == 1 else "s")]
 
 
 # Structure kinds nobody but the player ever creates in this game, so
@@ -224,15 +296,16 @@ def _do_mine(world, rest):
             % (x, y, hero.inventory["ore"])]
 
 
-def run_local_command(said, project, world=None):
+def run_local_command(said, project, world=None, history=None):
     """A single typed command line's result, as the lines chat_break
     should show. Purely local -- there is no server connection from the
     plain terminal player the way world3d.html/index.html have, so this
     is deliberately a smaller set than their own CHAT_COMMANDS: nobody
     else to /who, nothing here to /clear. Blank input is treated as
     /help, the friendliest thing to do with a stray keypress. `world`
-    is the live game (None is fine for anything that doesn't need it,
-    including every test of the pure command parsing below).
+    is the live game; `history` is the running log /log and /forget work
+    against (both None is fine for anything that doesn't need them,
+    including most direct tests of a single command in isolation).
 
     Returns ("quit", None) if the command means leave the game, or
     ("show", lines) with what to put on the result screen otherwise.
@@ -244,11 +317,21 @@ def run_local_command(said, project, world=None):
     if word == "help":
         return "show", _local_help_lines(project)
     if word == "mine":
-        return "show", _do_mine(world, rest)
+        lines = _do_mine(world, rest)
+        _history_add(history, lines)
+        return "show", lines
     if word == "units":
-        return "show", _do_units(world)
+        lines = _do_units(world)
+        _history_add(history, lines)
+        return "show", lines
     if word == "name":
-        return "show", _do_name(world, rest)
+        lines = _do_name(world, rest)
+        _history_add(history, lines)
+        return "show", lines
+    if word == "log":
+        return "show", _do_log(history, rest)
+    if word == "forget":
+        return "show", _do_forget(history, rest)
     if word in ("quit", "q"):
         return "quit", None
     return "show", ["no such command: /%s -- try /help" % word]
@@ -263,13 +346,16 @@ def draw_chat_result(lines):
     sys.stdout.flush()
 
 
-def chat_break(project, keyboard, world):
+def chat_break(project, keyboard, world, history):
     """Pressed "/" during play: hand the terminal back to normal cooked
     input for one line (so the phone's own text box/keyboard behaves
     exactly like it does everywhere else in this app, rather than
     gameplay's usual single-key swallowing), run whatever was typed as
     a command, and show the result as its own screen -- a second,
     separate view from the running world -- until any key dismisses it.
+    `history` is play()'s own running log, the same list across every
+    call this session -- see run_local_command for what actually lands
+    in it, and /log and /forget for reading it back and trimming it.
 
     Returns True if the command was to quit the game outright.
     """
@@ -281,7 +367,7 @@ def chat_break(project, keyboard, world):
     except EOFError:
         said = "quit"
     sys.stdout.write(HIDE)
-    kind, lines = run_local_command(said, project, world)
+    kind, lines = run_local_command(said, project, world, history)
     if kind == "quit":
         return True
     keyboard.resume()
@@ -299,6 +385,7 @@ def play(project, max_ticks=None):
     # You are playing your own game on your own phone, so the `open` tile is
     # allowed here. live.Session deliberately leaves it off.
     world.may_open = not headless
+    chat_history = []   # /mine, /units, /name results, for /log and /forget
 
     with Keyboard() as keyboard:
         if not headless:
@@ -311,7 +398,7 @@ def play(project, max_ticks=None):
                 if "q" in world.keys or "quit" in world.keys:
                     break
                 if "/" in world.keys and not headless:
-                    if chat_break(project, keyboard, world):
+                    if chat_break(project, keyboard, world, chat_history):
                         break
                     continue   # this tick's own keys are stale by now
                 world.step()
