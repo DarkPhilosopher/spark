@@ -101,7 +101,13 @@ def draw(world, speed):
     out = [HOME_CLEAR]
     out += world.render()
     hearts = sum(t.health for t in world.things if t.role == "player")
-    out.append("score %-5d  health %-4d tick %-6d" % (world.score, hearts, world.tick))
+    # Whoever's actually being controlled from here -- the same "the
+    # hero" every /mine-style chat command already means. None (shown as
+    # "-,-") only if the player character has died and there's nothing
+    # left to report a position for.
+    player = next((t for t in world.things if t.role == "player" and t.alive), None)
+    pos = "%d,%d" % (player.x, player.y) if player is not None else "-,-"
+    out.append("score %-5d  health %-4d tick %-6d  pos %s" % (world.score, hearts, world.tick, pos))
     out.append((world.message or "")[:world.width + 2])
     out.append("arrows/wasd move . space acts . q quits . / for chat")
     sys.stdout.write("\n".join(out) + "\n")

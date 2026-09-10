@@ -113,7 +113,7 @@ While a game is running (`spark.py play ...`, or **play it** in the menus):
 |---|---|
 | ↑ ↓ ← → | whatever the character's brain says for that key |
 | space | usually shoot — again, whatever the brain says |
-| w a s d, e, f, r, 1, 2 | available as tiles, if you build rows that use them |
+| w a s d, e, f, r, m, 1, 2 | available as tiles, if you build rows that use them |
 | `/` | a command line — see below |
 | `q` | quit back to the menu |
 | Ctrl-C | quit |
@@ -122,8 +122,8 @@ Keys are not hard-wired. `WHEN key up is pressed DO move up` is a brain row you
 built; delete it and the up arrow stops doing anything. The demo game wires the
 arrows and space for you.
 
-The display shows the world, then `score`, `health`, `tick`, then the most
-recent **say** message.
+The display shows the world, then `score`, `health`, `tick`, and your own
+`pos` (x,y) right under the map, then the most recent **say** message.
 
 **`/`** hands the terminal back to a normal, cooked text line — a real
 text box, backspace and all, exactly like typing anywhere else in this

@@ -954,6 +954,7 @@ Once `python3 spark.py install` has been run, every one of these works as plain
 | `python3 tests/check_lead.py` | check lead/dismiss/has_leader/recruit in the Python engine |
 | `node tests/lead.test.js` | check lead/dismiss/has_leader/recruit in the JavaScript engine |
 | `python3 tests/check_chat_break.py` | check the terminal's "/" command line: every command, and that it stays open |
+| `python3 tests/check_status_line.py` | check the terminal's own score/health/tick/position status line |
 | `node tests/button_position.test.js` | check saved button positions survive a resize/rotation |
 | `node tests/chat.test.js` | check the 3D view's own chat: dedup, command dispatch, paginated log |
 | `python3 tests/check_docs.py` | check this README still matches the code |

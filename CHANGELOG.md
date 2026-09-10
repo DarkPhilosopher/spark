@@ -14,6 +14,45 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ## Unreleased
 
+### Added
+
+- **`m` mines whatever ore you're touching, on demand** — requested
+  directly: "make so i can press M key to mine." A new row on
+  `outpost.json`'s hero: `WHEN key m AND touch ore DO give_item(self,
+  ore, 1)` — the same one-at-a-time amount the passive
+  stand-there-and-wait row already gives, just immediate instead of
+  waiting out the timer, the same way `e`/`r` are the deliberate,
+  on-demand counterpart to something that can otherwise just happen on
+  contact. Added `"m"` to the shared `KEYS` list so it's a real
+  tile-editor dropdown choice too, matching how `r`/`1`/`2` were added
+  when they were first used.
+
+  `tests/check_chat_break.py` extended (+4 checks, 70 total), against
+  the real `games/outpost.json` directly (not a stripped-down test
+  project, since this checks the actual shipped row): mines 1 while
+  touching ore, says so, mining again gives another, and not touching
+  ore means pressing `m` does nothing. `check_engines.py` still
+  bit-for-bit identical across four seeds with the updated
+  `outpost.json`. Validated with `python3 -m py_compile` and the full
+  existing suite, all green. Not seen on a real device yet.
+
+- **The terminal's status line now shows your own position** —
+  requested directly: "make so it shows my own coordinates just below
+  game map display in ASC[II]." Right under the map, on the same
+  `score`/`health`/`tick` line `draw()` already prints: `pos x,y` for
+  whoever's role is `player` and still alive — the same "the hero"
+  every `/mine`-style chat command already means. A dead player (no
+  position left to report) shows `pos -,-` rather than crashing.
+
+  `tests/check_status_line.py` (new, 4 checks): the position shows up,
+  the rest of the line (`score`/`health`/`tick`) is unchanged, it
+  actually updates as the player moves, and a dead player shows the
+  placeholder instead of erroring. Confirmed live too, through a real
+  pty driving an actual play session: `pos 42,19` before moving,
+  `pos 43,19` right after pressing → once. Validated with `python3 -m
+  py_compile` and the full existing suite, all green. Not seen on a
+  real device yet.
+
 ### Fixed
 
 - **`tests/check_menu.py`'s own occasional flake under load, actually

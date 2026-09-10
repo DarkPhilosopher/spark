@@ -25,6 +25,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from engine import brain                                          # noqa: E402
 from engine.runner import run_local_command, _local_help_lines   # noqa: E402
 from engine.world import World                                   # noqa: E402
 
@@ -230,6 +231,27 @@ kind, lines = run_local_command("/mine", w.project, w)
 check("missing coordinates gives a usage line, not a crash", "try: /mine" in lines[0], lines)
 kind, lines = run_local_command("/mine x y", w.project, w)
 check("non-numeric coordinates say so, not a crash", "plain numbers" in lines[0], lines)
+
+print("\npressing m while touching ore mines it directly (not a chat command --")
+print("the hero's own brain row, requested directly: \"press a M key to mine\")")
+
+w = World(brain.load(str(ROOT / "games" / "outpost.json")), seed=5)
+hero = next(t for t in w.things if t.kind == "hero")
+ore = next(t for t in w.things if t.kind == "ore")
+hero.x, hero.y = ore.x + 1, ore.y
+before = hero.inventory.get("ore", 0)
+w.keys = {"m"}
+w.step()
+check("pressing m while touching ore mines 1 right away",
+      hero.inventory.get("ore", 0) == before + 1, hero.inventory)
+check("says so", "mined" in (w.message or ""), w.message)
+w.step()
+check("pressing it again mines another", hero.inventory.get("ore", 0) == before + 2, hero.inventory)
+
+hero.x, hero.y = ore.x + 3, ore.y   # not touching it anymore
+before2 = hero.inventory.get("ore", 0)
+w.step()
+check("not touching ore -- pressing m does nothing", hero.inventory.get("ore", 0) == before2)
 
 print("\n/units and /name: the roster -- everything yours, named and located")
 

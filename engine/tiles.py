@@ -29,7 +29,7 @@ MAX_COMBO_DEPTH = 8
 
 DIRECTIONS = ["up", "down", "left", "right", "random", "toward it", "away from it", "forward"]
 STEPS = {"up": (0, -1), "down": (0, 1), "left": (-1, 0), "right": (1, 0)}
-KEYS = ["up", "down", "left", "right", "space", "w", "a", "s", "d", "e", "f", "r", "1", "2"]
+KEYS = ["up", "down", "left", "right", "space", "w", "a", "s", "d", "e", "f", "r", "m", "1", "2"]
 
 # The compass rose. North is up the screen, so its step is (0, -1). The four
 # diagonals are here and nowhere else, which is what makes `face` worth having:
