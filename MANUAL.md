@@ -164,11 +164,17 @@ name, which is what shows in `/units` from then on instead of its bare
 kind; unlike the four above, naming isn't range-limited — it's
 bookkeeping, not a physical act.
 
-`/mine`/`/attack`/`/recruit`/`/dismiss`/`/units`/`/name` results are
-kept, not just shown once — a real log, paginated 10 to a page. `/log
-[n]` shows one page (the latest if you leave the number off), titled
-by its own page number; `/forget <n>` deletes a page for good, and
-later pages shift down and renumber to fill the gap.
+`/list` is `/units` widened to the whole map — every entity alive
+anywhere, yours or not (bandits, unrecruited companions, all of it),
+each with its own kind, position, health, who's leading it if
+anyone is, and what it's carrying if anything — a full inspector for
+the workspace, not just your own roster.
+
+`/mine`/`/attack`/`/recruit`/`/dismiss`/`/units`/`/list`/`/name`
+results are kept, not just shown once — a real log, paginated 10 to a
+page. `/log [n]` shows one page (the latest if you leave the number
+off), titled by its own page number; `/forget <n>` deletes a page for
+good, and later pages shift down and renumber to fill the gap.
 
 ---
 
@@ -416,7 +422,7 @@ of blocks, with each character's glyph floating over its own block.
 | **⛶** | fullscreen |
 | **🎒** | Backpack, a small virtual file system |
 | **⚙** | Properties — grid-lock status, move speed, an opt-in minimap, and a clock, all driven by the world itself |
-| **💬** | Chat — the exact same conversation the browser editor's own box has, one per hosted game; anything typed without a leading `/` is said to the others, which only means anything in `LIVE` mode — there's nobody else to talk to in a local, single-tab copy. Stays open until you tap its own `✕` — nothing about sending a message or running a command closes it on its own. `/who` and `/clear` work either way. `/help` shows the game's own "how to play" first, if it has one (`games/outpost.json` does), then the full command reference grouped by type; `/help commands` (add `description` too) shows just that reference on its own. `/mine`/`/attack`/`/recruit`/`/dismiss x y` act on an exact spot the same as touching it would — gather ore, hit a bandit, recruit or release a bare/led companion/worker/soldier — one square away at most; `/units` lists everything you own or possess with its location, `/name x y <new name>` renames whatever's yours there. All local-play only like Build/Harvest above. Nothing here is ever silently lost — the whole log is kept, titled into numbered pages of 10; `/log n` scrolls to one, `/forget n` removes one for good, its own number never reused even after |
+| **💬** | Chat — the exact same conversation the browser editor's own box has, one per hosted game; anything typed without a leading `/` is said to the others, which only means anything in `LIVE` mode — there's nobody else to talk to in a local, single-tab copy. Stays open until you tap its own `✕` — nothing about sending a message or running a command closes it on its own. `/who` and `/clear` work either way. `/help` shows the game's own "how to play" first, if it has one (`games/outpost.json` does), then the full command reference grouped by type; `/help commands` (add `description` too) shows just that reference on its own. `/mine`/`/attack`/`/recruit`/`/dismiss x y` act on an exact spot the same as touching it would — gather ore, hit a bandit, recruit or release a bare/led companion/worker/soldier — one square away at most; `/units` lists everything you own or possess with its location, `/list` widens that to every entity in the world whether it's yours or not (kind, position, health, leader, inventory), `/name x y <new name>` renames whatever's yours there. All local-play only like Build/Harvest above. Nothing here is ever silently lost — the whole log is kept, titled into numbered pages of 10; `/log n` scrolls to one, `/forget n` removes one for good, its own number never reused even after |
 | **✎** | the button editor — select, drag, resize, and fade any button here, including the drawer's own |
 | **run here** / **go live** | switches between the running game and this tab's own engine |
 

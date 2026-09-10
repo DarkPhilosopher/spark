@@ -16,6 +16,26 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ### Added
 
+- **`/list`, a chat command: every entity in the world, yours or not,
+  with its properties** — requested directly: "a list of all entity
+  in workspace in chat command also showing its properties." `/units`
+  has always been scoped to "yours" (the hero, whatever it's led, and
+  every player-built structure); `/list` is the same idea widened to
+  the whole map — every living entity, bandits and unrecruited
+  companions included, each shown with its kind, position, health,
+  who's leading it if anyone is, and what it's carrying if its
+  inventory isn't empty. Sorted by kind then position so the same
+  world always lists the same way. Both engines: `_do_list` in
+  `engine/runner.py`, `CHAT_COMMANDS.list` in `world3d.html`, and a
+  matching row in each one's `COMMAND_CATALOG` (info category, right
+  under `/units`) so it shows up in `/help`. Like `/units`, its result
+  is added to the running log the same as any other command's.
+  `tests/check_chat_break.py` (+7 checks) and `tests/chat.test.js`
+  (+10 checks) cover it: an unled bystander and a dead thing (the
+  latter correctly absent), a led thing's "led by", a non-empty
+  inventory's "carrying", a bare entity showing neither, a custom
+  `/name` alongside its kind, and no world running.
+
 - **Multi-cell ASCII sprites and a real animation system — `set_frame`/
   `next_frame`, a Frames screen in the terminal builder, and a saved-
   game example** — requested directly: "make a list of saved frames

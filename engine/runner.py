@@ -124,6 +124,7 @@ COMMAND_CATALOG = [
     ("info", "/help [commands [description]]",
      "show this, or just the command list (add \"description\" for what each one does)"),
     ("info", "/units", "list everything you own or possess, and where it is"),
+    ("info", "/list", "list every entity in the world, yours or not, with its properties"),
     ("action", "/mine <x> <y>", "mine the ore at that spot, if you're next to it"),
     ("action", "/attack <x> <y>", "hit the bandit at that spot, if you're next to it"),
     ("action", "/recruit <x> <y>", "recruit whatever's bare there, if you're next to it"),
@@ -279,6 +280,36 @@ def _do_units(world):
     for t in owned:
         name = t.label or t.kind
         lines.append("  %s (%s) at (%d, %d)" % (name, t.kind, t.x, t.y))
+    return lines
+
+
+def _do_list(world):
+    """/list: every entity currently alive in the world -- not just yours
+    (see /units for that narrower "mine" view) -- each with its own
+    basic properties: kind, position, health, and whatever else it
+    happens to be carrying right now (a custom /name, a leader if
+    something's leading it, a non-empty inventory). Requested directly:
+    "a list of all entity in workspace in chat command also showing
+    its properties" -- the map-wide inspector /units was never meant
+    to be. Sorted by kind then position so the same world always lists
+    the same way, not by whatever order things happen to sit in
+    internally."""
+    if world is None:
+        return ["no game running"]
+    living = [t for t in world.things if t.alive]
+    if not living:
+        return ["nothing in the world at all"]
+    lines = []
+    for t in sorted(living, key=lambda t: (t.kind, t.x, t.y)):
+        name = ("%s (%s)" % (t.label, t.kind)) if t.label else t.kind
+        bits = [name, "at (%d, %d)" % (t.x, t.y), "health %d" % t.health]
+        if t.leader is not None and t.leader.alive:
+            bits.append("led by " + (t.leader.label or t.leader.kind))
+        carrying = {k: v for k, v in t.inventory.items() if v}
+        if carrying:
+            bits.append("carrying " + ", ".join(
+                "%d %s" % (v, k) for k, v in sorted(carrying.items())))
+        lines.append("  " + " -- ".join(bits))
     return lines
 
 
@@ -499,6 +530,10 @@ def run_local_command(said, project, world=None, history=None):
         return "show", lines
     if word == "units":
         lines = _do_units(world)
+        _history_add(history, lines)
+        return "show", lines
+    if word == "list":
+        lines = _do_list(world)
         _history_add(history, lines)
         return "show", lines
     if word == "name":

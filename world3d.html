@@ -5174,6 +5174,7 @@ const COMMAND_CATALOG = [
    "show this, or just the command list (add \"description\" for what each one does)"],
   ["info", "/who", "who is connected"],
   ["info", "/units", "list everything you own or possess, and where it is"],
+  ["info", "/list", "list every entity in the world, yours or not, with its properties"],
   ["action", "/mine <x> <y>", "mine the ore at that spot, if you're next to it"],
   ["action", "/attack <x> <y>", "hit the bandit at that spot, if you're next to it"],
   ["action", "/recruit <x> <y>", "recruit whatever's bare there, if you're next to it"],
@@ -5366,6 +5367,34 @@ const CHAT_COMMANDS = {
     for (const t of owned) {
       chatLine("", "  " + (t.label || t.kind) + " (" + t.kind + ") at ("
         + t.x + ", " + t.y + ")", "sys");
+    }
+  },
+  // Every entity currently alive in the world -- not just yours (see
+  // /units above for that narrower "mine" view) -- each with its own
+  // basic properties: kind, position, health, and whatever else it
+  // happens to be carrying right now (a custom /name, a leader if
+  // something's leading it, a non-empty inventory). Requested
+  // directly: "a list of all entity in workspace in chat command also
+  // showing its properties." Sorted by kind then position so the same
+  // world always lists the same way. Mirrors engine/runner.py's own
+  // _do_list exactly.
+  list() {
+    if (!world) { chatLine("", "no game running", "sys"); return; }
+    const living = world.things.filter(t => t.alive);
+    if (!living.length) { chatLine("", "nothing in the world at all", "sys"); return; }
+    const sorted = [...living].sort((a, b) =>
+      a.kind < b.kind ? -1 : a.kind > b.kind ? 1
+      : a.x !== b.x ? a.x - b.x : a.y - b.y);
+    for (const t of sorted) {
+      const name = t.label ? t.label + " (" + t.kind + ")" : t.kind;
+      const bits = [name, "at (" + t.x + ", " + t.y + ")", "health " + t.health];
+      if (t.leader && t.leader.alive) bits.push("led by " + (t.leader.label || t.leader.kind));
+      const carrying = Object.entries(t.inventory || {}).filter(([, v]) => v);
+      if (carrying.length) {
+        carrying.sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
+        bits.push("carrying " + carrying.map(([k, v]) => v + " " + k).join(", "));
+      }
+      chatLine("", "  " + bits.join(" — "), "sys");
     }
   },
   // /name <x> <y> <new name>: not range-limited the way /mine is --

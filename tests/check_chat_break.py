@@ -314,6 +314,35 @@ check("missing a name gives a usage line, not a crash", "try: /name" in lines[0]
 kind, lines = run_local_command("/name x y Bob", w.project, w)
 check("non-numeric coordinates say so, not a crash", "plain numbers" in lines[0], lines)
 
+print("\n/list: every entity in the world, yours or not, with its properties")
+
+w, hero, companion, stray, enemy, wall, turret = roster_game()
+hero.inventory["ore"] = 3
+kind, lines = run_local_command("/list", w.project, w)
+check("lists the hero", any("hero" in l and "(1, 1)" in l for l in lines), lines)
+check("lists the unled stray too, unlike /units", any("(3, 3)" in l for l in lines), lines)
+check("lists the bandit too", any("bandit" in l and "(4, 4)" in l for l in lines), lines)
+check("lists structures the same way /units does", any("(5, 5)" in l for l in lines), lines)
+check("shows health", any("health" in l and "(1, 1)" in l for l in lines), lines)
+check("shows who's leading a led thing",
+      any("(2, 2)" in l and "led by hero" in l for l in lines), lines)
+check("shows a non-empty inventory",
+      any("(1, 1)" in l and "carrying 3 ore" in l for l in lines), lines)
+stray_line = next(l for l in lines if "(3, 3)" in l)
+check("a plain thing with nothing extra shows neither 'led by' nor 'carrying'",
+      "led by" not in stray_line and "carrying" not in stray_line, stray_line)
+
+kind, lines = run_local_command("/list", None)
+check("with no world running, says so rather than crashing",
+      "no game running" in lines[0], lines)
+
+w2, h2, _, _, _, _, t2 = roster_game()
+for t in list(w2.things):
+    if t is not h2:
+        w2.remove(t)
+kind, lines = run_local_command("/list", w2.project, w2)
+check("with only the hero alive, lists just the hero", len(lines) == 1 and "(1, 1)" in lines[0], lines)
+
 print("\n/log [n] and /forget <n>: a real, paginated log -- \"consistent log history\"")
 
 history = []

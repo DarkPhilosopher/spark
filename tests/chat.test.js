@@ -403,6 +403,58 @@ function runRosterTests() {
        rendered(log)[rendered(log).length - 1].includes("plain numbers"), rendered(log));
   }
 
+  runListTests();
+}
+
+console.log("\n/list: every entity in the world, yours or not, with its properties");
+function runListTests() {
+  const thing = (kind, x, y, extra) =>
+    Object.assign({kind, x, y, role: "prop", alive: true, leader: null, label: null,
+                    health: 6, inventory: {}}, extra || {});
+  {
+    const {api, log} = load();
+    api.runChatSaid("/list");
+    ok("with no world running, says so rather than crashing",
+       rendered(log)[1].includes("no game running"), rendered(log));
+  }
+  {
+    const {api, log} = load();
+    const h = thing("hero", 1, 1, {role: "player", health: 10});
+    const stray = thing("companion", 3, 3);         // unled -- /units wouldn't show this
+    const led = thing("worker", 2, 2, {leader: h, inventory: {ore: 3}});
+    const bandit = thing("bandit", 9, 9, {health: 4});
+    api.setWorld({things: [h, stray, led, bandit]});
+    api.runChatSaid("/list");
+    const out = rendered(log);
+    ok("lists the hero", out.some(l => l.includes("hero") && l.includes("(1, 1)")), out);
+    ok("lists an unled bystander too, unlike /units", out.some(l => l.includes("(3, 3)")), out);
+    ok("lists a bandit too", out.some(l => l.includes("bandit") && l.includes("(9, 9)")), out);
+    ok("shows health", out.some(l => l.includes("health 10")), out);
+    ok("shows who's leading a led thing", out.some(l => l.includes("led by hero")), out);
+    ok("shows a non-empty inventory", out.some(l => l.includes("carrying 3 ore")), out);
+    ok("a plain thing with nothing extra shows neither 'led by' nor 'carrying'",
+       out.find(l => l.includes("(9, 9)")) &&
+       !out.find(l => l.includes("(9, 9)")).includes("led by") &&
+       !out.find(l => l.includes("(9, 9)")).includes("carrying"), out);
+  }
+  {
+    const {api, log} = load();
+    api.setWorld({things: [{kind: "wall", x: 0, y: 0, role: "prop", alive: false,
+                             leader: null, label: null, health: 5, inventory: {}}]});
+    api.runChatSaid("/list");
+    ok("a dead thing doesn't show up at all",
+       rendered(log)[1].includes("nothing in the world at all"), rendered(log));
+  }
+  {
+    const {api, log} = load();
+    const h = thing("hero", 1, 1, {role: "player"});
+    const named = thing("turret", 5, 5, {label: "North Gate"});
+    api.setWorld({things: [h, named]});
+    api.runChatSaid("/list");
+    ok("a custom /name shows up here too, alongside its own kind",
+       rendered(log).some(l => l.includes("North Gate (turret)")), rendered(log));
+  }
+
   runPageTests();
 }
 
