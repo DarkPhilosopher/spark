@@ -170,6 +170,19 @@
       ]
     },
     {
+      "id": "recall_target",
+      "label": "I recall the target {name}",
+      "params": [
+        {
+          "name": "name",
+          "prompt": "Which name?",
+          "kind": "text",
+          "choices": [],
+          "default": "spot"
+        }
+      ]
+    },
+    {
       "id": "spent",
       "label": "my range or time has run out",
       "params": []
@@ -661,6 +674,19 @@
           "kind": "text",
           "choices": [],
           "default": "com.android.chrome"
+        }
+      ]
+    },
+    {
+      "id": "mark_target",
+      "label": "mark {name} as a target",
+      "params": [
+        {
+          "name": "name",
+          "prompt": "Call it what?",
+          "kind": "text",
+          "choices": [],
+          "default": "spot"
         }
       ]
     },

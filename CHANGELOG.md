@@ -16,6 +16,30 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ### Added
 
+- **The 3D view's chat panel opens by default, and gets a real toggle**
+  — requested directly: "make so [out]post game has chat opened
+  already... chat to close [th]an reopen also by [the] slash button
+  but [s]end message enter [y]et still [h]ave chat open until i type
+  command \"/xchat\"." Four changes in `world3d.html`: (1) the chat
+  panel is open the moment a game loads, not only once `💬` is tapped
+  (`openChat(focus)` takes a new argument so this one auto-open
+  doesn't also steal focus and pop the on-screen keyboard uninvited);
+  (2) `💬` is now a real toggle — tapping it again while chat's open
+  closes it, where it used to only ever open; (3) pressing `/` does
+  the same, mirroring the terminal player's own `/` gesture exactly,
+  guarded to do nothing while any text field (the chat input
+  included) already has focus, so typing an ordinary `/help` still
+  just types; (4) a new chat command, `/xchat`, closes the panel from
+  the keyboard outright, independent of focus. Sending a message with
+  Enter already left the panel open and still does — nothing changed
+  there, it just needed a real way to close it that wasn't only the
+  `✕` button. `tests/chat.test.js` (+5 checks) covers `openChat`/
+  `closeChat`/`/xchat` and confirms sending a plain (no leading `/`)
+  message still reaches the others without closing anything; its own
+  `load()` test harness gained a real classList-backed `#chat-modal`
+  stub (`FakeModal`) to make that possible, in place of a blank object
+  that could not remember being opened or closed. `MANUAL.md` updated.
+
 - **`mark_target`/`recall_target`, two tiles: a named slot that holds
   the actual character, not just a frozen number** — requested (across
   several rounds of narrowing down what was actually meant): "the

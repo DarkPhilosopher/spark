@@ -43,9 +43,26 @@ class FakeEl {
   }
 }
 
+// A real (if tiny) classList, backed by a Set -- unlike a plain object
+// with add()/remove() no-ops, .contains() actually reflects what was
+// last added/removed, and the SAME object comes back every time $ is
+// asked for "#chat-modal" (a fresh literal each call couldn't remember
+// anything between one $() and the next). That's enough to check
+// openChat/closeChat/xchat's real effect, not just that they don't throw.
+class FakeModal {
+  constructor() {
+    const on = new Set();
+    this.classList = {
+      add: c => on.add(c), remove: c => on.delete(c), contains: c => on.has(c),
+    };
+  }
+}
+
 function load() {
   const log = new FakeLog();
+  const modal = new FakeModal();
   const $ = sel => (sel === "#chat-log" ? log
+                   : sel === "#chat-modal" ? modal
                    : {value: "", focus() {}, classList: {add() {}, remove() {}}});
   const documentStub = {
     createElement: () => new FakeEl(),
@@ -57,6 +74,7 @@ function load() {
   const body = src + `
     module.exports = {
       chatLine, showNewChat, runChatSaid, sendChatText, CHAT_COMMANDS,
+      openChat, closeChat,
       getSeenChat: () => seenChat, setSeenChat: v => { seenChat = v; },
       setLive: (v, snap) => { live = v; liveSnapshot = snap; },
       setProject: p => { project = p; },
@@ -65,7 +83,7 @@ function load() {
   `;
   new Function("module", "$", "document", "authHeaders", "fetch", "live", "liveSnapshot", "project", "world", body)(
     mod, $, documentStub, () => ({}), fakeFetch, false, null, null, null);
-  return {api: mod.exports, log, fetchCalls};
+  return {api: mod.exports, log, modal, fetchCalls};
 }
 
 // log.children are now page-wrapper elements (one per CHAT_PAGE_SIZE
@@ -531,6 +549,37 @@ function runPageTests() {
        rendered(log).some(l => l === "-- page 2 --") &&
        rendered(log).some(l => l === "after clear") &&
        !rendered(log).some(l => l === "before clear"), rendered(log));
+  }
+
+  console.log("\nopenChat/closeChat/xchat: the chat panel opens by default, and /xchat closes it");
+  {
+    const {api, modal} = load();
+    api.openChat(false);
+    ok("openChat actually marks the modal open", modal.classList.contains("on"));
+  }
+  {
+    const {api, modal} = load();
+    api.openChat(false);
+    api.closeChat();
+    ok("closeChat marks it closed again", !modal.classList.contains("on"));
+  }
+  {
+    const {api, modal} = load();
+    api.openChat(false);
+    api.runChatSaid("/xchat");
+    ok("/xchat closes the panel the same way closeChat does",
+       !modal.classList.contains("on"));
+  }
+  {
+    const {api, modal, fetchCalls} = load();
+    api.openChat(false);
+    api.setLive(true, {you: {name: "gabe"}, chat: []});
+    api.runChatSaid("hello everyone");
+    ok("sending an ordinary (no leading /) message does NOT close the panel",
+       modal.classList.contains("on"));
+    ok("...and it actually got sent, slash-free, to the others",
+       fetchCalls.length === 1 && JSON.parse(fetchCalls[0].opts.body).text === "hello everyone",
+       fetchCalls);
   }
 
   console.log("\n" + pass + " passed, " + fail + " failed");

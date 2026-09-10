@@ -5209,9 +5209,10 @@ const COMMAND_CATALOG = [
   ["log", "/log [n]", "scroll to a numbered page of this log; latest if n is left off"],
   ["log", "/forget <n>", "remove page n from this log for good"],
   ["log", "/clear", "empty this log"],
+  ["system", "/xchat", "close the chat panel (the chat button, or the / key, reopens it)"],
 ];
-const CATEGORY_ORDER = ["info", "action", "roster", "log"];
-const CATEGORY_TITLE = {info: "Info", action: "Actions", roster: "Roster", log: "Log"};
+const CATEGORY_ORDER = ["info", "action", "roster", "log", "system"];
+const CATEGORY_TITLE = {info: "Info", action: "Actions", roster: "Roster", log: "Log", system: "System"};
 
 // The whole command reference, grouped by type -- "/help commands"
 // (bare) or "/help commands description" (with what each one does).
@@ -5263,6 +5264,15 @@ const CHAT_COMMANDS = {
     // permanent labels, never reused, even across a /clear).
     chatPageEl = null;
     chatPageLineCount = 0;
+  },
+  // Closes the chat panel, same as tapping ✕ -- requested directly, so
+  // sending a message on Enter can keep chat open (it already did, and
+  // still does) without leaving no way at all to close it purely from
+  // the keyboard. The panel reopens the same three ways it always did:
+  // the chat button, the / key, or just playing on -- it opens again on
+  // its own the next time this page loads.
+  xchat() {
+    closeChat();
   },
   // Scrolls to a numbered page rather than replacing the view -- this
   // log is a live scrollback, not a single screen the way the
@@ -5458,18 +5468,28 @@ async function runChatSaid(said) {
   await fn(rest);
 }
 
-function openChat() {
+// `focus` is false only for the auto-open on load (below) -- stealing
+// focus there would pop the on-screen keyboard the instant a game opens,
+// before anyone's asked for it. Every other opening (the button, the /
+// key) still focuses it, same as always.
+function openChat(focus = true) {
   $("#chat-modal").classList.add("on");
   if (!live) chatLine("", "chat needs the server running -- switch to \"go live\" first", "sys");
-  $("#chat-input").focus();
+  if (focus) $("#chat-input").focus();
+}
+
+function closeChat() {
+  $("#chat-modal").classList.remove("on");
 }
 
 function setupChat() {
   $("#chat-toggle").onclick = () => {
     if (editingButtons) return;   // the button editor owns taps for now
-    openChat();
+    // A real toggle, not just "open": tapping it again while chat's
+    // already open closes it, the same as the / key below.
+    if ($("#chat-modal").classList.contains("on")) closeChat(); else openChat();
   };
-  $("#chat-close").onclick = () => $("#chat-modal").classList.remove("on");
+  $("#chat-close").onclick = closeChat;
   const send = () => {
     const input = $("#chat-input");
     const text = input.value;
@@ -5480,6 +5500,23 @@ function setupChat() {
   $("#chat-input").addEventListener("keydown", e => {
     if (e.key === "Enter") send();
   });
+  // The terminal's own "/" gesture, mirrored here: while you're actually
+  // playing (nothing else is mid-typing), pressing / opens chat, same as
+  // tapping the button -- and since the button is a real toggle too,
+  // this doubles as a way to reopen it after /xchat or ✕ closed it.
+  // Guarded to only fire outside any text field, so typing an ordinary
+  // "/help" once chat is already open and focused still just types.
+  document.addEventListener("keydown", e => {
+    if (e.key !== "/" || editingButtons) return;
+    const active = document.activeElement;
+    if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) return;
+    e.preventDefault();
+    if ($("#chat-modal").classList.contains("on")) closeChat(); else openChat();
+  });
+  // Open by default -- requested directly, so a game (outpost especially,
+  // being multiplayer-coordination-heavy) doesn't need the button tapped
+  // first just to see or send anything.
+  openChat(false);
 }
 
 /* Quickbar -- a fixed row of plain bubble slots, always visible, no tab
