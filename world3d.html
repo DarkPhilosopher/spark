@@ -5119,16 +5119,28 @@ function showNewChat() {
   }
 }
 
+// Whatever you type here is kept in this log either way -- requested
+// directly, "it wont take and save chat history [for] what is not a
+// command." Before, a plain message with no server (or a failed send)
+// vanished outright, with only an error line to show for it; now the
+// line itself is always written first, so nothing typed is ever
+// silently lost, the same principle /log's own pagination already
+// holds to. Only whether it also reaches anyone else depends on
+// actually being live.
 async function sendChatText(text) {
-  if (!live) { chatLine("", "chat needs the server running", "bad sys"); return; }
+  const myName = (liveSnapshot && liveSnapshot.you && liveSnapshot.you.name) || "you";
+  if (!live) {
+    chatLine(myName, text, "mine");
+    chatLine("", "not sent -- no server running, but kept in this log", "sys");
+    return;
+  }
   const res = await fetch("api/chat", {
     method: "POST",
     headers: {"Content-Type": "application/json", ...authHeaders()},
     body: JSON.stringify({text}),
   }).catch(() => null);
-  if (!res || !res.ok) { chatLine("", "could not say that", "bad sys"); return; }
-  const myName = (liveSnapshot && liveSnapshot.you && liveSnapshot.you.name) || "you";
   chatLine(myName, text, "mine");
+  if (!res || !res.ok) chatLine("", "could not send it, but it's kept in this log", "bad sys");
 }
 
 // Shared by every /<verb> <x> <y> chat command below (mine/attack/

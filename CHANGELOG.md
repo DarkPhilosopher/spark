@@ -200,6 +200,35 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ### Fixed
 
+- **A plain chat message with no server running (or a failed send)
+  vanished outright, saving nothing** — requested directly: "it wont
+  take and save chat history [for] what is not a command." Both
+  `sendChatText` (`world3d.html`) and `sendChat` (`index.html`, the
+  browser editor's own separate chat box — a genuinely different
+  implementation, not shared code, so the same bug had to be fixed
+  twice) showed only an error line and threw the typed text away the
+  moment there was no live server to actually deliver it to, or the
+  delivery itself failed. Now the line is written to the log first, in
+  both cases, before anything else happens — so what you typed is
+  never lost, only whether it also reached anyone else is in doubt,
+  and the log says so plainly ("not sent -- no server running" /
+  "could not send it, but it's kept in this log"). `tests/chat.test.js`
+  (+4 checks) and `tests/deck.test.js` (updated, its own "plain words
+  with no server" case asserted the *old*, losing behaviour) cover
+  both the offline case and a simulated failed send (a new `failFetch`
+  option on `chat.test.js`'s own `load()`). Along the way, found and
+  fixed a real, longstanding, purely cosmetic bug in `chat.test.js`
+  itself: a bare top-level `console.log(...)` header placed right
+  before a `function runXTests()` declaration never actually printed
+  for the eight sections after the file's first `.then()`-chained
+  `return` — that `return` truncates the module's synchronous
+  execution (function declarations are hoisted and still get called
+  later; the plain statements beside them are not, and get skipped).
+  Every check still ran and counted correctly the whole time (`passed`/
+  `failed` was never wrong), only the section headers in the console
+  output were silently missing. Fixed by moving each header to the
+  first line inside its own function.
+
 - **`tests/check_menu.py`'s own occasional flake under load, actually
   root-caused this time** — self-initiated ("anything else you
   suggest, do it"), after this exact flake had been shrugged off as a

@@ -1665,17 +1665,25 @@ async function runSaid(said) {
   await fn(rest);
 }
 
+// Whatever you type here is kept in this log either way -- before, a
+// plain message with no server (or a failed send) vanished outright,
+// with only an error note to show for it; now the line itself is
+// always written first, so nothing typed is ever silently lost. Only
+// whether it also reaches anyone else depends on actually being live.
+// Mirrors world3d.html's own sendChatText exactly.
 async function sendChat(text) {
+  const mine = me.name || "you";
   if (store.mode !== "server") {
-    return note("nobody to talk to — chat needs the server running", "bad");
+    chatLine(mine, text, true);
+    return note("not sent -- no server running, but kept in this log", "bad");
   }
   const res = await fetch("api/chat", {
     method: "POST",
     headers: {"Content-Type": "application/json", ...authHeaders()},
     body: JSON.stringify({text}),
   }).catch(() => null);
-  if (!res || !res.ok) return note("could not say that", "bad");
-  chatLine(me.name || "you", text, true);
+  chatLine(mine, text, true);
+  if (!res || !res.ok) return note("could not send it, but it's kept in this log", "bad");
   seenChat = Math.max(seenChat, 0);      // our own line is already on screen
 }
 

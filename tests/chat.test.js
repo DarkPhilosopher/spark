@@ -58,7 +58,7 @@ class FakeModal {
   }
 }
 
-function load() {
+function load({failFetch = false} = {}) {
   const log = new FakeLog();
   const modal = new FakeModal();
   const $ = sel => (sel === "#chat-log" ? log
@@ -69,7 +69,13 @@ function load() {
     createTextNode: t => ({text: String(t)}),
   };
   const fetchCalls = [];
-  const fakeFetch = (url, opts) => { fetchCalls.push({url, opts}); return Promise.resolve({ok: true}); };
+  // failFetch simulates a bad connection -- resolved, but !ok, same as the
+  // real fetch call's own .catch(() => null) never even needs to fire for
+  // an ordinary server-side rejection (only an actual network failure does).
+  const fakeFetch = (url, opts) => {
+    fetchCalls.push({url, opts});
+    return Promise.resolve({ok: !failFetch});
+  };
   const mod = {exports: {}};
   const body = src + `
     module.exports = {
@@ -159,12 +165,44 @@ console.log("\nrunChatSaid: commands dispatch, plain text is chat, unknown comma
     ok("plain text (no leading /) is sent as chat, not treated as a command",
        fetchCalls.length === 1 && fetchCalls[0].url === "api/chat", fetchCalls);
 
-    runHelpTests();
+    runSavedOfflineTests();
   });
 }
 
-console.log("\n/help: shows the loaded game's own instructions, when it has any");
+function runSavedOfflineTests() {
+  // A top-level console.log right before a function declaration like this
+  // one never actually prints -- the earlier top-level `return` (inside
+  // the .then() this function is eventually called from) truncates the
+  // rest of the module's synchronous execution, skipping every bare
+  // statement after it while still hoisting the function declarations
+  // themselves. Harmless (every check below still runs and counts;
+  // "passed"/"failed" stay accurate), but the header needs to be the
+  // first line INSIDE the function to actually appear in the output.
+  console.log("\nsendChatText: nothing typed is ever silently lost, live or not");
+  {
+    const {api, log} = load();
+    api.setLive(false, null);
+    api.runChatSaid("saved even offline");
+    ok("a plain message with no server still lands in the log, not just an error",
+       rendered(log).some(l => l.includes("saved even offline")), rendered(log));
+    ok("...with a note that it wasn't actually sent anywhere",
+       rendered(log).some(l => l.includes("not sent")), rendered(log));
+  }
+  {
+    const {api, log} = load({failFetch: true});
+    api.setLive(true, {you: {name: "gabe"}, chat: []});
+    return api.runChatSaid("does this survive a bad connection").then(() => {
+      ok("even a failed send still keeps the message in the log",
+         rendered(log).some(l => l.includes("does this survive a bad connection")), rendered(log));
+      ok("...and says it could not actually be delivered",
+         rendered(log).some(l => l.includes("could not send")), rendered(log));
+      runHelpTests();
+    });
+  }
+}
+
 function runHelpTests() {
+  console.log("\n/help: shows the loaded game's own instructions, when it has any");
   {
     const {api, log} = load();
     api.setProject({name: "outpost", help: "line one\nline two"});
@@ -207,8 +245,8 @@ function runHelpTests() {
   runMineTests();
 }
 
-console.log("\n/mine <x> <y>: gather from a known spot instead of walking up to it blind");
 function runMineTests() {
+  console.log("\n/mine <x> <y>: gather from a known spot instead of walking up to it blind");
   const hero = () => ({kind: "hero", role: "player", alive: true, x: 5, y: 5, inventory: {}});
   const ore = (x, y) => ({kind: "ore", role: "prop", alive: true, x, y, inventory: {}});
 
@@ -254,8 +292,8 @@ function runMineTests() {
   runAttackTests();
 }
 
-console.log("\n/attack <x> <y>: hit a bandit at a known spot instead of walking up to it blind");
 function runAttackTests() {
+  console.log("\n/attack <x> <y>: hit a bandit at a known spot instead of walking up to it blind");
   const hero = (x, y) => ({kind: "hero", role: "player", alive: true, x, y, inventory: {}});
   const bandit = (x, y, health) => ({kind: "bandit", role: "prop", alive: true, x, y, health: health || 6});
 
@@ -298,8 +336,8 @@ function runAttackTests() {
   runSquadTests();
 }
 
-console.log("\n/recruit <x> <y> and /dismiss <x> <y>: the same as e/r, aimed at a spot");
 function runSquadTests() {
+  console.log("\n/recruit <x> <y> and /dismiss <x> <y>: the same as e/r, aimed at a spot");
   const hero = (x, y) => ({kind: "hero", role: "player", alive: true, x, y, inventory: {}});
   const worker = (x, y, leader) => ({kind: "worker", role: "prop", alive: true, x, y, leader: leader || null});
   const bandit = (x, y) => ({kind: "bandit", role: "prop", alive: true, x, y, health: 6});
@@ -364,8 +402,8 @@ function runSquadTests() {
   runRosterTests();
 }
 
-console.log("\n/units and /name: the roster -- everything yours, named and located");
 function runRosterTests() {
+  console.log("\n/units and /name: the roster -- everything yours, named and located");
   const thing = (kind, x, y, extra) =>
     Object.assign({kind, x, y, role: "prop", alive: true, leader: null, label: null, inventory: {}}, extra || {});
   const rosterWorld = () => {
@@ -424,8 +462,8 @@ function runRosterTests() {
   runListTests();
 }
 
-console.log("\n/list: every entity in the world, yours or not, with its properties");
 function runListTests() {
+  console.log("\n/list: every entity in the world, yours or not, with its properties");
   const thing = (kind, x, y, extra) =>
     Object.assign({kind, x, y, role: "prop", alive: true, leader: null, label: null,
                     health: 6, inventory: {}}, extra || {});
@@ -476,8 +514,8 @@ function runListTests() {
   runPageTests();
 }
 
-console.log("\nchatLine: consistent, paginated history -- no more silent 200-line trim");
 function runPageTests() {
+  console.log("\nchatLine: consistent, paginated history -- no more silent 200-line trim");
   {
     const {api, log} = load();
     for (let i = 0; i < 25; i++) api.chatLine("", "line " + i);

@@ -203,8 +203,15 @@ console.log("\nwhat is a command and what is chat");
   const d = harness({mode: "static"});
   await d.runSaid("hello everyone");
   const said = d.log.map(l => l.text).join(" | ");
-  ok("plain words with no server say there is nobody to talk to",
-     /nobody to talk to/.test(said), said);
+  // Requested directly, in the same wording for world3d.html's own
+  // sendChatText: "it wont take and save chat history [for] what is
+  // not a command." A plain message with no server used to vanish
+  // outright behind a "nobody to talk to" error -- now it's kept in
+  // the log either way, with a note that it wasn't actually sent.
+  ok("plain words with no server still land in the log, not just an error",
+     /hello everyone/.test(said), said);
+  ok("...with a note that it wasn't actually sent anywhere",
+     /not sent/.test(said), said);
 }
 {
   const d = harness();
