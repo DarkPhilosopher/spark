@@ -87,6 +87,49 @@ outcome) stays together.
     recruit → follow → gather → fight → dismiss, walking a hero there
     with injected keypresses), never an actual screen.
 
+  **Continued, same thread (2026-09-10 → 2026-09-11), three more
+  follow-up requests:**
+  - A real bug reported and fixed: `outpost`'s hero had no gathering
+    row of its own at all — only recruited companions/workers did, and
+    the Harvest panel is JS-only, never in the terminal — so the hero
+    touching ore in `spark.py play` did nothing. Fixed with one row,
+    the same `timer`+`touch`+`give_item` pattern companions/workers
+    already used.
+  - "press a button to make the ore" → space now spawns a fresh ore
+    vein (the existing `spawn` tile, no new engine code). `/mine <x>
+    <y>` (new, both places a command types) gathers a known spot from a
+    distance instead of walking there blind — still one square away at
+    most.
+  - "place also a turrent," "make so all things purchased go into a
+    selecter menu... named and located" → a placeable `turret` (`WHEN
+    see bandit within 5 DO damage it 3` — no new tiles; `damage` never
+    needed adjacency, only `see`'s own range did), plus `/units` (lists
+    the hero, everything led by it, every wall/turret — reusing
+    `leader`, nothing new for structures since only the player ever
+    creates one in this game) and `/name <x> <y> <name>` (new
+    per-Thing, purely cosmetic `label` field, both engines).
+  - "chat to have consistent log history... title each page by
+    number... command to remove from history" → `world3d.html`'s
+    `#chat-log` used to silently drop its oldest line past 200 — gone;
+    every line now lands in an auto-created page wrapper (10 lines
+    each, titled "`-- page N --`", numbered permanently, never reused
+    or reshuffled even after `/forget`). New `/log [n]` (scrolls to a
+    page) and `/forget <n>` (deletes one). The terminal player had no
+    persistent log at all before this — gained its own flat, list-based
+    version of the same two commands, deliberately documented as
+    renumbering after a deletion (unlike world3d.html's gap-preserving
+    one), since a flat list and independently-stamped DOM wrappers are
+    genuinely different data structures, not an accidental parity gap.
+  - Tests grew alongside every one of these
+    (`tests/check_lead.py`/`lead.test.js` to 16/17,
+    `tests/check_chat_break.py`/`chat.test.js` to 45/49), including one
+    real bug `chat.test.js` itself caught before shipping: `/clear`
+    wasn't resetting the open-page tracking, so the next line typed
+    after clearing would have silently vanished into a detached DOM
+    node. `check_engines.py` re-confirmed bit-for-bit parity after every
+    single change that touched `outpost.json`. Still nothing seen on an
+    actual device through this whole continuation either.
+
 - [x] **(noted 2026-09-03):** "make each page before progression a 6
   panel largest button to fit screen besides chat on side, same as
   before" — the 3D view's five modals (Backpack, Properties, Mesh
