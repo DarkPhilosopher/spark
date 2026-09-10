@@ -16,6 +16,48 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ### Added
 
+- **A placeable turret, and `/units`/`/name` — a roster of everything
+  you own or possess, named and located** — requested directly: "place
+  also a turret into spark outpost," and "make so all things purchased
+  go into a selecter menu for things i already own or posses and allow
+  all things to me named and located for selection into the chat."
+
+  `turret` (new `outpost.json` kind, count 0, solid, buildable like
+  `wall` already was): a stationary defender, `WHEN see bandit within 5
+  DO damage it 3` — no new tiles needed, since `damage` never required
+  adjacency in the first place, only `see`'s own range. It never moves;
+  it just shoots whatever wanders into range.
+
+  `/units` and `/name <x> <y> <new name>` are new in both places a
+  command can be typed (the terminal's own `/` line, world3d.html's
+  chat) — the "selector menu" itself, since there's no clickable UI
+  here, just text: `/units` lists the hero, everything currently led by
+  the hero (recruited companions/workers/soldiers — reusing `leader`,
+  nothing new), and every `wall`/`turret` in the world (nobody but the
+  player ever creates one in this game, so "every one that exists" IS
+  "every one the player built" — no separate ownership field needed for
+  structures). `/name` gives whatever's yours at an exact spot a custom
+  display name, backed by a new, purely cosmetic `Thing.label` field
+  (both engines, default `None`/`null`, never read by any tile) — once
+  named, that's what shows in `/units` from then on instead of its bare
+  kind. Naming isn't range-limited the way `/mine` is; it's bookkeeping,
+  not a physical act.
+
+  `tests/check_chat_break.py` extended (+13 checks, 33 total) and
+  `tests/chat.test.js` extended (+13 checks, 33 total): a recruited
+  companion is listed, an *unled* one of the same kind is not (proving
+  it's really `leader`-based, not just "every companion"), a bandit
+  never is, walls/turrets are regardless of `leader`, naming actually
+  sticks and shows up in a later `/units` call, and naming something
+  not yours refuses. Verified the turret itself directly through the
+  real engine too (spawned one, put a bandit three squares away, it
+  never moved and killed it in two ticks). `check_engines.py` confirms
+  the whole updated `outpost.json` — turret included — is still
+  bit-for-bit identical between the two engines across four seeds.
+  Validated with `node --check`, a full `html.parser` pass, `python3 -m
+  py_compile`, and the full existing suite, all green. Not seen running
+  on a real device yet.
+
 - **A button to make a new ore vein, and `/mine <x> <y>` to gather a
   known one from a distance** — requested directly, right after the
   gather fix above: "press a button to make the ore," and a chat

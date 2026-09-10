@@ -107,6 +107,67 @@ check("missing coordinates gives a usage line, not a crash", "try: /mine" in lin
 kind, lines = run_local_command("/mine x y", w.project, w)
 check("non-numeric coordinates say so, not a crash", "plain numbers" in lines[0], lines)
 
+print("\n/units and /name: the roster -- everything yours, named and located")
+
+
+def roster_game():
+    project = {
+        "name": "roster_probe", "world": {"width": 12, "height": 12, "speed": 6},
+        "characters": [
+            {"kind": "hero", "glyph": "@", "color": "green", "role": "player",
+             "count": 0, "brain": []},
+            {"kind": "companion", "glyph": "c", "color": "yellow", "role": "prop",
+             "count": 0, "brain": []},
+            {"kind": "bandit", "glyph": "x", "color": "red", "role": "prop",
+             "count": 0, "brain": []},
+            {"kind": "wall", "glyph": "#", "color": "grey", "role": "prop",
+             "count": 0, "brain": []},
+            {"kind": "turret", "glyph": "T", "color": "silver", "role": "prop",
+             "count": 0, "brain": []},
+        ],
+    }
+    w = World(project)
+    hero = w.spawn("hero", 1, 1)
+    companion = w.spawn("companion", 2, 2)
+    companion.leader = hero
+    stray = w.spawn("companion", 3, 3)          # NOT led -- shouldn't show up as ours
+    enemy = w.spawn("bandit", 4, 4)              # never ours
+    wall = w.spawn("wall", 5, 5)                 # structures are ours by kind alone
+    turret = w.spawn("turret", 6, 6)
+    return w, hero, companion, stray, enemy, wall, turret
+
+
+w, hero, companion, stray, enemy, wall, turret = roster_game()
+kind, lines = run_local_command("/units", w.project, w)
+check("lists the hero", any("hero" in l and "(1, 1)" in l for l in lines), lines)
+check("lists a recruited companion", any("(2, 2)" in l for l in lines), lines)
+check("does NOT list an unled companion -- not ours just for existing",
+      not any("(3, 3)" in l for l in lines), lines)
+check("does NOT list a bandit", not any("bandit" in l for l in lines), lines)
+check("lists a wall (structures are ours by kind, no leader needed)",
+      any("(5, 5)" in l for l in lines), lines)
+check("lists a turret the same way", any("(6, 6)" in l for l in lines), lines)
+
+kind, lines = run_local_command("/units", None)
+check("with no world running, says so rather than crashing",
+      "no game running" in lines[0], lines)
+
+w, hero, companion, stray, enemy, wall, turret = roster_game()
+kind, lines = run_local_command("/name 6 6 North Gate", w.project, w)
+check("naming something of yours works", "North Gate" in lines[0], lines)
+check("...and the name actually sticks on the Thing", turret.label == "North Gate")
+kind, lines = run_local_command("/units", w.project, w)
+check("the custom name shows up in /units from then on",
+      any("North Gate" in l for l in lines), lines)
+
+kind, lines = run_local_command("/name 3 3 Sneaky", w.project, w)   # the unled stray
+check("can't name something that isn't yours", "nothing of yours" in lines[0], lines)
+
+kind, lines = run_local_command("/name 6 6", w.project, w)
+check("missing a name gives a usage line, not a crash", "try: /name" in lines[0], lines)
+kind, lines = run_local_command("/name x y Bob", w.project, w)
+check("non-numeric coordinates say so, not a crash", "plain numbers" in lines[0], lines)
+
 print("\n%d passed, %d failed (pure logic)\n" % (passed, failed))
 
 # -- end to end, through a real pty ----------------------------------------

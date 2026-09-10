@@ -143,6 +143,14 @@ own hero brain), just named by coordinate instead of walked to blind.
 Still one square away at most, the same reach `touch` itself always
 means; it refuses (says so) rather than mining across the map.
 
+`/units` lists everything you own or possess — the hero, every
+recruited companion/worker/soldier, every wall and turret you've
+built — each with where it is, and its name if you've given it one.
+`/name <x> <y> <new name>` gives whatever's yours at that exact spot a
+name, which is what shows in `/units` from then on instead of its bare
+kind; unlike `/mine`, naming isn't range-limited — it's bookkeeping,
+not a physical act.
+
 ---
 
 ## Controls: the terminal menus
@@ -373,7 +381,7 @@ of blocks, with each character's glyph floating over its own block.
 | **⛶** | fullscreen |
 | **🎒** | Backpack, a small virtual file system |
 | **⚙** | Properties — grid-lock status, move speed, an opt-in minimap, and a clock, all driven by the world itself |
-| **💬** | Chat — the exact same conversation the browser editor's own box has, one per hosted game; anything typed without a leading `/` is said to the others, which only means anything in `LIVE` mode — there's nobody else to talk to in a local, single-tab copy. `/who` and `/clear` work either way. `/help` too, and — if the game itself carries its own "how to play" — shows that first: `games/outpost.json` is the one game so far that does. `/mine x y` gathers from the ore at that exact spot (one square away at most), local-play only like Build/Harvest above |
+| **💬** | Chat — the exact same conversation the browser editor's own box has, one per hosted game; anything typed without a leading `/` is said to the others, which only means anything in `LIVE` mode — there's nobody else to talk to in a local, single-tab copy. `/who` and `/clear` work either way. `/help` too, and — if the game itself carries its own "how to play" — shows that first: `games/outpost.json` is the one game so far that does. `/mine x y` gathers from the ore at that exact spot (one square away at most), `/units` lists everything you own or possess with its location, `/name x y <new name>` renames whatever's yours there — all local-play only like Build/Harvest above |
 | **✎** | the button editor — select, drag, resize, and fade any button here, including the drawer's own |
 | **run here** / **go live** | switches between the running game and this tab's own engine |
 

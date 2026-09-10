@@ -953,7 +953,7 @@ Once `python3 spark.py install` has been run, every one of these works as plain
 | `node tests/draw_line.test.js` | check draw_line/world.lines and pushLine's own geometry |
 | `python3 tests/check_lead.py` | check lead/dismiss/has_leader/recruit in the Python engine |
 | `node tests/lead.test.js` | check lead/dismiss/has_leader/recruit in the JavaScript engine |
-| `python3 tests/check_chat_break.py` | check the terminal player's own "/" command line, /help, /mine |
+| `python3 tests/check_chat_break.py` | check the terminal's "/" command line: /help, /mine, /units, /name |
 | `node tests/button_position.test.js` | check saved button positions survive a resize/rotation |
 | `node tests/chat.test.js` | check the 3D view's own chat: dedup and command dispatch |
 | `python3 tests/check_docs.py` | check this README still matches the code |

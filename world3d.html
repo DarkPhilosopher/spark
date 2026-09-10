@@ -1349,6 +1349,9 @@ class Thing {
     // own "toward it" already knows how to chase it once a sensor hands
     // that Thing back as `it`.
     this.leader = null;
+    // A custom display name, or null -- purely cosmetic bookkeeping for
+    // the chat's /units and /name commands, never read by any tile.
+    this.label = null;
   }
 }
 
@@ -5065,6 +5068,27 @@ async function sendChatText(text) {
   chatLine(myName, text, "mine");
 }
 
+// Structure kinds nobody but the player ever creates in outpost, so
+// "every wall/turret in the world" already means "every one the
+// player built" -- there's no ownership field on a structure the way
+// a recruited unit's own `leader` is one. Specific to outpost.json's
+// own roster on purpose, mirroring engine/runner.py's own list.
+const STRUCTURE_KINDS = ["wall", "turret"];
+
+// The hero, plus everything led by the hero, plus every player-built
+// structure -- "yours" for /units and /name. [null, []] if there's no
+// living player character at all.
+function ownedThings() {
+  const hero = world.things.find(t => t.role === "player" && t.alive);
+  if (!hero) return [null, []];
+  const owned = [hero];
+  for (const t of world.things) {
+    if (t === hero || !t.alive) continue;
+    if (t.leader === hero || STRUCTURE_KINDS.includes(t.kind)) owned.push(t);
+  }
+  return [hero, owned];
+}
+
 const CHAT_COMMANDS = {
   // A game's own "how to play" -- an optional plain-text field on the
   // game JSON itself (project.help), same idea as its name or world
@@ -5079,6 +5103,8 @@ const CHAT_COMMANDS = {
     }
     chatLine("", "/who — who is connected.  /clear — empty this log", "sys");
     chatLine("", "/mine <x> <y> — mine the ore at that spot, if you're next to it", "sys");
+    chatLine("", "/units — list everything you own or possess, and where it is", "sys");
+    chatLine("", "/name <x> <y> <new name> — rename whatever's yours at that spot", "sys");
     chatLine("", "anything else is said to the others, if the server is running", "sys");
   },
   who() {
@@ -5112,6 +5138,40 @@ const CHAT_COMMANDS = {
     if (!target) { chatLine("", "no ore at (" + x + ", " + y + ")", "sys"); return; }
     hero.inventory.ore = (hero.inventory.ore || 0) + 1;
     chatLine("", "mined 1 ore at (" + x + ", " + y + ") — you now have " + hero.inventory.ore, "sys");
+  },
+  // Everything you own or possess, named and located -- the "selector
+  // menu" for referring back to something later, with /name below, and
+  // with /mine already taking a coordinate the same way.
+  units() {
+    if (!world) { chatLine("", "no game running", "sys"); return; }
+    const [hero, owned] = ownedThings();
+    if (!hero) { chatLine("", "no player character", "sys"); return; }
+    chatLine("", "yours:", "sys");
+    for (const t of owned) {
+      chatLine("", "  " + (t.label || t.kind) + " (" + t.kind + ") at ("
+        + t.x + ", " + t.y + ")", "sys");
+    }
+  },
+  // /name <x> <y> <new name>: not range-limited the way /mine is --
+  // naming isn't a physical act the way mining is.
+  name(rest) {
+    if (!world) { chatLine("", "no game running", "sys"); return; }
+    const parts = String(rest || "").trim().split(/\s+/);
+    if (parts.length < 3 || parts[0] === "") {
+      chatLine("", "try: /name <x> <y> <new name>", "sys"); return;
+    }
+    const x = parseInt(parts[0], 10), y = parseInt(parts[1], 10);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      chatLine("", "x and y need to be plain numbers: /name <x> <y> <new name>", "sys"); return;
+    }
+    const newName = parts.slice(2).join(" ").trim();
+    if (!newName) { chatLine("", "give it an actual name: /name <x> <y> <new name>", "sys"); return; }
+    const [hero, owned] = ownedThings();
+    if (!hero) { chatLine("", "no player character", "sys"); return; }
+    const target = owned.find(t => t.x === x && t.y === y);
+    if (!target) { chatLine("", "nothing of yours at (" + x + ", " + y + ")", "sys"); return; }
+    target.label = newName;
+    chatLine("", target.kind + " is now called \"" + newName + "\"", "sys");
   },
 };
 

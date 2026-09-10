@@ -81,6 +81,11 @@ class Thing:
         # ordinary move tile, unchanged) already knows how to chase it the
         # moment a sensor hands that Thing back as `it`.
         self.leader = None
+        # A custom display name, or None -- purely cosmetic bookkeeping
+        # for the terminal/chat /units and /name commands (see
+        # engine/runner.py), never read by any tile or sensor. Not part
+        # of the template; nothing sets this at spawn time.
+        self.label = None
 
 
 class World:

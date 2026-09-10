@@ -119,8 +119,78 @@ def _local_help_lines(project):
         lines.append("")
     lines.append("/help -- show this")
     lines.append("/mine <x> <y> -- mine the ore at that spot, if you're next to it")
+    lines.append("/units -- list everything you own or possess, and where it is")
+    lines.append("/name <x> <y> <new name> -- rename whatever's yours at that spot")
     lines.append("/quit -- leave the game (same as pressing q)")
     return lines
+
+
+# Structure kinds nobody but the player ever creates in this game, so
+# "every wall/turret in the world" already means "every one the player
+# built" -- there's no ownership field on a structure the way a
+# recruited unit's own `leader` is one. Specific to outpost.json's own
+# roster on purpose, rather than a guess at what every possible game
+# might call its buildings.
+STRUCTURE_KINDS = ("wall", "turret")
+
+
+def _owned_things(world):
+    """The hero, plus everything led by the hero, plus every player-built
+    structure -- "yours" for /units and /name. Returns (hero, [things]),
+    hero first; (None, []) if there's no living player character at all."""
+    hero = next((t for t in world.things if t.role == "player" and t.alive), None)
+    if hero is None:
+        return None, []
+    owned = [hero]
+    for t in world.things:
+        if t is hero or not t.alive:
+            continue
+        if t.leader is hero or t.kind in STRUCTURE_KINDS:
+            owned.append(t)
+    return hero, owned
+
+
+def _do_units(world):
+    """/units: everything you own or possess, named and located, the
+    "selector menu" for referring back to something later -- with
+    /name, and with /mine already taking a coordinate the same way."""
+    if world is None:
+        return ["no game running"]
+    hero, owned = _owned_things(world)
+    if hero is None:
+        return ["no player character"]
+    lines = ["yours:"]
+    for t in owned:
+        name = t.label or t.kind
+        lines.append("  %s (%s) at (%d, %d)" % (name, t.kind, t.x, t.y))
+    return lines
+
+
+def _do_name(world, rest):
+    """/name <x> <y> <new name>: give whatever's yours at that exact spot
+    a custom name, so it shows up as that in /units from then on (and,
+    unlike /mine's, this one edit is not range-limited to next to you --
+    naming something isn't a physical act the way mining is)."""
+    if world is None:
+        return ["no game running"]
+    parts = rest.split(None, 2)
+    if len(parts) < 3:
+        return ["try: /name <x> <y> <new name>"]
+    try:
+        x, y = int(parts[0]), int(parts[1])
+    except ValueError:
+        return ["x and y need to be plain numbers: /name <x> <y> <new name>"]
+    new_name = parts[2].strip()
+    if not new_name:
+        return ["give it an actual name: /name <x> <y> <new name>"]
+    hero, owned = _owned_things(world)
+    if hero is None:
+        return ["no player character"]
+    target = next((t for t in owned if t.x == x and t.y == y), None)
+    if target is None:
+        return ["nothing of yours at (%d, %d)" % (x, y)]
+    target.label = new_name
+    return ["%s is now called \"%s\"" % (target.kind, new_name)]
 
 
 def _do_mine(world, rest):
@@ -175,6 +245,10 @@ def run_local_command(said, project, world=None):
         return "show", _local_help_lines(project)
     if word == "mine":
         return "show", _do_mine(world, rest)
+    if word == "units":
+        return "show", _do_units(world)
+    if word == "name":
+        return "show", _do_name(world, rest)
     if word in ("quit", "q"):
         return "quit", None
     return "show", ["no such command: /%s -- try /help" % word]
