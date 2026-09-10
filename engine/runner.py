@@ -108,23 +108,61 @@ def draw(world, speed):
     sys.stdout.flush()
 
 
-def _local_help_lines(project):
-    """A game's own "how to play", the same `help` field and fallback
-    order world3d.html's own /help chat command reads -- see that file's
-    CHAT_COMMANDS.help for the JS twin of this."""
+# (category, syntax, description) -- kept in sync by hand with
+# world3d.html's own COMMAND_CATALOG. CATEGORY_ORDER below is the
+# order "/help commands" groups and lists them in; each category only
+# shows up if it actually has a command in it, so the two engines'
+# slightly different command sets (no /who or /clear here, no /quit
+# there) never leave a heading with nothing under it.
+COMMAND_CATALOG = [
+    ("info", "/help [commands [description]]",
+     "show this, or just the command list (add \"description\" for what each one does)"),
+    ("info", "/units", "list everything you own or possess, and where it is"),
+    ("action", "/mine <x> <y>", "mine the ore at that spot, if you're next to it"),
+    ("action", "/attack <x> <y>", "hit the bandit at that spot, if you're next to it"),
+    ("action", "/recruit <x> <y>", "recruit whatever's bare there, if you're next to it"),
+    ("action", "/dismiss <x> <y>", "release whatever's yours there, if you're next to it"),
+    ("roster", "/name <x> <y> <new name>", "rename whatever's yours at that spot"),
+    ("log", "/log [n]", "a numbered page of the log; latest if n is left off"),
+    ("log", "/forget <n>", "remove page n from the log for good"),
+    ("system", "/quit", "leave the game (same as pressing q)"),
+]
+CATEGORY_ORDER = ["info", "action", "roster", "log", "system"]
+CATEGORY_TITLE = {"info": "Info", "action": "Actions", "roster": "Roster",
+                   "log": "Log", "system": "System"}
+
+
+def _command_list_lines(with_description):
+    """The whole command reference, grouped by type -- "/help commands"
+    (bare) or "/help commands description" (with what each one does).
+    Also folded into plain /help's own tail, after a game's own text."""
+    lines = []
+    for cat in CATEGORY_ORDER:
+        rows = [c for c in COMMAND_CATALOG if c[0] == cat]
+        if not rows:
+            continue
+        lines.append(CATEGORY_TITLE[cat] + ":")
+        for _, syntax, desc in rows:
+            lines.append("  " + syntax + (" -- " + desc if with_description else ""))
+    return lines
+
+
+def _local_help_lines(project, rest=""):
+    """A game's own "how to play" plus the full command reference, or
+    -- given "commands" as an argument -- just the reference on its
+    own (add "description" too for what each one does). The same
+    `help` field and fallback order world3d.html's own /help chat
+    command reads -- see that file's CHAT_COMMANDS.help for the JS
+    twin of this."""
+    words = rest.split()
+    if words and words[0] == "commands":
+        return _command_list_lines(with_description=len(words) > 1 and words[1] == "description")
     lines = []
     text = project.get("help")
     if text:
         lines.extend(str(text).split("\n"))
         lines.append("")
-    lines.append("/help -- show this")
-    lines.append("/mine <x> <y> -- mine the ore at that spot, if you're next to it")
-    lines.append("/units -- list everything you own or possess, and where it is")
-    lines.append("/name <x> <y> <new name> -- rename whatever's yours at that spot")
-    lines.append("/log [n] -- a numbered page of the log (mine/units/name results); "
-                  "latest if n is left off")
-    lines.append("/forget <n> -- remove page n from the log for good")
-    lines.append("/quit -- leave the game (same as pressing q)")
+    lines.extend(_command_list_lines(with_description=True))
     return lines
 
 
@@ -265,6 +303,37 @@ def _do_name(world, rest):
     return ["%s is now called \"%s\"" % (target.kind, new_name)]
 
 
+def _hero(world, verb):
+    """The living player character, or a one-line complaint -- shared by
+    every /<verb> <x> <y> command below. Returns (hero, None) or
+    (None, [complaint])."""
+    hero = next((t for t in world.things if t.role == "player" and t.alive), None)
+    if hero is None:
+        return None, ["no player character to %s with" % verb]
+    return hero, None
+
+
+def _parse_xy(rest, usage):
+    """Shared arg-parsing for every /<verb> <x> <y> command below. Returns
+    ((x, y), None) or (None, [complaint])."""
+    parts = rest.split()
+    if len(parts) < 2:
+        return None, ["try: " + usage]
+    try:
+        return (int(parts[0]), int(parts[1])), None
+    except ValueError:
+        return None, ["x and y need to be plain numbers: " + usage]
+
+
+def _too_far(hero, x, y):
+    """None if adjacent (the same one square `touch` itself always
+    means), else the complaint -- shared by every physical (not just
+    bookkeeping, like /name) /<verb> <x> <y> command below."""
+    if max(abs(hero.x - x), abs(hero.y - y)) > 1:
+        return ["too far away -- get within one square of (%d, %d) first" % (x, y)]
+    return None
+
+
 def _do_mine(world, rest):
     """/mine <x> <y>: gather from the ore at that exact spot, same as
     walking up and standing there would over time (see the hero's own
@@ -275,18 +344,16 @@ def _do_mine(world, rest):
     for reaching it, not a way to mine from across the map."""
     if world is None:
         return ["no game running to mine in"]
-    parts = rest.split()
-    if len(parts) < 2:
-        return ["try: /mine <x> <y>"]
-    try:
-        x, y = int(parts[0]), int(parts[1])
-    except ValueError:
-        return ["x and y need to be plain numbers: /mine <x> <y>"]
-    hero = next((t for t in world.things if t.role == "player" and t.alive), None)
-    if hero is None:
-        return ["no player character to mine with"]
-    if max(abs(hero.x - x), abs(hero.y - y)) > 1:
-        return ["too far away -- get within one square of (%d, %d) first" % (x, y)]
+    xy, err = _parse_xy(rest, "/mine <x> <y>")
+    if err:
+        return err
+    x, y = xy
+    hero, err = _hero(world, "mine")
+    if err:
+        return err
+    err = _too_far(hero, x, y)
+    if err:
+        return err
     target = next((t for t in world.things
                     if t.alive and t.kind == "ore" and t.x == x and t.y == y), None)
     if target is None:
@@ -294,6 +361,98 @@ def _do_mine(world, rest):
     hero.inventory["ore"] = hero.inventory.get("ore", 0) + 1
     return ["mined 1 ore at (%d, %d) -- you now have %d"
             % (x, y, hero.inventory["ore"])]
+
+
+ATTACK_DAMAGE = 2   # matches the hero's own touch(bandit) -> damage it 2 row exactly
+
+
+def _do_attack(world, rest):
+    """/attack <x> <y>: hit the bandit at that exact spot, the same
+    amount of damage touching one already does -- a shortcut for
+    reaching it, not ranged combat from across the map. Kills it
+    outright (removed from the world) the same way ordinary contact
+    damage already does, once its health runs out."""
+    if world is None:
+        return ["no game running to attack with"]
+    xy, err = _parse_xy(rest, "/attack <x> <y>")
+    if err:
+        return err
+    x, y = xy
+    hero, err = _hero(world, "attack")
+    if err:
+        return err
+    err = _too_far(hero, x, y)
+    if err:
+        return err
+    target = next((t for t in world.things
+                    if t.alive and t.kind == "bandit" and t.x == x and t.y == y), None)
+    if target is None:
+        return ["no bandit at (%d, %d)" % (x, y)]
+    target.health -= ATTACK_DAMAGE
+    if target.health <= 0:
+        world.remove(target)
+        return ["attacked (%d, %d) -- bandit destroyed" % (x, y)]
+    return ["attacked (%d, %d) -- bandit has %d health left" % (x, y, target.health)]
+
+
+# Kinds a bare, unled one of can be recruited -- everything the hero's
+# own "1"/"2" buy rows can hire, plus the free-roaming companions
+# already scattered around at the start. Never a bandit or a structure.
+RECRUITABLE_KINDS = ("companion", "worker", "soldier")
+
+
+def _do_recruit(world, rest):
+    """/recruit <x> <y>: the same as touching a companion and pressing e
+    (see the hero's own `lead` row), just aimed at an exact spot.
+    Works on any bare (not already led by someone) companion/worker/
+    soldier -- including one you dismissed earlier and want back,
+    which the ordinary in-game "e" key can't reach at all, since it
+    only ever touches kind "companion"."""
+    if world is None:
+        return ["no game running to recruit with"]
+    xy, err = _parse_xy(rest, "/recruit <x> <y>")
+    if err:
+        return err
+    x, y = xy
+    hero, err = _hero(world, "recruit")
+    if err:
+        return err
+    err = _too_far(hero, x, y)
+    if err:
+        return err
+    target = next((t for t in world.things
+                    if t.alive and t.kind in RECRUITABLE_KINDS and t.leader is None
+                    and t.x == x and t.y == y), None)
+    if target is None:
+        return ["nothing recruitable at (%d, %d)" % (x, y)]
+    target.leader = hero
+    return ["recruited the %s at (%d, %d)" % (target.kind, x, y)]
+
+
+def _do_dismiss(world, rest):
+    """/dismiss <x> <y>: the same as touching one of yours and pressing
+    r, just aimed at an exact spot -- and, unlike the ordinary "r" key
+    (which only ever touches kind "companion"), works on a bought
+    worker or soldier too, which otherwise has no way to be released
+    at all."""
+    if world is None:
+        return ["no game running to dismiss with"]
+    xy, err = _parse_xy(rest, "/dismiss <x> <y>")
+    if err:
+        return err
+    x, y = xy
+    hero, err = _hero(world, "dismiss")
+    if err:
+        return err
+    err = _too_far(hero, x, y)
+    if err:
+        return err
+    target = next((t for t in world.things
+                    if t.alive and t.leader is hero and t.x == x and t.y == y), None)
+    if target is None:
+        return ["nothing of yours to dismiss at (%d, %d)" % (x, y)]
+    target.leader = None
+    return ["dismissed the %s at (%d, %d)" % (target.kind, x, y)]
 
 
 def run_local_command(said, project, world=None, history=None):
@@ -315,9 +474,21 @@ def run_local_command(said, project, world=None, history=None):
     word = (said if cut < 0 else said[:cut]).lower() or "help"
     rest = "" if cut < 0 else said[cut + 1:]
     if word == "help":
-        return "show", _local_help_lines(project)
+        return "show", _local_help_lines(project, rest)
     if word == "mine":
         lines = _do_mine(world, rest)
+        _history_add(history, lines)
+        return "show", lines
+    if word == "attack":
+        lines = _do_attack(world, rest)
+        _history_add(history, lines)
+        return "show", lines
+    if word == "recruit":
+        lines = _do_recruit(world, rest)
+        _history_add(history, lines)
+        return "show", lines
+    if word == "dismiss":
+        lines = _do_dismiss(world, rest)
         _history_add(history, lines)
         return "show", lines
     if word == "units":
@@ -339,40 +510,48 @@ def run_local_command(said, project, world=None, history=None):
 
 def draw_chat_result(lines):
     out = [HOME_CLEAR, "=" * 40, " chat", "=" * 40, ""]
-    out.extend(lines)
+    out.extend(lines if lines else ["(type a command, e.g. /help)"])
     out.append("")
-    out.append("(press any key to go back)")
+    out.append("(blank line closes chat)")
     sys.stdout.write("\n".join(out) + "\n")
     sys.stdout.flush()
 
 
 def chat_break(project, keyboard, world, history):
-    """Pressed "/" during play: hand the terminal back to normal cooked
-    input for one line (so the phone's own text box/keyboard behaves
-    exactly like it does everywhere else in this app, rather than
-    gameplay's usual single-key swallowing), run whatever was typed as
-    a command, and show the result as its own screen -- a second,
-    separate view from the running world -- until any key dismisses it.
-    `history` is play()'s own running log, the same list across every
-    call this session -- see run_local_command for what actually lands
-    in it, and /log and /forget for reading it back and trimming it.
+    """Pressed "/" during play: opens a chat session that stays open --
+    requested directly ("fix chat to stay open") after it turned out to
+    be one command and straight back to the game every single time.
+    Hands the terminal back to normal cooked input the whole time it's
+    open (so the phone's own text box/keyboard behaves exactly like it
+    does everywhere else in this app, rather than gameplay's usual
+    single-key swallowing): type a command, see its result on its own
+    screen, type the next one right after with no need to press "/"
+    again, however many in a row -- a blank line (or Ctrl-D) is what
+    actually closes it and goes back to the running game. `history` is
+    play()'s own running log, the same list across every call this
+    session -- see run_local_command for what actually lands in it, and
+    /log and /forget for reading it back and trimming it.
 
     Returns True if the command was to quit the game outright.
     """
     keyboard.pause()
     sys.stdout.write(SHOW)
     sys.stdout.flush()
-    try:
-        said = input("\n/")
-    except EOFError:
-        said = "quit"
+    lines = []
+    while True:
+        draw_chat_result(lines)
+        try:
+            said = input("\n/")
+        except EOFError:
+            said = "quit"   # the same safety-valve exit pressing q always is
+        if not said.strip():
+            break
+        kind, lines = run_local_command(said, project, world, history)
+        if kind == "quit":
+            sys.stdout.write(HIDE)
+            return True
     sys.stdout.write(HIDE)
-    kind, lines = run_local_command(said, project, world, history)
-    if kind == "quit":
-        return True
     keyboard.resume()
-    draw_chat_result(lines)
-    read_key(keyboard.fd)   # block for exactly one key, then back to the game
     return False
 
 

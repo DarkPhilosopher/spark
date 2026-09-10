@@ -3,8 +3,9 @@
 play swallows nothing gameplay would have used it for (nothing does --
 see engine/runner.py's Keyboard.pause/resume comments), drops into a
 real, cooked-mode text line so the phone's own keyboard/text box behaves
-normally, runs the command, and shows the result as its own screen
-before any key brings the running world back.
+normally, runs the command, shows the result as its own screen, and
+stays open for as many more commands as you like, in a row -- a blank
+line is what actually closes it and goes back to the running world.
 
     python3 tests/check_chat_break.py
 
@@ -62,6 +63,129 @@ check("/q is the same as /quit", kind == "quit")
 kind, lines = run_local_command("/nonsense", {})
 check("an unknown command says so, doesn't crash",
       kind == "show" and any("no such command" in l for l in lines), lines)
+
+print("\n/help commands [description]: the reference on its own, grouped by type")
+
+kind, lines = run_local_command("/help commands", {})
+check("just the reference -- no game text, even if there is one to skip",
+      lines[0] == "Info:", lines)
+check("bare syntax only, no descriptions", not any(" -- " in l for l in lines), lines)
+check("grouped under headings, in a fixed order",
+      lines.index("Actions:") > lines.index("Info:")
+      and lines.index("Log:") > lines.index("Actions:"), lines)
+
+kind, lines = run_local_command("/help commands description", {})
+check("same reference, with what each one does this time",
+      lines[0] == "Info:" and any(" -- " in l for l in lines), lines)
+
+print("\n/attack <x> <y>: hit a bandit at a known spot instead of walking up to it blind")
+
+
+def attack_game(hero_pos, bandit_pos, bandit_health=6):
+    project = {
+        "name": "attack_probe", "world": {"width": 12, "height": 12, "speed": 6},
+        "characters": [
+            {"kind": "hero", "glyph": "@", "color": "green", "role": "player",
+             "count": 0, "brain": []},
+            {"kind": "bandit", "glyph": "x", "color": "red", "role": "prop",
+             "count": 0, "brain": []},
+        ],
+    }
+    w = World(project)
+    w.spawn("hero", *hero_pos)
+    b = w.spawn("bandit", *bandit_pos)
+    b.health = bandit_health
+    return w, b
+
+
+kind, lines = run_local_command("/attack 5 5", None)
+check("with no world running, says so rather than crashing",
+      "no game running" in lines[0], lines)
+
+w, bandit = attack_game((5, 5), (6, 5))
+kind, lines = run_local_command("/attack 6 5", w.project, w)
+check("attacking an adjacent bandit does 2 damage, the same touch already does",
+      "attacked" in lines[0] and bandit.health == 4, (lines, bandit.health))
+check("it's still alive with health left", bandit.alive)
+
+w, bandit = attack_game((5, 5), (6, 5), bandit_health=2)
+kind, lines = run_local_command("/attack 6 5", w.project, w)
+check("killing it outright removes it from the world, same as ordinary contact damage",
+      "destroyed" in lines[0] and not bandit.alive, (lines, bandit.alive))
+
+w, bandit = attack_game((0, 0), (6, 5))
+kind, lines = run_local_command("/attack 6 5", w.project, w)
+check("too far away refuses", "too far" in lines[0], lines)
+
+w, bandit = attack_game((5, 5), (6, 5))
+kind, lines = run_local_command("/attack 5 6", w.project, w)   # adjacent, nothing there
+check("adjacent but nothing there says so", "no bandit at" in lines[0], lines)
+
+print("\n/recruit <x> <y> and /dismiss <x> <y>: the same as e/r, aimed at a spot")
+
+
+def squad_game(hero_pos, worker_pos, worker_leader=None):
+    project = {
+        "name": "squad_probe", "world": {"width": 12, "height": 12, "speed": 6},
+        "characters": [
+            {"kind": "hero", "glyph": "@", "color": "green", "role": "player",
+             "count": 0, "brain": []},
+            {"kind": "worker", "glyph": "w", "color": "lime", "role": "prop",
+             "count": 0, "brain": []},
+            {"kind": "bandit", "glyph": "x", "color": "red", "role": "prop",
+             "count": 0, "brain": []},
+        ],
+    }
+    w = World(project)
+    hero = w.spawn("hero", *hero_pos)
+    worker = w.spawn("worker", *worker_pos)
+    worker.leader = worker_leader
+    return w, hero, worker
+
+
+kind, lines = run_local_command("/recruit 5 5", None)
+check("with no world running, says so rather than crashing", "no game running" in lines[0], lines)
+
+w, hero, worker = squad_game((5, 5), (6, 5))   # bare (unled) worker, adjacent
+kind, lines = run_local_command("/recruit 6 5", w.project, w)
+check("recruiting a bare worker (not just a companion) works",
+      "recruited the worker" in lines[0] and worker.leader is hero, (lines, worker.leader))
+
+w, hero, worker = squad_game((5, 5), (6, 5), worker_leader="someone else already")
+kind, lines = run_local_command("/recruit 6 5", w.project, w)
+check("can't recruit something already led by someone", "nothing recruitable" in lines[0], lines)
+
+w, hero, worker = squad_game((0, 0), (6, 5))
+kind, lines = run_local_command("/recruit 6 5", w.project, w)
+check("too far away refuses", "too far" in lines[0], lines)
+
+bandit_only = {
+    "name": "bandit_probe", "world": {"width": 12, "height": 12, "speed": 6},
+    "characters": [
+        {"kind": "hero", "glyph": "@", "color": "green", "role": "player", "count": 0, "brain": []},
+        {"kind": "bandit", "glyph": "x", "color": "red", "role": "prop", "count": 0, "brain": []},
+    ],
+}
+w2 = World(bandit_only)
+w2.spawn("hero", 5, 5)
+w2.spawn("bandit", 6, 5)
+kind, lines = run_local_command("/recruit 6 5", w2.project, w2)
+check("a bandit is never recruitable, even bare and adjacent", "nothing recruitable" in lines[0], lines)
+
+w, hero, worker = squad_game((5, 5), (6, 5))
+worker.leader = hero
+kind, lines = run_local_command("/dismiss 6 5", w.project, w)
+check("dismissing a bought worker works, not just a companion",
+      "dismissed the worker" in lines[0] and worker.leader is None, (lines, worker.leader))
+
+w, hero, worker = squad_game((5, 5), (6, 5))   # bare, not led by hero
+kind, lines = run_local_command("/dismiss 6 5", w.project, w)
+check("can't dismiss something that isn't yours", "nothing of yours" in lines[0], lines)
+
+w, hero, worker = squad_game((0, 0), (6, 5))
+worker.leader = hero
+kind, lines = run_local_command("/dismiss 6 5", w.project, w)
+check("too far away refuses", "too far" in lines[0], lines)
 
 print("\n/mine <x> <y>: gather from a known spot instead of walking up to it blind")
 
@@ -254,7 +378,7 @@ play_probe = (
     "runner.play(p)\n"
 ) % str(ROOT)
 
-print("pressing / during play: a real cooked line, then its own result screen")
+print("pressing / during play: a real cooked line, its own result screen, and it stays open")
 s = Session(play_probe)
 s.drain(0.3)   # let the game render its first frame
 s.send(b"/")
@@ -265,12 +389,19 @@ check("the game's own help text made it onto the result screen",
       "frontier camp" in out, out[-400:])
 check("...and the chat header too, a screen distinct from the running world",
       "chat" in out.lower(), out[-400:])
-check("the command legend mentions /mine too",
+check("the reference mentions /mine too",
       "/mine" in out, out[-400:])
 
-s.send(b"x")   # any key dismisses the result screen -- x isn't a bound key
+s.send(b"units\r")   # a second command, right after the first, with no re-pressing /
+out2 = s.drain(0.6)
+check("chat stayed open -- a second command runs without pressing / again",
+      "yours:" in out2, out2[-400:])
+check("still on the chat screen, not back in the running game yet",
+      "chat" in out2.lower() and "score" not in out2, out2[-400:])
+
+s.send(b"\r")   # a blank line is what actually closes chat
 back = s.drain(0.6)
-check("a key afterward goes back to the running game (the world redraws)",
+check("a blank line closes chat and goes back to the running game (the world redraws)",
       "score" in back, back[-200:])
 
 print("\npressing space during play makes a new ore vein (the \"press a button\" ask)")
@@ -279,12 +410,22 @@ made = s.drain(0.6)
 check("the hero's own space row fires -- a fresh ore vein message shows up",
       "ore vein appeared" in made, made[-200:])
 
-s.send(b"q")
+print("\n/quit from inside an open chat leaves the game outright, same as pressing q")
+s.send(b"/")
+s.drain(0.2)
+s.send(b"quit\r")
 s.drain(0.4)
 s.send(b"\r")   # play()'s own "press enter to go back to the menu" prompt
-bye = s.drain(0.6)
 s.close()
-check("q still quits normally afterward", s.proc.returncode == 0, s.proc.returncode)
+check("the process actually exited", s.proc.returncode == 0, s.proc.returncode)
+
+s2 = Session(play_probe)
+s2.drain(0.3)
+s2.send(b"q")
+s2.drain(0.4)
+s2.send(b"\r")   # play()'s own "press enter to go back to the menu" prompt
+s2.close()
+check("q still quits normally too, without ever opening chat", s2.proc.returncode == 0, s2.proc.returncode)
 
 print("\n%d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

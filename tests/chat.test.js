@@ -162,7 +162,28 @@ function runHelpTests() {
     api.setProject({name: "chase"});   // no help field at all
     api.runChatSaid("/help");
     ok("a game with no help field just skips straight to the command legend",
-       rendered(log)[1].includes("/who"), rendered(log));
+       rendered(log)[1] === "Info:" && rendered(log).some(l => l.includes("/who")), rendered(log));
+  }
+
+  console.log("\n/help commands [description]: the reference on its own, grouped by type");
+  {
+    const {api, log} = load();
+    api.setProject({name: "outpost", help: "some game text"});
+    api.runChatSaid("/help commands");
+    const out = rendered(log);
+    ok("just the reference -- no game text, even though there is one to skip",
+       out[1] === "Info:" && !out.some(l => l.includes("some game text")), out);
+    ok("bare syntax only, no descriptions", !out.some(l => l.includes(" — ")), out);
+    ok("grouped under headings, in a fixed order",
+       out.indexOf("Actions:") > out.indexOf("Info:") &&
+       out.indexOf("Log:") > out.indexOf("Actions:"), out);
+  }
+  {
+    const {api, log} = load();
+    api.runChatSaid("/help commands description");
+    const out = rendered(log);
+    ok("same reference, with what each one does this time",
+       out[1] === "Info:" && out.some(l => l.includes(" — ")), out);
   }
 
   runMineTests();
@@ -210,6 +231,116 @@ function runMineTests() {
     api.runChatSaid("/mine x y");
     ok("non-numeric coordinates say so, not a crash",
        rendered(log)[2].includes("plain numbers"), rendered(log));
+  }
+
+  runAttackTests();
+}
+
+console.log("\n/attack <x> <y>: hit a bandit at a known spot instead of walking up to it blind");
+function runAttackTests() {
+  const hero = (x, y) => ({kind: "hero", role: "player", alive: true, x, y, inventory: {}});
+  const bandit = (x, y, health) => ({kind: "bandit", role: "prop", alive: true, x, y, health: health || 6});
+
+  {
+    const {api, log} = load();
+    api.runChatSaid("/attack 5 5");
+    ok("with no world running, says so rather than crashing",
+       rendered(log)[1].includes("no game running"), rendered(log));
+  }
+  {
+    const {api, log} = load();
+    const b = bandit(6, 5);
+    api.setWorld({things: [hero(5, 5), b]});
+    api.runChatSaid("/attack 6 5");
+    ok("attacking an adjacent bandit does 2 damage, the same touch already does",
+       rendered(log)[1].includes("attacked") && b.health === 4, [rendered(log), b.health]);
+    ok("it's still alive with health left", b.alive);
+  }
+  {
+    const {api, log} = load();
+    const b = bandit(6, 5, 2);
+    api.setWorld({things: [hero(5, 5), b], remove(t) { t.alive = false; }});
+    api.runChatSaid("/attack 6 5");
+    ok("killing it outright removes it, same as ordinary contact damage",
+       rendered(log)[1].includes("destroyed") && !b.alive, [rendered(log), b.alive]);
+  }
+  {
+    const {api, log} = load();
+    api.setWorld({things: [hero(0, 0), bandit(6, 5)]});
+    api.runChatSaid("/attack 6 5");
+    ok("too far away refuses", rendered(log)[1].includes("too far"), rendered(log));
+  }
+  {
+    const {api, log} = load();
+    api.setWorld({things: [hero(5, 5), bandit(6, 5)]});
+    api.runChatSaid("/attack 5 6");   // adjacent, nothing there
+    ok("adjacent but nothing there says so", rendered(log)[1].includes("no bandit at"), rendered(log));
+  }
+
+  runSquadTests();
+}
+
+console.log("\n/recruit <x> <y> and /dismiss <x> <y>: the same as e/r, aimed at a spot");
+function runSquadTests() {
+  const hero = (x, y) => ({kind: "hero", role: "player", alive: true, x, y, inventory: {}});
+  const worker = (x, y, leader) => ({kind: "worker", role: "prop", alive: true, x, y, leader: leader || null});
+  const bandit = (x, y) => ({kind: "bandit", role: "prop", alive: true, x, y, health: 6});
+
+  {
+    const {api, log} = load();
+    api.runChatSaid("/recruit 5 5");
+    ok("with no world running, says so rather than crashing",
+       rendered(log)[1].includes("no game running"), rendered(log));
+  }
+  {
+    const {api, log} = load();
+    const h = hero(5, 5), w = worker(6, 5);
+    api.setWorld({things: [h, w]});
+    api.runChatSaid("/recruit 6 5");
+    ok("recruiting a bare worker (not just a companion) works",
+       rendered(log)[1].includes("recruited the worker") && w.leader === h, [rendered(log), w.leader]);
+  }
+  {
+    const {api, log} = load();
+    api.setWorld({things: [hero(5, 5), worker(6, 5, "someone else already")]});
+    api.runChatSaid("/recruit 6 5");
+    ok("can't recruit something already led by someone",
+       rendered(log)[1].includes("nothing recruitable"), rendered(log));
+  }
+  {
+    const {api, log} = load();
+    api.setWorld({things: [hero(0, 0), worker(6, 5)]});
+    api.runChatSaid("/recruit 6 5");
+    ok("too far away refuses", rendered(log)[1].includes("too far"), rendered(log));
+  }
+  {
+    const {api, log} = load();
+    api.setWorld({things: [hero(5, 5), bandit(6, 5)]});
+    api.runChatSaid("/recruit 6 5");
+    ok("a bandit is never recruitable, even bare and adjacent",
+       rendered(log)[1].includes("nothing recruitable"), rendered(log));
+  }
+  {
+    const {api, log} = load();
+    const h = hero(5, 5), w = worker(6, 5, h);   // already led by the hero itself
+    api.setWorld({things: [h, w]});
+    api.runChatSaid("/dismiss 6 5");
+    ok("dismissing a bought worker works, not just a companion",
+       rendered(log)[1].includes("dismissed the worker") && w.leader === null, [rendered(log), w.leader]);
+  }
+  {
+    const {api, log} = load();
+    api.setWorld({things: [hero(5, 5), worker(6, 5)]});   // bare, not led by hero
+    api.runChatSaid("/dismiss 6 5");
+    ok("can't dismiss something that isn't yours",
+       rendered(log)[1].includes("nothing of yours"), rendered(log));
+  }
+  {
+    const {api, log} = load();
+    const h = hero(0, 0);
+    api.setWorld({things: [h, worker(6, 5, h)]});
+    api.runChatSaid("/dismiss 6 5");
+    ok("too far away refuses", rendered(log)[1].includes("too far"), rendered(log));
   }
 
   runRosterTests();

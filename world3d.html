@@ -5092,12 +5092,48 @@ async function sendChatText(text) {
   chatLine(myName, text, "mine");
 }
 
+// Shared by every /<verb> <x> <y> chat command below (mine/attack/
+// recruit/dismiss): parses "x y" out of the typed rest of the line,
+// returning [[x, y], null] or [null, complaintLine].
+function parseXY(rest, usage) {
+  const parts = String(rest || "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length < 2) return [null, "try: " + usage];
+  const x = parseInt(parts[0], 10), y = parseInt(parts[1], 10);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) {
+    return [null, "x and y need to be plain numbers: " + usage];
+  }
+  return [[x, y], null];
+}
+
+// The living player character, or a one-line complaint -- shared by
+// every /<verb> <x> <y> command below.
+function findHero(verb) {
+  const hero = world.things.find(t => t.role === "player" && t.alive);
+  return hero ? [hero, null] : [null, "no player character to " + verb + " with"];
+}
+
+// null if adjacent (the same one square `touch` itself always means),
+// else the complaint -- shared by every physical (not /name, which
+// isn't) /<verb> <x> <y> command below.
+function tooFar(hero, x, y) {
+  if (Math.max(Math.abs(hero.x - x), Math.abs(hero.y - y)) > 1) {
+    return "too far away — get within one square of (" + x + ", " + y + ") first";
+  }
+  return null;
+}
+
 // Structure kinds nobody but the player ever creates in outpost, so
 // "every wall/turret in the world" already means "every one the
 // player built" -- there's no ownership field on a structure the way
 // a recruited unit's own `leader` is one. Specific to outpost.json's
 // own roster on purpose, mirroring engine/runner.py's own list.
 const STRUCTURE_KINDS = ["wall", "turret"];
+
+// Kinds a bare, unled one of can be recruited -- everything the
+// hero's own "1"/"2" buy rows can hire, plus the free-roaming
+// companions already scattered around at the start. Mirroring
+// engine/runner.py's own list.
+const RECRUITABLE_KINDS = ["companion", "worker", "soldier"];
 
 // The hero, plus everything led by the hero, plus every player-built
 // structure -- "yours" for /units and /name. [null, []] if there's no
@@ -5113,24 +5149,64 @@ function ownedThings() {
   return [hero, owned];
 }
 
+// (category, syntax, description) -- kept in sync by hand with
+// engine/runner.py's own COMMAND_CATALOG. CATEGORY_ORDER is the order
+// "/help commands" groups and lists them in; a category only shows up
+// if it actually has a command in it, so the two engines' slightly
+// different sets (no /quit here, no /who or /clear there) never leave
+// a heading with nothing under it.
+const COMMAND_CATALOG = [
+  ["info", "/help [commands [description]]",
+   "show this, or just the command list (add \"description\" for what each one does)"],
+  ["info", "/who", "who is connected"],
+  ["info", "/units", "list everything you own or possess, and where it is"],
+  ["action", "/mine <x> <y>", "mine the ore at that spot, if you're next to it"],
+  ["action", "/attack <x> <y>", "hit the bandit at that spot, if you're next to it"],
+  ["action", "/recruit <x> <y>", "recruit whatever's bare there, if you're next to it"],
+  ["action", "/dismiss <x> <y>", "release whatever's yours there, if you're next to it"],
+  ["roster", "/name <x> <y> <new name>", "rename whatever's yours at that spot"],
+  ["log", "/log [n]", "scroll to a numbered page of this log; latest if n is left off"],
+  ["log", "/forget <n>", "remove page n from this log for good"],
+  ["log", "/clear", "empty this log"],
+];
+const CATEGORY_ORDER = ["info", "action", "roster", "log"];
+const CATEGORY_TITLE = {info: "Info", action: "Actions", roster: "Roster", log: "Log"};
+
+// The whole command reference, grouped by type -- "/help commands"
+// (bare) or "/help commands description" (with what each one does).
+// Also folded into plain /help's own tail, after a game's own text.
+function commandListLines(withDescription) {
+  const lines = [];
+  for (const cat of CATEGORY_ORDER) {
+    const rows = COMMAND_CATALOG.filter(c => c[0] === cat);
+    if (!rows.length) continue;
+    lines.push(CATEGORY_TITLE[cat] + ":");
+    for (const [, syntax, desc] of rows) {
+      lines.push("  " + syntax + (withDescription ? " — " + desc : ""));
+    }
+  }
+  return lines;
+}
+
 const CHAT_COMMANDS = {
   // A game's own "how to play" -- an optional plain-text field on the
   // game JSON itself (project.help), same idea as its name or world
   // size: written once by whoever built the game, not a chat feature of
   // its own. Works whether or not the server's running -- unlike saying
   // something to others, showing your own local text needs nothing but
-  // this tab.
-  help() {
+  // this tab. "commands" (optionally "description" too) shows just the
+  // command reference on its own, grouped by type.
+  help(rest) {
+    const words = String(rest || "").trim().split(/\s+/).filter(Boolean);
+    if (words[0] === "commands") {
+      for (const line of commandListLines(words[1] === "description")) chatLine("", line, "sys");
+      return;
+    }
     if (project && project.help) {
       for (const line of String(project.help).split("\n")) chatLine("", line, "sys");
       chatLine("", "—", "sys");
     }
-    chatLine("", "/who — who is connected.  /clear — empty this log", "sys");
-    chatLine("", "/mine <x> <y> — mine the ore at that spot, if you're next to it", "sys");
-    chatLine("", "/units — list everything you own or possess, and where it is", "sys");
-    chatLine("", "/name <x> <y> <new name> — rename whatever's yours at that spot", "sys");
-    chatLine("", "/log [n] — scroll to a numbered page of this log; latest if n is left off", "sys");
-    chatLine("", "/forget <n> — remove page n from this log for good", "sys");
+    for (const line of commandListLines(true)) chatLine("", line, "sys");
     chatLine("", "anything else is said to the others, if the server is running", "sys");
   },
   who() {
@@ -5193,22 +5269,77 @@ const CHAT_COMMANDS = {
   // sees nor keeps.
   mine(rest) {
     if (!world) { chatLine("", "no game running to mine in", "sys"); return; }
-    const parts = String(rest || "").trim().split(/\s+/).filter(Boolean);
-    if (parts.length < 2) { chatLine("", "try: /mine <x> <y>", "sys"); return; }
-    const x = parseInt(parts[0], 10), y = parseInt(parts[1], 10);
-    if (!Number.isFinite(x) || !Number.isFinite(y)) {
-      chatLine("", "x and y need to be plain numbers: /mine <x> <y>", "sys"); return;
-    }
-    const hero = world.things.find(t => t.role === "player" && t.alive);
-    if (!hero) { chatLine("", "no player character to mine with", "sys"); return; }
-    if (Math.max(Math.abs(hero.x - x), Math.abs(hero.y - y)) > 1) {
-      chatLine("", "too far away — get within one square of (" + x + ", " + y + ") first", "sys");
-      return;
-    }
+    const [xy, xyErr] = parseXY(rest, "/mine <x> <y>");
+    if (xyErr) { chatLine("", xyErr, "sys"); return; }
+    const [x, y] = xy;
+    const [hero, heroErr] = findHero("mine");
+    if (heroErr) { chatLine("", heroErr, "sys"); return; }
+    const farErr = tooFar(hero, x, y);
+    if (farErr) { chatLine("", farErr, "sys"); return; }
     const target = world.things.find(t => t.alive && t.kind === "ore" && t.x === x && t.y === y);
     if (!target) { chatLine("", "no ore at (" + x + ", " + y + ")", "sys"); return; }
     hero.inventory.ore = (hero.inventory.ore || 0) + 1;
     chatLine("", "mined 1 ore at (" + x + ", " + y + ") — you now have " + hero.inventory.ore, "sys");
+  },
+  // /attack <x> <y>: the same damage touching a bandit already does,
+  // aimed at an exact spot -- a shortcut for reaching it, not ranged
+  // combat across the map. Matches the hero's own touch(bandit) ->
+  // damage it 2 row exactly.
+  attack(rest) {
+    if (!world) { chatLine("", "no game running to attack with", "sys"); return; }
+    const [xy, xyErr] = parseXY(rest, "/attack <x> <y>");
+    if (xyErr) { chatLine("", xyErr, "sys"); return; }
+    const [x, y] = xy;
+    const [hero, heroErr] = findHero("attack");
+    if (heroErr) { chatLine("", heroErr, "sys"); return; }
+    const farErr = tooFar(hero, x, y);
+    if (farErr) { chatLine("", farErr, "sys"); return; }
+    const target = world.things.find(t => t.alive && t.kind === "bandit" && t.x === x && t.y === y);
+    if (!target) { chatLine("", "no bandit at (" + x + ", " + y + ")", "sys"); return; }
+    target.health -= 2;
+    if (target.health <= 0) {
+      world.remove(target);
+      chatLine("", "attacked (" + x + ", " + y + ") — bandit destroyed", "sys");
+    } else {
+      chatLine("", "attacked (" + x + ", " + y + ") — bandit has " + target.health + " health left", "sys");
+    }
+  },
+  // /recruit <x> <y>: the same as touching a companion and pressing e,
+  // aimed at an exact spot -- and, unlike the ordinary e key (which
+  // only ever touches kind "companion"), works on a bare worker or
+  // soldier too, including one you dismissed earlier and want back.
+  recruit(rest) {
+    if (!world) { chatLine("", "no game running to recruit with", "sys"); return; }
+    const [xy, xyErr] = parseXY(rest, "/recruit <x> <y>");
+    if (xyErr) { chatLine("", xyErr, "sys"); return; }
+    const [x, y] = xy;
+    const [hero, heroErr] = findHero("recruit");
+    if (heroErr) { chatLine("", heroErr, "sys"); return; }
+    const farErr = tooFar(hero, x, y);
+    if (farErr) { chatLine("", farErr, "sys"); return; }
+    const target = world.things.find(t => t.alive && RECRUITABLE_KINDS.includes(t.kind)
+      && t.leader === null && t.x === x && t.y === y);
+    if (!target) { chatLine("", "nothing recruitable at (" + x + ", " + y + ")", "sys"); return; }
+    target.leader = hero;
+    chatLine("", "recruited the " + target.kind + " at (" + x + ", " + y + ")", "sys");
+  },
+  // /dismiss <x> <y>: the same as touching one of yours and pressing
+  // r, aimed at an exact spot -- and, unlike the ordinary r key,
+  // works on a bought worker or soldier too, which otherwise has no
+  // way to be released at all.
+  dismiss(rest) {
+    if (!world) { chatLine("", "no game running to dismiss with", "sys"); return; }
+    const [xy, xyErr] = parseXY(rest, "/dismiss <x> <y>");
+    if (xyErr) { chatLine("", xyErr, "sys"); return; }
+    const [x, y] = xy;
+    const [hero, heroErr] = findHero("dismiss");
+    if (heroErr) { chatLine("", heroErr, "sys"); return; }
+    const farErr = tooFar(hero, x, y);
+    if (farErr) { chatLine("", farErr, "sys"); return; }
+    const target = world.things.find(t => t.alive && t.leader === hero && t.x === x && t.y === y);
+    if (!target) { chatLine("", "nothing of yours to dismiss at (" + x + ", " + y + ")", "sys"); return; }
+    target.leader = null;
+    chatLine("", "dismissed the " + target.kind + " at (" + x + ", " + y + ")", "sys");
   },
   // Everything you own or possess, named and located -- the "selector
   // menu" for referring back to something later, with /name below, and

@@ -127,35 +127,48 @@ recent **say** message.
 
 **`/`** hands the terminal back to a normal, cooked text line — a real
 text box, backspace and all, exactly like typing anywhere else in this
-app — for exactly one command, instead of gameplay's usual one-key-at-
-a-time reading. Nothing you type there ever reaches a game's own
-`WHEN key` rows; it's swallowed before any of that runs. `/help` shows
-the game's own "how to play," if it wrote one into its `help` field
-(`games/outpost.json` does), then the short list of what else is
-typeable; anything else says it doesn't recognise it. Whatever the
-command showed stays up as its own screen — a second view, distinct
-from the running world — until any key dismisses it and play resumes
-right where it left off.
+app — instead of gameplay's usual one-key-at-a-time reading. Nothing
+you type there ever reaches a game's own `WHEN key` rows; it's
+swallowed before any of that runs. Type a command, see its result on
+its own screen — a second view, distinct from the running world — then
+type the next one right there, however many in a row, with no need to
+press `/` again each time; a **blank line** (or Ctrl-D) is what
+actually closes chat and goes back to the running game. `/quit` typed
+mid-chat leaves the whole game outright instead, the same as pressing
+`q` would.
 
-`/mine <x> <y>` gathers from the ore at that exact spot — the same
-thing standing there yourself does over time (`games/outpost.json`'s
-own hero brain), just named by coordinate instead of walked to blind.
-Still one square away at most, the same reach `touch` itself always
-means; it refuses (says so) rather than mining across the map.
+`/help` shows the game's own "how to play," if it wrote one into its
+`help` field (`games/outpost.json` does), then the full command
+reference, grouped by type. `/help commands` shows just that
+reference on its own — add `description` too (`/help commands
+description`) for what each one does; bare `/help commands` is names
+and syntax only. An unrecognised command says so rather than doing
+nothing.
+
+Four commands act on an exact spot instead of making you walk there
+and touch it first — the same one square `touch` itself always means,
+so none of these reach across the map: `/mine <x> <y>` gathers ore the
+same as standing there does over time; `/attack <x> <y>` hits a bandit
+there for the same damage ordinary contact does; `/recruit <x> <y>`
+recruits whatever's bare there — a companion, or a worker/soldier
+you'd dismissed earlier, which the ordinary `e` key can't reach at all
+since it only ever touches companions; `/dismiss <x> <y>` releases
+whatever of yours is there, worker/soldier included, which the
+ordinary `r` key can't do either for the same reason.
 
 `/units` lists everything you own or possess — the hero, every
 recruited companion/worker/soldier, every wall and turret you've
 built — each with where it is, and its name if you've given it one.
 `/name <x> <y> <new name>` gives whatever's yours at that exact spot a
 name, which is what shows in `/units` from then on instead of its bare
-kind; unlike `/mine`, naming isn't range-limited — it's bookkeeping,
-not a physical act.
+kind; unlike the four above, naming isn't range-limited — it's
+bookkeeping, not a physical act.
 
-`/mine`, `/units`, and `/name` results are kept, not just shown once —
-a real log, paginated 10 to a page. `/log [n]` shows one page (the
-latest if you leave the number off), titled by its own page number;
-`/forget <n>` deletes a page for good, and later pages shift down and
-renumber to fill the gap.
+`/mine`/`/attack`/`/recruit`/`/dismiss`/`/units`/`/name` results are
+kept, not just shown once — a real log, paginated 10 to a page. `/log
+[n]` shows one page (the latest if you leave the number off), titled
+by its own page number; `/forget <n>` deletes a page for good, and
+later pages shift down and renumber to fill the gap.
 
 ---
 
@@ -387,7 +400,7 @@ of blocks, with each character's glyph floating over its own block.
 | **⛶** | fullscreen |
 | **🎒** | Backpack, a small virtual file system |
 | **⚙** | Properties — grid-lock status, move speed, an opt-in minimap, and a clock, all driven by the world itself |
-| **💬** | Chat — the exact same conversation the browser editor's own box has, one per hosted game; anything typed without a leading `/` is said to the others, which only means anything in `LIVE` mode — there's nobody else to talk to in a local, single-tab copy. `/who` and `/clear` work either way. `/help` too, and — if the game itself carries its own "how to play" — shows that first: `games/outpost.json` is the one game so far that does. `/mine x y` gathers from the ore at that exact spot (one square away at most), `/units` lists everything you own or possess with its location, `/name x y <new name>` renames whatever's yours there — all local-play only like Build/Harvest above. Nothing here is ever silently lost — the whole log is kept, titled into numbered pages of 10; `/log n` scrolls to one, `/forget n` removes one for good, its own number never reused even after |
+| **💬** | Chat — the exact same conversation the browser editor's own box has, one per hosted game; anything typed without a leading `/` is said to the others, which only means anything in `LIVE` mode — there's nobody else to talk to in a local, single-tab copy. Stays open until you tap its own `✕` — nothing about sending a message or running a command closes it on its own. `/who` and `/clear` work either way. `/help` shows the game's own "how to play" first, if it has one (`games/outpost.json` does), then the full command reference grouped by type; `/help commands` (add `description` too) shows just that reference on its own. `/mine`/`/attack`/`/recruit`/`/dismiss x y` act on an exact spot the same as touching it would — gather ore, hit a bandit, recruit or release a bare/led companion/worker/soldier — one square away at most; `/units` lists everything you own or possess with its location, `/name x y <new name>` renames whatever's yours there. All local-play only like Build/Harvest above. Nothing here is ever silently lost — the whole log is kept, titled into numbered pages of 10; `/log n` scrolls to one, `/forget n` removes one for good, its own number never reused even after |
 | **✎** | the button editor — select, drag, resize, and fade any button here, including the drawer's own |
 | **run here** / **go live** | switches between the running game and this tab's own engine |
 

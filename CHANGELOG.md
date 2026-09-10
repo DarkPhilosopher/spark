@@ -16,6 +16,66 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ### Added
 
+- **`/attack`, `/recruit`, `/dismiss` — the rest of the touch-gated hero
+  actions, reachable at a distance** — asked directly for a gap check
+  ("any missing commands for chat in outpost?"), then "yes add all
+  three." `/mine`/`/name` already let you act on a coordinate for
+  things that normally need touching; three more touch-gated actions
+  had no such shortcut. `/attack <x> <y>` does the same 2 damage
+  ordinary contact with a bandit already does. `/recruit <x> <y>` is
+  the same as touching a companion and pressing `e` — except it works
+  on any bare (unled) `companion`/`worker`/`soldier`, not just a
+  companion, so a `worker`/`soldier` you dismissed earlier (previously
+  unreachable — the ordinary `e` key only ever touches kind
+  "companion") can be recruited right back. `/dismiss <x> <y>` is the
+  same as `r`, with the matching generalization — a bought
+  worker/soldier can finally be released at all, which the in-game `r`
+  key alone never could. All three share new `_hero()`/`_parse_xy()`/
+  `_too_far()` helpers with `/mine` now (and its own JS twins,
+  `findHero()`/`parseXY()`/`tooFar()`), a small refactor rather than a
+  fourth copy of the same three checks.
+
+  `/help` itself grew two more layers, requested in the same breath:
+  `/help commands` (bare reference, grouped by type) and `/help
+  commands description` (the same, with what each one does) — both
+  engines' own command lists are now one shared, data-driven
+  `COMMAND_CATALOG` (kept in sync by hand between them, same as
+  `STRUCTURE_KINDS`/`RECRUITABLE_KINDS` already were) rather than
+  hand-written lines that would drift as commands kept getting added.
+  Plain `/help` folds the same categorized reference in after a game's
+  own text, replacing what used to be a flat, manually-ordered list.
+
+  **Also fixed, asked right after: "fix chat to stay open"** — the
+  terminal's own `/` command line used to be one command and straight
+  back to the game, every time; opening it again for a second command
+  meant pressing `/` again from scratch. `chat_break()` now loops:
+  type a command, see its result, type the next one right there with
+  no need to re-press `/`, however many in a row — a blank line (or
+  Ctrl-D, the same safety-valve `q` always was) is what actually closes
+  it and returns to the running game. `/quit` typed mid-session still
+  leaves the whole game outright, same as before. world3d.html's own
+  chat modal was checked too and already behaved this way (only closes
+  on an explicit tap of its own `✕`) — nothing to fix there.
+
+  `tests/check_chat_break.py` extended (+21 checks, 66 total):
+  `/attack`/`/recruit`/`/dismiss` each get the same shape of coverage
+  `/mine` already had (adjacent success, too far, nothing there, no
+  world running), plus recruiting/dismissing a *worker* specifically
+  (proving the generalization beyond "companion"), refusing an
+  already-led target, and a bandit never being recruitable; `/help
+  commands`/`/help commands description` checked for no game text,
+  grouped headings in order, and descriptions present only when asked
+  for; and the pty section rewritten end to end for the new
+  stays-open flow -- a second command runs with no re-press of `/`,
+  still clearly on the chat screen (not back in the game) after it,
+  and a blank line is what actually returns to the running world.
+  `tests/chat.test.js` extended (+18 checks, 67 total), the same cases
+  against the JS twins directly. `check_engines.py` still bit-for-bit
+  identical across four seeds with `outpost.json`'s updated `help`
+  text. Validated with `node --check`, a full `html.parser` pass,
+  `python3 -m py_compile`, and the full existing suite, all green. Not
+  seen running on a real device yet.
+
 - **Chat gets a real, paginated log — `/log`/`/forget`, no more silent
   history loss** — requested directly: "i need chat to have consistent
   log hiistory but title each [page] of chat by [page] numbwr and make
