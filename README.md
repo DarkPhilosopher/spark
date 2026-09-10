@@ -20,9 +20,9 @@ is a list of rows. Every row reads the same way:
 
     WHEN something is true   DO something
 
-That is the whole idea, and it is the idea Kodu and Project Spark used. Sixteen
-WHEN tiles crossed with thirty-five DO tiles is five hundred and sixty
-different sentences, and rows can hold more than one tile each, so the real
+That is the whole idea, and it is the idea Kodu and Project Spark used.
+Seventeen WHEN tiles crossed with thirty-six DO tiles is six hundred and
+twelve different sentences, and rows can hold more than one tile each, so the real
 number is much larger. One of those tiles is **your own**: fold any row up under
 a name and it joins the palette like the rest.
 
@@ -280,6 +280,7 @@ who arrived before you started a game — they are connected and waiting.
 | I am at the edge of the world | make it / self disappear |
 | my range or time has run out | jump to a random empty square |
 | I remember `<name>` is `<value>` | remember `<name>` is `<value>` |
+| I recall the target `<name>` | mark `<name>` as a target |
 | placeholder `<who>` has `<face>` `<test>` `<n>` | open `<object>` at `<target>` |
 | placeholder `<who>` is named "`<text>`" | name `<who>` is "`<text>`" |
 | the tile called "`<name>`" — one of your own | the tile called "`<name>`" — one of your own |
@@ -629,6 +630,25 @@ whole part of it:
 `games/placeholders.json` is a small worked game that uses all of this — open it
 and read the rows.
 
+### Targets: a name that follows the real thing, not just its number
+
+A placeholder's vector face is three plain numbers — a snapshot, frozen the
+moment you write it. **mark `<name>` as a target** and **I recall the target
+`<name>`** are a different kind of slot: they hold the actual character (or a
+plain spot on the map, if there was nothing to hold), not just its position.
+
+    WHEN I see bandit within 8   DO mark enemy as a target
+    WHEN I recall the target enemy   DO move toward it
+
+`mark` saves whatever `it` is under the name — an object or a character, if a
+WHEN tile earlier in the same row found one, or else your own square right
+now, frozen, as a plain location. All three — an object, a character, or a
+location — are things `it` is already allowed to be; one tile covers all
+three because of that. `recall the target` hands it straight back as `it`, so
+*every* existing "toward it" / "away from it" tile just works with it — and if
+what was marked was a moving character, following it keeps following, tick
+after tick, the way a placeholder's frozen numbers never could.
+
 ### Which way am I pointing
 
 **face** turns a character on the spot. Nothing moves; only its bearing
@@ -968,6 +988,8 @@ Once `python3 spark.py install` has been run, every one of these works as plain
 | `node tests/lead.test.js` | check lead/dismiss/has_leader/recruit in the JavaScript engine |
 | `python3 tests/check_frames.py` | check set_frame/next_frame and multi-cell sprite rendering |
 | `node tests/frames_tiles.test.js` | check set_frame/next_frame in the JavaScript engine |
+| `python3 tests/check_targets.py` | check mark_target/recall_target in the Python engine |
+| `node tests/targets.test.js` | check mark_target/recall_target in the JavaScript engine |
 | `python3 tests/check_frames_screen.py` | check the terminal builder's own Frames screen |
 | `python3 tests/check_chat_break.py` | check the terminal's "/" command line: every command, and that it stays open |
 | `python3 tests/check_status_line.py` | check the terminal's own score/health/tick/position status line |

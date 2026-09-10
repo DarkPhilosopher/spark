@@ -16,6 +16,37 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ### Added
 
+- **`mark_target`/`recall_target`, two tiles: a named slot that holds
+  the actual character, not just a frozen number** — requested (across
+  several rounds of narrowing down what was actually meant): "the
+  variable of a vector to say it belongs to a title of an other
+  variable being an object character or location." Spark already had
+  exactly this shape for plain numbers — **placeholders** (`name`/
+  `value`/`vector` faces, see README's "Placeholders" section) — but a
+  placeholder's vector face is three frozen numbers, snapshotted the
+  moment you write it; nothing existing could hold a *live* reference
+  that keeps tracking a moving character. `mark {name} as a target`
+  saves whatever `it` is under a name — an object or a character, if a
+  WHEN tile earlier in the row found one (a live reference: if it
+  moves or dies, `recall_target` sees that), or else, with no `it` to
+  save, this Thing's own spot right now, frozen forever, as a plain
+  location. One tile covers "an object, a character, or a location"
+  exactly because those are already the only three things `it` is ever
+  allowed to be. `I recall the target {name}` hands it straight back
+  as `it`, so every existing "toward it"/"away from it" tile (`move`,
+  `face`, `shoot`...) just works, unchanged — no new movement code,
+  the same trick `has_leader` already used for `lead`/`dismiss`. A
+  location marker is a real `Thing`, just never added to `world.things`
+  (`engine/world.py`'s `World.targets`, `world3d.html`'s matching
+  `this.targets`), so it never renders, ticks, or collides, but still
+  satisfies the engines' own "only a `Thing` can become `it`" rule.
+  `tests/check_targets.py` (11 checks) and `tests/targets.test.js`
+  (10 checks) cover both cases directly, plus a dead target reading
+  false, an unmarked name reading false, and a blank name being
+  refused (matching `remember`'s own). Deliberately not folded into
+  `check_engines.py`'s shared snapshot harness, same reasoning as
+  `check_lead.py`'s own long comment gives.
+
 - **`/list`, a chat command: every entity in the world, yours or not,
   with its properties** — requested directly: "a list of all entity
   in workspace in chat command also showing its properties." `/units`

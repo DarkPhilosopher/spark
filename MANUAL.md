@@ -15,6 +15,7 @@ turning on the browser interface and GitHub.
 - [Controls: the browser editor](#controls-the-browser-editor)
 - [Controls: the 3D view](#controls-the-3d-view)
 - [Placeholders: the exact rules](#placeholders-the-exact-rules)
+- [Targets: the exact rules](#targets-the-exact-rules)
 - [Tiles you write in Python: the exact rules](#tiles-you-write-in-python-the-exact-rules)
 - [Every command](#every-command)
 - [Connecting the browser interface](#connecting-the-browser-interface)
@@ -855,6 +856,34 @@ compares two moving things as readily as one against a constant:
 `it` is what the sensors *produce*, so there is none available while a WHEN tile
 is being read: `it x` in that box is `0`. Neither tile produces an "it" either,
 so neither can feed *move toward it*.
+
+---
+
+## Targets: the exact rules
+
+A placeholder's vector face is three numbers, frozen the instant you write
+them. A **target** is the other kind of slot: it holds the actual character
+(or, failing that, a plain spot), and reading it back hands you that same
+live thing — which is what lets it keep following something that moves.
+
+- **mark `<name>` as a target** saves whatever `it` is when the tile runs.
+  If an earlier WHEN tile in the same row found an object or a character,
+  that is what gets saved — the real one, not a copy. If there was no `it` at
+  all, your own square right now is saved instead, frozen, as a location.
+- **I recall the target `<name>`** hands back whatever was saved, *as* `it` —
+  so `move toward it`, `face toward it`, `shoot toward it`, and anything else
+  that reads `it` all work with it unchanged, exactly as if a `see` or
+  `touch` tile had found it moments ago.
+- A target that was an object or character keeps being read back **live**: if
+  it moves, `recall the target` sees the new position; if it dies, `recall
+  the target` reads False from then on, the same as never having marked one.
+  A target that was a location never changes — it is not a Thing that can die
+  or move, just a frozen square.
+- Targets belong to the **world**, not to a character, the same as
+  placeholders — every character reads and writes the same ones. They start
+  empty every game and are not saved into the game file.
+- A **blank** name is refused; nothing is saved.
+- Marking under a name that already holds something replaces it outright.
 
 ---
 

@@ -144,6 +144,12 @@ class World:
         self.combo_depth = 0        # how deep one named tile is inside another
 
         self.memory = {}            # name -> value, written by the remember tile
+        # name -> Thing, written by the mark_target tile: whichever object
+        # or character `it` was when marked (a live reference -- recall_target
+        # keeps tracking it if it moves), or a frozen, never-added-to-things
+        # marker Thing standing in for a plain location when there was no
+        # `it` to mark. See mark_target/recall_target in tiles.py.
+        self.targets = {}
         # name -> {"name", "value", "x", "y", "z"}: the placeholders, each an
         # arbitrary slot with three faces. Made on demand by the tiles that
         # write to them -- see tiles.place.

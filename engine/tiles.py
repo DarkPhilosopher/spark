@@ -527,6 +527,24 @@ def s_recall(obj, world, a):
         str(a.get("value", ""))
 
 
+@sensor("recall_target", "I recall the target {name}",
+        Param("name", "Which name?", "text", [], "spot"))
+def s_recall_target(obj, world, a):
+    """Hands back whatever mark_target last saved under this name, as
+    `it` -- an object or character (a live reference: if it moves or
+    dies, this sees that, the same as `see`/`touch` already do), or a
+    frozen location if that's what was marked instead. False if
+    nothing's been marked by this name yet.
+
+    Requested directly: a vector/target "belongs to... an object,
+    character or location" by name -- one tile to read it back,
+    whichever of the three it turns out to be, and every existing
+    "toward it"/"away from it" direction (move, face, shoot...) just
+    works, since those only ever read it.x/it.y."""
+    target = world.targets.get(str(a.get("name", "")).strip())
+    return target if (target is not None and target.alive) else False
+
+
 @sensor("spent", "my range or time has run out")
 def s_spent(obj, world, a):
     """True once a character has flown its reach or lived out its longevity.
@@ -880,6 +898,26 @@ def a_remember(obj, world, a, it):
     name = str(a.get("name", "")).strip()
     if name:
         world.memory[name] = str(a.get("value", ""))
+
+
+@action("mark_target", "mark {name} as a target",
+        Param("name", "Call it what?", "text", [], "spot"))
+def a_mark_target(obj, world, a, it):
+    """Save whoever/whatever `it` is under a name, for recall_target to
+    hand back later -- an object or character if a WHEN sensor earlier
+    in this same row found one (`it` is always that, unchanged), or
+    else -- nothing to point at -- this Thing's own spot right now,
+    frozen forever, as a plain location. One tile covers "an object, a
+    character, or a location" exactly because those are already the
+    only three things `it` is ever allowed to be."""
+    name = str(a.get("name", "")).strip()
+    if not name:
+        return
+    if it is not None:
+        world.targets[name] = it
+    else:
+        from .world import Thing   # deferred: world.py itself imports tiles
+        world.targets[name] = Thing("spot", obj.x, obj.y, {})
 
 
 @action("give_item", "give {target} {amount} {item}",

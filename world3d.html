@@ -1393,6 +1393,16 @@ const SENSORS = {
     return has(world.memory, name) &&
       world.memory[name] === String(a.value === undefined ? "" : a.value);
   },
+  // Hands back whatever mark_target last saved under this name, as it --
+  // an object or character (a live reference, same as see/touch), or a
+  // frozen location if that's what was marked instead. false if nothing's
+  // been marked by this name yet. Mirrors engine/tiles.py's own
+  // s_recall_target exactly.
+  recall_target: (obj, world, a) => {
+    const name = String(a.name === undefined ? "" : a.name).trim();
+    const target = has(world.targets, name) ? world.targets[name] : null;
+    return (target && target.alive) ? target : false;
+  },
   spent: (obj) => {
     if (obj.maxRange && obj.travelled >= obj.maxRange) return true;
     return !!(obj.maxLife && obj.age >= obj.maxLife);
@@ -1568,6 +1578,16 @@ const ACTIONS = {
     const name = String(a.name === undefined ? "" : a.name).trim();
     if (name) world.memory[name] = String(a.value === undefined ? "" : a.value);
   },
+  // Save whoever/whatever `it` is under a name, for recall_target to hand
+  // back later -- an object or character if a WHEN sensor earlier in this
+  // row found one (it is always that, unchanged), or else -- nothing to
+  // point at -- this Thing's own spot right now, frozen forever, as a
+  // plain location. Mirrors engine/tiles.py's own a_mark_target exactly.
+  mark_target: (obj, world, a, it) => {
+    const name = String(a.name === undefined ? "" : a.name).trim();
+    if (!name) return;
+    world.targets[name] = it || new Thing("spot", obj.x, obj.y, {});
+  },
   // Each Thing's own count, not world.memory -- see has_item above for why.
   // Never goes below zero; an item nobody's given at all reads the same as
   // one explicitly given zero of.
@@ -1698,6 +1718,12 @@ class World {
     this.comboDepth = 0;
 
     this.memory = {};
+    // name -> Thing, written by the mark_target tile: whichever object or
+    // character `it` was when marked (a live reference -- recall_target
+    // keeps tracking it if it moves), or a frozen, never-added-to-things
+    // marker Thing standing in for a plain location when there was no
+    // `it` to mark. Mirrors engine/world.py's own World.targets exactly.
+    this.targets = {};
     this.places = {};
     this.mayOpen = false;
     this.opened = {};
