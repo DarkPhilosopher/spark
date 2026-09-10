@@ -113,7 +113,8 @@ While a game is running (`spark.py play ...`, or **play it** in the menus):
 |---|---|
 | ↑ ↓ ← → | whatever the character's brain says for that key |
 | space | usually shoot — again, whatever the brain says |
-| w a s d, e, f | available as tiles, if you build rows that use them |
+| w a s d, e, f, r, 1, 2 | available as tiles, if you build rows that use them |
+| `/` | a command line — see below |
 | `q` | quit back to the menu |
 | Ctrl-C | quit |
 
@@ -123,6 +124,18 @@ arrows and space for you.
 
 The display shows the world, then `score`, `health`, `tick`, then the most
 recent **say** message.
+
+**`/`** hands the terminal back to a normal, cooked text line — a real
+text box, backspace and all, exactly like typing anywhere else in this
+app — for exactly one command, instead of gameplay's usual one-key-at-
+a-time reading. Nothing you type there ever reaches a game's own
+`WHEN key` rows; it's swallowed before any of that runs. `/help` shows
+the game's own "how to play," if it wrote one into its `help` field
+(`games/outpost.json` does), then the short list of what else is
+typeable; anything else says it doesn't recognise it. Whatever the
+command showed stays up as its own screen — a second view, distinct
+from the running world — until any key dismisses it and play resumes
+right where it left off.
 
 ---
 

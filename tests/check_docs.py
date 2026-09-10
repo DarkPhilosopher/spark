@@ -88,7 +88,7 @@ numbers = {"nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13,
            "twenty-one": 21, "twenty-two": 22, "twenty-three": 23,
            "twenty-four": 24, "twenty-five": 25, "twenty-six": 26,
            "twenty-seven": 27, "twenty-eight": 28, "twenty-nine": 29,
-           "thirty": 30, "thirty-one": 31, "thirty-two": 32}
+           "thirty": 30, "thirty-one": 31, "thirty-two": 32, "thirty-three": 33}
 if claim:
     said = (numbers.get(claim.group(1).lower()), numbers.get(claim.group(2).lower()))
     check(said == (len(tiles.SENSORS), len(tiles.ACTIONS)),

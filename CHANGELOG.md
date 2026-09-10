@@ -16,6 +16,73 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ### Added
 
+- **The plain terminal player has its own "/" command line and `/help`
+  now, not just world3d.html's chat** — requested directly: get the
+  keys `outpost` actually plays with to stop leaking into some text box,
+  and put a second, dedicated screen behind the keyboard for `/help` and
+  commands, in the terminal (`python3 spark.py play`), not just the
+  browser. Pressing `/` during play hands the terminal back to normal
+  cooked line input for one line — a real text box, backspace and all,
+  the same as it behaves anywhere else in this app — rather than
+  gameplay's usual one-key-at-a-time swallowing (`Keyboard.pause()`/
+  `.resume()`, wrapping the exact termios restore/re-apply
+  `__exit__`/`__enter__` already did). Whatever's typed runs as a
+  command and its result shows on its own screen — `/help` reads the
+  same `help` field a game's `/help` in chat does (see below), a small,
+  deliberately local set otherwise (there's no server connection from
+  the plain terminal player the way the browser clients have, so no
+  `/who` to answer or `/clear` to run) — until any key dismisses it and
+  the running world comes back.
+
+  `tests/check_chat_break.py` (new, 11 checks): the pure command logic
+  directly (help text, blank input treated as help, unknown commands,
+  /quit), and a real pty end to end — pressing `/`, typing `help`,
+  confirming `outpost`'s own instructions and a distinct "chat" screen
+  show up, a key afterward returning to the running game, and `q`
+  still quitting normally afterward. Same trick `check_menu.py` already
+  uses for this exact reason: a plain pipe can't tell apart from a real
+  terminal the way this feature needs to.
+
+- **`recruit`: "buy a unit" for a price** — requested directly, right
+  after asking for the chat/help work above: "I wanted into outpost...
+  to buy with ore amount a new unit entity to my team for work or
+  combat, name one soldier and one worker." One new tile: `recruit`
+  spawns a new `{kind}` at the recruiter's OWN spot (not a random empty
+  square, the way plain `spawn` works) and already following them --
+  `spawn` then `lead` in the same row could never target the thing
+  `spawn` just made, since a row's DO tiles all get the same `it` from
+  the WHEN half. Pair it with `has_item` (WHEN) and a negative
+  `give_item` (DO) in the same row to actually charge for it -- neither
+  tile enforces a cost on its own, `recruit` only handles the
+  spawn-and-follow half.
+
+  `games/outpost.json`'s hero can now press `1` for a `worker` (8 ore --
+  gathers ore twice as fast as a plain recruited companion, no combat
+  at all) or `2` for a `soldier` (15 ore -- more health and reach than a
+  companion, hits harder, doesn't gather) -- each a distinct kind with
+  its own ordinary brain rows (`has_leader`/`see`/`touch`, nothing new),
+  not a new engine-level unit type. Both appear already following the
+  hero, at the hero's own feet, the instant they're bought. Added `"1"`,
+  `"2"`, and (from the release-key work in the previous entry) `"r"` to
+  the shared `KEYS` list -- all three worked already (the engine only
+  ever checks key membership, never the suggested-choices list) but
+  weren't real picks in the tile editor's own dropdown until now.
+
+  `tests/check_lead.py` extended (+5 checks, 16 total) and
+  `tests/lead.test.js` extended (+4 checks, 17 total): a fresh unit
+  actually appears, at the recruiter's own spot, already led by them --
+  and one row combining `has_item`/`give_item`/`recruit` together,
+  confirming it silently does nothing while unaffordable and actually
+  deducts the cost once it is. `check_engines.py` picked up the whole
+  updated `outpost.json` for free (it discovers every `games/*.json`),
+  confirmed bit-for-bit identical between the two engines across four
+  seeds with the new kinds and buy rows in place. Also manually hired
+  one of each and watched the game run another 500 ticks with no
+  crashes. Validated with `node --check`, a full `html.parser` pass,
+  `python3 -m py_compile`, and the full existing suite, all green. Not
+  seen running in either the terminal or world3d.html on a real device
+  yet.
+
 - **A game can carry its own "how to play," shown any time with `/help`
   in chat** — requested directly, right after simulating a playthrough
   of `outpost`: "add to spark > outpost instructions how to play also

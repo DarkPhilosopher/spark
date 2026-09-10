@@ -1441,6 +1441,14 @@ const ACTIONS = {
   },
   heal: (obj, world, a) => { obj.health += num(a.amount, 1); },
   spawn: (obj, world, a) => { world.spawnSomewhere(a.kind); },
+  // The "buy a unit" tile: like spawn, but at MY OWN spot rather than a
+  // random empty cell, and already following me -- one tile, since a
+  // separate spawn then lead in the same row would still hand lead the
+  // WHEN half's own `it`, never the thing spawn just made.
+  recruit: (obj, world, a) => {
+    const fresh = world.spawn(a.kind, obj.x, obj.y);
+    if (fresh) fresh.leader = obj;
+  },
   shape: (obj, world, a, it) => {
     const victim = a.target === "self" ? obj : it;
     if (victim) {

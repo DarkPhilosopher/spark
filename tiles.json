@@ -25,7 +25,9 @@
             "d",
             "e",
             "f",
-            "r"
+            "r",
+            "1",
+            "2"
           ],
           "default": "up"
         }
@@ -403,6 +405,19 @@
           "kind": "kind",
           "choices": [],
           "default": "apple"
+        }
+      ]
+    },
+    {
+      "id": "recruit",
+      "label": "hire a new {kind} that already follows me",
+      "params": [
+        {
+          "name": "kind",
+          "prompt": "Hire what?",
+          "kind": "kind",
+          "choices": [],
+          "default": "worker"
         }
       ]
     },
@@ -970,6 +985,8 @@
     "d",
     "e",
     "f",
-    "r"
+    "r",
+    "1",
+    "2"
   ]
 }

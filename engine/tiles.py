@@ -29,7 +29,7 @@ MAX_COMBO_DEPTH = 8
 
 DIRECTIONS = ["up", "down", "left", "right", "random", "toward it", "away from it", "forward"]
 STEPS = {"up": (0, -1), "down": (0, 1), "left": (-1, 0), "right": (1, 0)}
-KEYS = ["up", "down", "left", "right", "space", "w", "a", "s", "d", "e", "f", "r"]
+KEYS = ["up", "down", "left", "right", "space", "w", "a", "s", "d", "e", "f", "r", "1", "2"]
 
 # The compass rose. North is up the screen, so its step is (0, -1). The four
 # diagonals are here and nowhere else, which is what makes `face` worth having:
@@ -676,6 +676,21 @@ def a_heal(obj, world, a, it):
         Param("kind", "Make what?", "kind", [], "apple"))
 def a_spawn(obj, world, a, it):
     world.spawn_somewhere(a["kind"])
+
+
+@action("recruit", "hire a new {kind} that already follows me",
+        Param("kind", "Hire what?", "kind", [], "worker"))
+def a_recruit(obj, world, a, it):
+    """The "buy a unit" tile: spawn tile, but at MY OWN spot rather than
+    a random empty cell, and already following me -- one tile, since
+    `do_all` hands every DO tile in a row the same `it` from the WHEN
+    half, so a separate `spawn` then `lead` in the same row could never
+    make `lead` target the thing `spawn` just made. Pair with `has_item`
+    (WHEN) and `give_item` -amount (DO) in the same row to charge for it;
+    neither tile enforces a cost on its own."""
+    new = world.spawn(a["kind"], obj.x, obj.y)
+    if new is not None:
+        new.leader = obj
 
 
 # Same list, same order, as world.SHAPES and world3d.html's own SHAPES --

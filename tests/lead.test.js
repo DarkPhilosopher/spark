@@ -91,5 +91,35 @@ console.log("\ntarget \"self\": a companion can dismiss (or lead) itself, not ju
      loner.leader === loner);
 }
 
+console.log("\nrecruit: \"buy a unit\" -- spawns at MY spot, already following me");
+{
+  // A world just featureful enough for the real spawn() to work off of:
+  // a templates lookup and in-bounds check, exactly what recruit itself
+  // calls through.
+  const templates = {worker: {glyph: "w", color: "yellow"}};
+  const w = {
+    templates, things: [],
+    inBounds: () => true,
+    spawn(kind, x, y) {
+      const t = templates[kind];
+      if (!t) return null;
+      const fresh = new Thing(kind, x, y, t);
+      this.things.push(fresh);
+      return fresh;
+    },
+  };
+  const hero = thing("hero", 5, 5);
+  ACTIONS.recruit(hero, w, {kind: "worker"});
+  ok("a fresh worker actually appears", w.things.length === 1, w.things.map(t => t.kind));
+  const fresh = w.things[0];
+  ok("it spawns at the recruiter's own spot, not a random empty cell",
+     fresh.x === 5 && fresh.y === 5, [fresh.x, fresh.y]);
+  ok("...and already follows whoever recruited it -- no separate lead needed",
+     fresh.leader === hero, fresh.leader);
+
+  ACTIONS.recruit(hero, w, {kind: "no-such-kind"});
+  ok("an unknown kind is simply a no-op, not a crash", w.things.length === 1);
+}
+
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

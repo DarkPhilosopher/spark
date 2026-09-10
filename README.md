@@ -21,7 +21,7 @@ is a list of rows. Every row reads the same way:
     WHEN something is true   DO something
 
 That is the whole idea, and it is the idea Kodu and Project Spark used. Sixteen
-WHEN tiles crossed with thirty-two DO tiles is five hundred and twelve
+WHEN tiles crossed with thirty-three DO tiles is five hundred and twenty-eight
 different sentences, and rows can hold more than one tile each, so the real
 number is much larger. One of those tiles is **your own**: fold any row up under
 a name and it joins the palette like the rest.
@@ -795,6 +795,13 @@ unchanged. What a recruited companion does once it's near you (fight,
 gather, stand guard) is just whatever rows you give it; recruiting only
 decides who it tags along with.
 
+One more, `recruit`, is the "buy a unit" tile: it hires a brand-new `kind` that already follows whoever paid for it.
+Pair it with `has_item` in the WHEN half and a negative `give_item` in the
+DO half to actually charge for it — neither tile enforces a cost on its
+own, `recruit` just spawns the new one at the buyer's own spot instead of
+a random empty square, already led by them. `games/outpost.json`'s hero
+can hire a `worker` or a `soldier` this way, for ore.
+
 **Backpack, Properties, Mesh Creator, Build, and the Object Inspector share
 one shape**: up to six large buttons filling most of the screen, a box off
 to the side for whatever those buttons don't cover — live readouts, a
@@ -944,8 +951,9 @@ Once `python3 spark.py install` has been run, every one of these works as plain
 | `node tests/harvest_tiles.test.js` | check give_item/has_item/harvestable in the JavaScript engine |
 | `python3 tests/check_draw_line.py` | check draw_line/world.lines in the Python engine |
 | `node tests/draw_line.test.js` | check draw_line/world.lines and pushLine's own geometry |
-| `python3 tests/check_lead.py` | check lead/dismiss/has_leader in the Python engine |
-| `node tests/lead.test.js` | check lead/dismiss/has_leader in the JavaScript engine |
+| `python3 tests/check_lead.py` | check lead/dismiss/has_leader/recruit in the Python engine |
+| `node tests/lead.test.js` | check lead/dismiss/has_leader/recruit in the JavaScript engine |
+| `python3 tests/check_chat_break.py` | check the terminal player's own "/" command line and /help |
 | `node tests/button_position.test.js` | check saved button positions survive a resize/rotation |
 | `node tests/chat.test.js` | check the 3D view's own chat: dedup and command dispatch |
 | `python3 tests/check_docs.py` | check this README still matches the code |

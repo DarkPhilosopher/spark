@@ -38,8 +38,8 @@ def check(name, condition, extra=""):
         print("  FAIL " + name + ("  -> " + str(extra) if extra else ""))
 
 
-def game(hero_rows, companion_rows=None, width=9, height=9):
-    """Both characters start at count 0 -- every test spawns them itself,
+def game(hero_rows, companion_rows=None, width=9, height=9, extra_characters=None):
+    """Every character starts at count 0 -- every test spawns them itself,
     at exact positions, with world.spawn(). Random placement (the normal
     "count: N" startup path) would make every adjacency/direction check
     below flaky by design."""
@@ -51,7 +51,7 @@ def game(hero_rows, companion_rows=None, width=9, height=9):
              "count": 0, "brain": hero_rows},
             {"kind": "companion", "glyph": "c", "color": "yellow", "role": "prop",
              "count": 0, "brain": companion_rows or []},
-        ],
+        ] + (extra_characters or []),
     }
 
 
@@ -63,6 +63,7 @@ def companion(world):
     return next(t for t in world.things if t.kind == "companion")
 
 
+ALWAYS = [{"tile": "always", "args": {}}]
 TOUCH_COMPANION = [{"tile": "touch", "args": {"kind": "companion"}}]
 LEAD_IT = [{"tile": "lead", "args": {"target": "it"}}]
 DISMISS_IT = [{"tile": "dismiss", "args": {"target": "it"}}]
@@ -140,6 +141,45 @@ world.spawn("companion", 5, 4)
 world.step()
 check("recruited, then dismisses itself in the very same tick's companion rules",
       companion(world).leader is None, companion(world).leader)
+
+print("\nrecruit: \"buy a unit\" -- spawns at MY spot, already following me")
+
+WORKER_TEMPLATE = {"kind": "worker", "glyph": "w", "color": "yellow",
+                    "role": "prop", "count": 0, "brain": []}
+RECRUIT_WORKER = [{"tile": "recruit", "args": {"kind": "worker"}}]
+
+world = World(game([{"when": ALWAYS, "do": RECRUIT_WORKER}],
+                    extra_characters=[WORKER_TEMPLATE]))
+world.spawn("hero", 5, 5)
+before = len(world.things)
+world.step()
+check("a fresh worker actually appears", len(world.things) == before + 1,
+      [t.kind for t in world.things])
+new_worker = next(t for t in world.things if t.kind == "worker")
+check("it spawns at the recruiter's own spot, not a random empty cell",
+      (new_worker.x, new_worker.y) == (5, 5), (new_worker.x, new_worker.y))
+check("...and already follows whoever recruited it -- no separate lead needed",
+      new_worker.leader is hero(world), new_worker.leader)
+
+print("\nrecruit is exactly the right hook for a real \"pay ore for a unit\" row")
+
+world = World(game(
+    [{"when": [{"tile": "has_item", "args": {"item": "ore", "amount": 5}}],
+      "do": [{"tile": "give_item", "args": {"target": "self", "item": "ore", "amount": -5}}]
+            + RECRUIT_WORKER}],
+    extra_characters=[WORKER_TEMPLATE],
+))
+h = world.spawn("hero", 5, 5)
+h.inventory["ore"] = 3
+world.step()
+check("can't afford it yet -- no worker, ore untouched",
+      not any(t.kind == "worker" for t in world.things) and h.inventory["ore"] == 3,
+      h.inventory)
+h.inventory["ore"] = 5
+world.step()
+check("affordable now -- hired, and the cost is actually deducted",
+      any(t.kind == "worker" for t in world.things) and h.inventory["ore"] == 0,
+      (h.inventory, [t.kind for t in world.things]))
 
 print("\n%d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)
