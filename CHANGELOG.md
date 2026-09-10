@@ -14,6 +14,32 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ## Unreleased
 
+### Fixed
+
+- **`outpost`'s hero couldn't gather ore at all** — reported directly
+  ("cant gather ore"). Root cause: the hero had no gathering rule of
+  its own — only a recruited companion or worker's own `touch(ore) +
+  give_item` rows ever put anything in an inventory, and the flashy
+  Harvest countdown panel (the other way to gather, used by
+  `harvestable` cones elsewhere) is deliberately world3d.html-only,
+  bespoke JS UI, never implemented in the plain terminal player at all
+  — so walking the hero onto ore in the terminal genuinely did nothing,
+  not even indirectly, unless you'd already recruited help. Fixed with
+  one new row on the hero's own brain, `WHEN timer(5) AND touch(ore) DO
+  give_item(self, ore, 1)` — the exact same pattern the worker/companion
+  already use, so it works identically in both engines, terminal
+  included, with no dependency on anything JS-only. `help` text updated
+  to match ("trickles into your own count over time").
+
+  Confirmed by walking the hero to an ore vein and standing there
+  through the real engine (both a fixed-position check and a full
+  simulated walk-there-yourself run through `world.step()`, matching
+  exactly what the terminal's own key-press loop does) — ore now
+  actually accumulates. `check_engines.py` confirms the changed
+  `outpost.json` is still bit-for-bit identical between the two engines
+  across four seeds. Full existing suite green. Not seen running on a
+  real device yet.
+
 ### Added
 
 - **The plain terminal player has its own "/" command line and `/help`

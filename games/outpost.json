@@ -1,6 +1,6 @@
 {
   "name": "outpost",
-  "help": "Outpost -- a small frontier camp.\nMove: arrow keys.\nRecruit: touch a companion (c), press e -- it follows you and fights/gathers on its own.\nRelease: touch a recruited companion, press r.\nHire: with enough ore, press 1 for a worker (w, 8 ore, gathers fast) or\n2 for a soldier (s, 15 ore, fights hard) -- it appears at your side, already yours.\nFight: walk into a bandit (x) -- yours and theirs both do it automatically once adjacent.\nGather: stand next to an ore vein (o) for the harvest countdown, or let a recruited\ncompanion or worker slowly mine one on its own just by standing next to it.\nBuild: open Build mode (top bar) to place walls (#) around the camp.\nType /help any time to see this again.",
+  "help": "Outpost -- a small frontier camp.\nMove: arrow keys.\nRecruit: touch a companion (c), press e -- it follows you and fights/gathers on its own.\nRelease: touch a recruited companion, press r.\nHire: with enough ore, press 1 for a worker (w, 8 ore, gathers fast) or\n2 for a soldier (s, 15 ore, fights hard) -- it appears at your side, already yours.\nFight: walk into a bandit (x) -- yours and theirs both do it automatically once adjacent.\nGather: stand next to an ore vein (o) and it trickles into your own count over time --\na recruited companion or worker standing next to one gathers it too, on its own.\nBuild: open Build mode (top bar) to place walls (#) around the camp.\nType /help any time to see this again.",
   "world": {
     "width": 50,
     "height": 30,
@@ -223,6 +223,32 @@
               "tile": "say",
               "args": {
                 "text": "soldier hired!"
+              }
+            }
+          ]
+        },
+        {
+          "when": [
+            {
+              "tile": "timer",
+              "args": {
+                "every": 5
+              }
+            },
+            {
+              "tile": "touch",
+              "args": {
+                "kind": "ore"
+              }
+            }
+          ],
+          "do": [
+            {
+              "tile": "give_item",
+              "args": {
+                "target": "self",
+                "item": "ore",
+                "amount": 1
               }
             }
           ]
