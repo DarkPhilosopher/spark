@@ -5078,6 +5078,7 @@ const CHAT_COMMANDS = {
       chatLine("", "—", "sys");
     }
     chatLine("", "/who — who is connected.  /clear — empty this log", "sys");
+    chatLine("", "/mine <x> <y> — mine the ore at that spot, if you're next to it", "sys");
     chatLine("", "anything else is said to the others, if the server is running", "sys");
   },
   who() {
@@ -5086,6 +5087,32 @@ const CHAT_COMMANDS = {
     for (const p of people) chatLine("", p.name + " — " + p.role, "sys");
   },
   clear() { $("#chat-log").textContent = ""; },
+  // Same idea as outpost's own touch(ore)+give_item brain row -- gather
+  // from the ore at an exact spot rather than walking up to it blind.
+  // Still one-square range, the same as `touch` itself always means;
+  // this is a shortcut for reaching a known spot, not remote mining.
+  // Local-play only in effect, like Harvest/Build above: it edits the
+  // local world directly, which a game someone else is hosting neither
+  // sees nor keeps.
+  mine(rest) {
+    if (!world) { chatLine("", "no game running to mine in", "sys"); return; }
+    const parts = String(rest || "").trim().split(/\s+/).filter(Boolean);
+    if (parts.length < 2) { chatLine("", "try: /mine <x> <y>", "sys"); return; }
+    const x = parseInt(parts[0], 10), y = parseInt(parts[1], 10);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      chatLine("", "x and y need to be plain numbers: /mine <x> <y>", "sys"); return;
+    }
+    const hero = world.things.find(t => t.role === "player" && t.alive);
+    if (!hero) { chatLine("", "no player character to mine with", "sys"); return; }
+    if (Math.max(Math.abs(hero.x - x), Math.abs(hero.y - y)) > 1) {
+      chatLine("", "too far away — get within one square of (" + x + ", " + y + ") first", "sys");
+      return;
+    }
+    const target = world.things.find(t => t.alive && t.kind === "ore" && t.x === x && t.y === y);
+    if (!target) { chatLine("", "no ore at (" + x + ", " + y + ")", "sys"); return; }
+    hero.inventory.ore = (hero.inventory.ore || 0) + 1;
+    chatLine("", "mined 1 ore at (" + x + ", " + y + ") — you now have " + hero.inventory.ore, "sys");
+  },
 };
 
 async function runChatSaid(said) {
@@ -5094,9 +5121,10 @@ async function runChatSaid(said) {
   if (!said.startsWith("/")) { await sendChatText(said); return; }
   const cut = said.indexOf(" ");
   const word = (cut < 0 ? said.slice(1) : said.slice(1, cut)).toLowerCase();
+  const rest = cut < 0 ? "" : said.slice(cut + 1);
   const fn = CHAT_COMMANDS[word];
   if (!fn) { chatLine("", "no such command: /" + word + " — try /help", "bad sys"); return; }
-  await fn();
+  await fn(rest);
 }
 
 function openChat() {

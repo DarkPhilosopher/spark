@@ -14,6 +14,37 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ## Unreleased
 
+### Added
+
+- **A button to make a new ore vein, and `/mine <x> <y>` to gather a
+  known one from a distance** — requested directly, right after the
+  gather fix above: "press a button to make the ore," and a chat
+  command "to attempt to mine if its in distance of my character the
+  ore at which xyz coordinates." Space is now bound on `outpost`'s hero
+  (`WHEN key space DO spawn(ore)`, the existing `spawn` tile — no new
+  engine code at all) to drop a fresh ore vein somewhere on the map.
+  `/mine <x> <y>` is new in both places a command can be typed — the
+  terminal's own `/` line (see the entry below) and world3d.html's
+  chat: it does exactly what standing next to ore already does
+  (`give_item`, one at a time), just aimed at an exact spot instead of
+  whatever you happen to be touching, and still range-limited to one
+  square away — refuses (says so) rather than mining across the map.
+  A new `_do_mine()` in `engine/runner.py` and a twin `mine()` on
+  world3d.html's `CHAT_COMMANDS` do the actual work; `run_local_command()`
+  and `runChatSaid()` both needed to start threading the rest of a typed
+  line through to its command, which neither did before (nothing before
+  `/mine` took an argument).
+
+  `tests/check_chat_break.py` extended (+9 checks, 20 total: the pure
+  `/mine` parsing and range logic against a real `World`, plus a pty
+  check that pressing space during a real play session actually
+  produces a new vein) and `tests/chat.test.js` extended (+7 checks, 20
+  total: the same `/mine` cases against `CHAT_COMMANDS.mine` directly).
+  `check_engines.py` confirms the changed `outpost.json` stays
+  bit-for-bit identical between the two engines. Validated with `node
+  --check`, a full `html.parser` pass, `python3 -m py_compile`, and the
+  full existing suite, all green. Not seen running on a real device yet.
+
 ### Fixed
 
 - **`outpost`'s hero couldn't gather ore at all** — reported directly

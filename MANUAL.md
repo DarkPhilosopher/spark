@@ -137,6 +137,12 @@ command showed stays up as its own screen — a second view, distinct
 from the running world — until any key dismisses it and play resumes
 right where it left off.
 
+`/mine <x> <y>` gathers from the ore at that exact spot — the same
+thing standing there yourself does over time (`games/outpost.json`'s
+own hero brain), just named by coordinate instead of walked to blind.
+Still one square away at most, the same reach `touch` itself always
+means; it refuses (says so) rather than mining across the map.
+
 ---
 
 ## Controls: the terminal menus
@@ -367,7 +373,7 @@ of blocks, with each character's glyph floating over its own block.
 | **⛶** | fullscreen |
 | **🎒** | Backpack, a small virtual file system |
 | **⚙** | Properties — grid-lock status, move speed, an opt-in minimap, and a clock, all driven by the world itself |
-| **💬** | Chat — the exact same conversation the browser editor's own box has, one per hosted game; anything typed without a leading `/` is said to the others, which only means anything in `LIVE` mode — there's nobody else to talk to in a local, single-tab copy. `/who` and `/clear` work either way. `/help` too, and — if the game itself carries its own "how to play" — shows that first: `games/outpost.json` is the one game so far that does |
+| **💬** | Chat — the exact same conversation the browser editor's own box has, one per hosted game; anything typed without a leading `/` is said to the others, which only means anything in `LIVE` mode — there's nobody else to talk to in a local, single-tab copy. `/who` and `/clear` work either way. `/help` too, and — if the game itself carries its own "how to play" — shows that first: `games/outpost.json` is the one game so far that does. `/mine x y` gathers from the ore at that exact spot (one square away at most), local-play only like Build/Harvest above |
 | **✎** | the button editor — select, drag, resize, and fade any button here, including the drawer's own |
 | **run here** / **go live** | switches between the running game and this tab's own engine |
 

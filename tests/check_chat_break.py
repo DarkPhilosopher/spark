@@ -25,6 +25,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from engine.runner import run_local_command, _local_help_lines   # noqa: E402
+from engine.world import World                                   # noqa: E402
 
 passed = failed = 0
 
@@ -61,6 +62,50 @@ check("/q is the same as /quit", kind == "quit")
 kind, lines = run_local_command("/nonsense", {})
 check("an unknown command says so, doesn't crash",
       kind == "show" and any("no such command" in l for l in lines), lines)
+
+print("\n/mine <x> <y>: gather from a known spot instead of walking up to it blind")
+
+
+def mine_game(hero_pos, ore_pos):
+    project = {
+        "name": "mine_probe", "world": {"width": 12, "height": 12, "speed": 6},
+        "characters": [
+            {"kind": "hero", "glyph": "@", "color": "green", "role": "player",
+             "count": 0, "brain": []},
+            {"kind": "ore", "glyph": "o", "color": "gold", "role": "prop",
+             "count": 0, "brain": []},
+        ],
+    }
+    w = World(project)
+    w.spawn("hero", *hero_pos)
+    w.spawn("ore", *ore_pos)
+    return w
+
+
+kind, lines = run_local_command("/mine 5 5", None)
+check("with no world running, says so rather than crashing",
+      kind == "show" and "no game running" in lines[0], lines)
+
+w = mine_game((5, 5), (6, 5))   # adjacent
+hero = next(t for t in w.things if t.kind == "hero")
+kind, lines = run_local_command("/mine 6 5", w.project, w)
+check("mining an adjacent, real ore spot works", "mined 1 ore" in lines[0], lines)
+check("...and it actually lands in the hero's own count", hero.inventory.get("ore") == 1)
+
+w = mine_game((0, 0), (6, 5))   # far away
+kind, lines = run_local_command("/mine 6 5", w.project, w)
+check("too far away refuses, doesn't teleport-mine across the map",
+      "too far" in lines[0], lines)
+
+w = mine_game((5, 5), (6, 5))
+kind, lines = run_local_command("/mine 5 6", w.project, w)   # adjacent, but nothing there
+check("adjacent but nothing there says so", "no ore at" in lines[0], lines)
+
+w = mine_game((5, 5), (6, 5))
+kind, lines = run_local_command("/mine", w.project, w)
+check("missing coordinates gives a usage line, not a crash", "try: /mine" in lines[0], lines)
+kind, lines = run_local_command("/mine x y", w.project, w)
+check("non-numeric coordinates say so, not a crash", "plain numbers" in lines[0], lines)
 
 print("\n%d passed, %d failed (pure logic)\n" % (passed, failed))
 
@@ -124,11 +169,19 @@ check("the game's own help text made it onto the result screen",
       "frontier camp" in out, out[-400:])
 check("...and the chat header too, a screen distinct from the running world",
       "chat" in out.lower(), out[-400:])
+check("the command legend mentions /mine too",
+      "/mine" in out, out[-400:])
 
-s.send(b" ")   # any key dismisses the result screen
+s.send(b"x")   # any key dismisses the result screen -- x isn't a bound key
 back = s.drain(0.6)
 check("a key afterward goes back to the running game (the world redraws)",
       "score" in back, back[-200:])
+
+print("\npressing space during play makes a new ore vein (the \"press a button\" ask)")
+s.send(b" ")
+made = s.drain(0.6)
+check("the hero's own space row fires -- a fresh ore vein message shows up",
+      "ore vein appeared" in made, made[-200:])
 
 s.send(b"q")
 s.drain(0.4)

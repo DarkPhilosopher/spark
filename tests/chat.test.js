@@ -55,10 +55,11 @@ function load() {
       getSeenChat: () => seenChat, setSeenChat: v => { seenChat = v; },
       setLive: (v, snap) => { live = v; liveSnapshot = snap; },
       setProject: p => { project = p; },
+      setWorld: w => { world = w; },
     };
   `;
-  new Function("module", "$", "document", "authHeaders", "fetch", "live", "liveSnapshot", "project", body)(
-    mod, $, documentStub, () => ({}), fakeFetch, false, null, null);
+  new Function("module", "$", "document", "authHeaders", "fetch", "live", "liveSnapshot", "project", "world", body)(
+    mod, $, documentStub, () => ({}), fakeFetch, false, null, null, null);
   return {api: mod.exports, log, fetchCalls};
 }
 
@@ -142,6 +143,53 @@ function runHelpTests() {
     api.runChatSaid("/help");
     ok("a game with no help field just skips straight to the command legend",
        rendered(log)[0].includes("/who"), rendered(log));
+  }
+
+  runMineTests();
+}
+
+console.log("\n/mine <x> <y>: gather from a known spot instead of walking up to it blind");
+function runMineTests() {
+  const hero = () => ({kind: "hero", role: "player", alive: true, x: 5, y: 5, inventory: {}});
+  const ore = (x, y) => ({kind: "ore", role: "prop", alive: true, x, y, inventory: {}});
+
+  {
+    const {api, log} = load();
+    api.runChatSaid("/mine 5 5");
+    ok("with no world running, says so rather than crashing",
+       rendered(log)[0].includes("no game running"), rendered(log));
+  }
+  {
+    const {api, log} = load();
+    const h = hero();
+    api.setWorld({things: [h, ore(6, 5)]});
+    api.runChatSaid("/mine 6 5");
+    ok("mining an adjacent, real ore spot works",
+       rendered(log)[0].includes("mined 1 ore"), rendered(log));
+    ok("...and it actually lands in the hero's own count", h.inventory.ore === 1);
+  }
+  {
+    const {api, log} = load();
+    api.setWorld({things: [{...hero(), x: 0, y: 0}, ore(6, 5)]});
+    api.runChatSaid("/mine 6 5");
+    ok("too far away refuses, doesn't teleport-mine across the map",
+       rendered(log)[0].includes("too far"), rendered(log));
+  }
+  {
+    const {api, log} = load();
+    api.setWorld({things: [hero(), ore(6, 5)]});
+    api.runChatSaid("/mine 5 6");   // adjacent, but nothing there
+    ok("adjacent but nothing there says so", rendered(log)[0].includes("no ore at"), rendered(log));
+  }
+  {
+    const {api, log} = load();
+    api.setWorld({things: [hero()]});
+    api.runChatSaid("/mine");
+    ok("missing coordinates gives a usage line, not a crash",
+       rendered(log)[0].includes("try: /mine"), rendered(log));
+    api.runChatSaid("/mine x y");
+    ok("non-numeric coordinates say so, not a crash",
+       rendered(log)[1].includes("plain numbers"), rendered(log));
   }
 
   console.log("\n" + pass + " passed, " + fail + " failed");

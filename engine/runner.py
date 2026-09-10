@@ -118,25 +118,63 @@ def _local_help_lines(project):
         lines.extend(str(text).split("\n"))
         lines.append("")
     lines.append("/help -- show this")
+    lines.append("/mine <x> <y> -- mine the ore at that spot, if you're next to it")
     lines.append("/quit -- leave the game (same as pressing q)")
     return lines
 
 
-def run_local_command(said, project):
+def _do_mine(world, rest):
+    """/mine <x> <y>: gather from the ore at that exact spot, same as
+    walking up and standing there would over time (see the hero's own
+    touch(ore) row in games/outpost.json) -- just named by coordinate
+    instead, for whenever you already know where one is and don't want
+    to walk there blind. Still range-limited to right next to you, the
+    same one square `touch` itself always means -- this is a shortcut
+    for reaching it, not a way to mine from across the map."""
+    if world is None:
+        return ["no game running to mine in"]
+    parts = rest.split()
+    if len(parts) < 2:
+        return ["try: /mine <x> <y>"]
+    try:
+        x, y = int(parts[0]), int(parts[1])
+    except ValueError:
+        return ["x and y need to be plain numbers: /mine <x> <y>"]
+    hero = next((t for t in world.things if t.role == "player" and t.alive), None)
+    if hero is None:
+        return ["no player character to mine with"]
+    if max(abs(hero.x - x), abs(hero.y - y)) > 1:
+        return ["too far away -- get within one square of (%d, %d) first" % (x, y)]
+    target = next((t for t in world.things
+                    if t.alive and t.kind == "ore" and t.x == x and t.y == y), None)
+    if target is None:
+        return ["no ore at (%d, %d)" % (x, y)]
+    hero.inventory["ore"] = hero.inventory.get("ore", 0) + 1
+    return ["mined 1 ore at (%d, %d) -- you now have %d"
+            % (x, y, hero.inventory["ore"])]
+
+
+def run_local_command(said, project, world=None):
     """A single typed command line's result, as the lines chat_break
     should show. Purely local -- there is no server connection from the
     plain terminal player the way world3d.html/index.html have, so this
     is deliberately a smaller set than their own CHAT_COMMANDS: nobody
     else to /who, nothing here to /clear. Blank input is treated as
-    /help, the friendliest thing to do with a stray keypress.
+    /help, the friendliest thing to do with a stray keypress. `world`
+    is the live game (None is fine for anything that doesn't need it,
+    including every test of the pure command parsing below).
 
     Returns ("quit", None) if the command means leave the game, or
     ("show", lines) with what to put on the result screen otherwise.
     """
-    word = said.strip().lstrip("/").split(None, 1)
-    word = word[0].lower() if word else "help"
+    said = said.strip().lstrip("/")
+    cut = said.find(" ")
+    word = (said if cut < 0 else said[:cut]).lower() or "help"
+    rest = "" if cut < 0 else said[cut + 1:]
     if word == "help":
         return "show", _local_help_lines(project)
+    if word == "mine":
+        return "show", _do_mine(world, rest)
     if word in ("quit", "q"):
         return "quit", None
     return "show", ["no such command: /%s -- try /help" % word]
@@ -151,7 +189,7 @@ def draw_chat_result(lines):
     sys.stdout.flush()
 
 
-def chat_break(project, keyboard):
+def chat_break(project, keyboard, world):
     """Pressed "/" during play: hand the terminal back to normal cooked
     input for one line (so the phone's own text box/keyboard behaves
     exactly like it does everywhere else in this app, rather than
@@ -169,7 +207,7 @@ def chat_break(project, keyboard):
     except EOFError:
         said = "quit"
     sys.stdout.write(HIDE)
-    kind, lines = run_local_command(said, project)
+    kind, lines = run_local_command(said, project, world)
     if kind == "quit":
         return True
     keyboard.resume()
@@ -199,7 +237,7 @@ def play(project, max_ticks=None):
                 if "q" in world.keys or "quit" in world.keys:
                     break
                 if "/" in world.keys and not headless:
-                    if chat_break(project, keyboard):
+                    if chat_break(project, keyboard, world):
                         break
                     continue   # this tick's own keys are stale by now
                 world.step()

@@ -1,6 +1,6 @@
 {
   "name": "outpost",
-  "help": "Outpost -- a small frontier camp.\nMove: arrow keys.\nRecruit: touch a companion (c), press e -- it follows you and fights/gathers on its own.\nRelease: touch a recruited companion, press r.\nHire: with enough ore, press 1 for a worker (w, 8 ore, gathers fast) or\n2 for a soldier (s, 15 ore, fights hard) -- it appears at your side, already yours.\nFight: walk into a bandit (x) -- yours and theirs both do it automatically once adjacent.\nGather: stand next to an ore vein (o) and it trickles into your own count over time --\na recruited companion or worker standing next to one gathers it too, on its own.\nBuild: open Build mode (top bar) to place walls (#) around the camp.\nType /help any time to see this again.",
+  "help": "Outpost -- a small frontier camp.\nMove: arrow keys.\nRecruit: touch a companion (c), press e -- it follows you and fights/gathers on its own.\nRelease: touch a recruited companion, press r.\nHire: with enough ore, press 1 for a worker (w, 8 ore, gathers fast) or\n2 for a soldier (s, 15 ore, fights hard) -- it appears at your side, already yours.\nFight: walk into a bandit (x) -- yours and theirs both do it automatically once adjacent.\nGather: stand next to an ore vein (o) and it trickles into your own count over time --\na recruited companion or worker standing next to one gathers it too, on its own.\nMake ore: press space -- a fresh ore vein appears somewhere on the map.\nMine at a distance: type /mine x y in chat -- works if you're within one square of that\nspot and there's actually ore there, wherever it landed.\nBuild: open Build mode (top bar) to place walls (#) around the camp.\nType /help any time to see this again.",
   "world": {
     "width": 50,
     "height": 30,
@@ -249,6 +249,30 @@
                 "target": "self",
                 "item": "ore",
                 "amount": 1
+              }
+            }
+          ]
+        },
+        {
+          "when": [
+            {
+              "tile": "key",
+              "args": {
+                "key": "space"
+              }
+            }
+          ],
+          "do": [
+            {
+              "tile": "spawn",
+              "args": {
+                "kind": "ore"
+              }
+            },
+            {
+              "tile": "say",
+              "args": {
+                "text": "a new ore vein appeared somewhere"
               }
             }
           ]
