@@ -408,7 +408,7 @@
             {
               "tile": "chance",
               "args": {
-                "percent": 15
+                "percent": 3
               }
             }
           ],

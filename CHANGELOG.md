@@ -14,6 +14,63 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ## Unreleased
 
+### Fixed
+
+- **`tests/check_menu.py`'s own occasional flake under load, actually
+  root-caused this time** — self-initiated ("anything else you
+  suggest, do it"), after this exact flake had been shrugged off as a
+  pre-existing, unrelated, "clean on rerun" non-issue several separate
+  times earlier in this project's own history without ever actually
+  being dug into. Root cause: two spots drove a real pty with a *blind
+  fixed sleep* between starting the child process and reading its
+  output back — fine normally, but under genuine system load a
+  heavier child (one that loads a game and renders the full ASCII
+  logo, e.g.) can take longer to produce its first byte than any single
+  fixed guess, and moving on regardless just means the subsequent read
+  window starts counting down against a process that hasn't written
+  anything yet, truncating what gets captured. Fixed both:
+  `Session.__init__` now `select()`s for actual readiness instead of
+  `time.sleep(0.3)` (faster for the common, already-fast case too,
+  since it returns the instant output starts rather than waiting out a
+  fixed budget regardless); a second, separate hand-rolled pty block
+  (`SPARK_PLAIN` on a real pty) had the identical pattern independently
+  and got the same fix, plus a longer, retry-until-timeout read loop
+  in place of its old "stop at the very first quiet poll" one.
+
+  Verified with a real stress test, not just a clean rerun: ran
+  `check_menu.py` concurrently with several other heavy test files
+  firing at once (deliberately worse contention than this project
+  would ever normally see) — reliably reproduced the flake on the
+  *unfixed* code (3-4 failures per batch of 4 concurrent runs, the
+  same two checks each time), then confirmed 0 failures across three
+  separate batches (13 concurrent runs total, one batch with 9
+  simultaneous background processes) on the fixed code. Full existing
+  suite still green under normal conditions.
+
+- **A recruited companion's own wander chance competing with actually
+  gathering** — self-initiated, following up on something flagged
+  during an earlier simulated playthrough of `outpost` but never
+  acted on ("a calmer wander chance... would fix that if you want
+  steadier gathering"). No `NOT` sensor exists in this engine to gate
+  the wander row on "not currently led" cleanly, so the practical fix
+  is the one already named at the time: `games/outpost.json`'s
+  companion's own `chance` row lowered from 15% to 3% — still enough
+  to give an un-recruited companion some idle-roaming life before
+  you've found it, far less likely to now drag a recruited one away
+  from an ore vein it's supposed to be standing next to.
+
+  Confirmed directly: with bandits removed from the picture (so the
+  companion's own, entirely correct "chase anything within 6 squares"
+  row can't also be blamed for movement), a recruited companion now
+  holds its exact position over 40 ticks next to ore, steadily
+  gathering (0 drift, 6 ore banked) where it visibly wandered before.
+  Also confirmed the earlier playthrough's own apparent "drift" was
+  mostly the companion correctly chasing off a nearby bandit, not the
+  wander row itself — a real, working feature, not something this
+  needed to touch. `check_engines.py` still bit-for-bit identical
+  across four seeds with the updated `outpost.json`. Full existing
+  suite green.
+
 ### Added
 
 - **`/attack`, `/recruit`, `/dismiss` — the rest of the touch-gated hero

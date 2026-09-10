@@ -56,7 +56,19 @@ class Session:
             [sys.executable, "-c", code], cwd=str(ROOT),
             stdin=slave, stdout=slave, stderr=slave, close_fds=True)
         os.close(slave)
-        time.sleep(0.3)
+        # Wait for the child to actually start producing output, rather
+        # than a blind fixed sleep -- this project's own history has a
+        # real, if occasional, flake right here: a heavier child (more
+        # imports, a bigger first render -- the title screen's full
+        # logo, e.g.) under system load can genuinely take longer than
+        # any single fixed guess, and moving on before its first byte
+        # arrives just means the very next drain() call's own timeout
+        # window starts counting down against a process that hasn't
+        # written anything at all yet, truncating what it captures.
+        # select() returns the moment output is ready, so a fast child
+        # (most of them) isn't slowed down either -- only a genuinely
+        # slow start gets to use the full budget below.
+        select.select([self.master], [], [], 1.0)
 
     def send(self, keys, wait=0.12):
         os.write(self.master, keys)
@@ -157,14 +169,28 @@ proc = subprocess.Popen([sys.executable, "-c", menu_probe()], cwd=str(ROOT),
                          env=env, stdin=slave, stdout=slave, stderr=slave,
                          close_fds=True)
 os.close(slave)
-time.sleep(0.3)
+# Same fix as Session.__init__ above, and for the same reason: wait for
+# the child to actually be ready rather than a blind fixed sleep. A
+# line written to a pty's input queue is preserved regardless of
+# whether the child has reached its input() yet (line-buffered by
+# default), so writing "2\n" a little early here is harmless either way
+# -- it's purely the READ-back below that a fixed sleep put at risk.
+select.select([master], [], [], 1.0)
 os.write(master, b"2\n")
-time.sleep(0.3)
 out = b""
-while select.select([master], [], [], 0.3)[0]:
+end = time.time() + 2.0
+while time.time() < end:
+    ready, _, _ = select.select([master], [], [], 0.2)
+    if master not in ready:
+        continue
     try:
-        out += os.read(master, 4096)
+        chunk = os.read(master, 4096)
     except OSError:
+        break
+    if not chunk:
+        break
+    out += chunk
+    if b"RESULT=" in out:   # got what this check actually needs already
         break
 proc.wait(timeout=5)
 os.close(master)
@@ -184,7 +210,11 @@ child = (
     "builder.main_menu(p)\n"
 ) % str(ROOT)
 s = Session(child)
-title = s.drain(0.5)
+# A bigger budget than the other drain() calls in this file get -- this
+# is the heaviest single render here (brain.load() plus the full ASCII
+# logo), the specific spot this project's own history has seen an
+# occasional flake under load.
+title = s.drain(1.2)
 check("the title screen shows the big SPARK logo",
       "####" in title, title)
 check("...and offers editor, not the old flat list",
