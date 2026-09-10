@@ -354,7 +354,7 @@ of blocks, with each character's glyph floating over its own block.
 | **⛶** | fullscreen |
 | **🎒** | Backpack, a small virtual file system |
 | **⚙** | Properties — grid-lock status, move speed, an opt-in minimap, and a clock, all driven by the world itself |
-| **💬** | Chat — the exact same conversation the browser editor's own box has, one per hosted game. `/who`, `/clear`, `/help`; anything else is said to the others. `LIVE` mode only — there's nobody else to talk to in a local, single-tab copy |
+| **💬** | Chat — the exact same conversation the browser editor's own box has, one per hosted game; anything typed without a leading `/` is said to the others, which only means anything in `LIVE` mode — there's nobody else to talk to in a local, single-tab copy. `/who` and `/clear` work either way. `/help` too, and — if the game itself carries its own "how to play" — shows that first: `games/outpost.json` is the one game so far that does |
 | **✎** | the button editor — select, drag, resize, and fade any button here, including the drawer's own |
 | **run here** / **go live** | switches between the running game and this tab's own engine |
 

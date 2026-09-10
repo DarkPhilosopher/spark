@@ -29,7 +29,7 @@ MAX_COMBO_DEPTH = 8
 
 DIRECTIONS = ["up", "down", "left", "right", "random", "toward it", "away from it", "forward"]
 STEPS = {"up": (0, -1), "down": (0, 1), "left": (-1, 0), "right": (1, 0)}
-KEYS = ["up", "down", "left", "right", "space", "w", "a", "s", "d", "e", "f"]
+KEYS = ["up", "down", "left", "right", "space", "w", "a", "s", "d", "e", "f", "r"]
 
 # The compass rose. North is up the screen, so its step is (0, -1). The four
 # diagonals are here and nowhere else, which is what makes `face` worth having:
@@ -492,6 +492,16 @@ def s_has_item(obj, world, a):
     return obj.inventory.get(item, 0) >= a["amount"]
 
 
+@sensor("has_leader", "someone has recruited me")
+def s_has_leader(obj, world, a):
+    """True while I have a leader, with that leader as `it` -- so the
+    ordinary `move` tile's own "toward it" direction, unchanged, is all a
+    recruited companion needs to actually follow whoever recruited it.
+    A leader who has since died reads the same as never having had one,
+    rather than chasing a corpse for ever."""
+    return obj.leader if (obj.leader is not None and obj.leader.alive) else False
+
+
 @sensor("chance", "{percent}% of the time",
         Param("percent", "Percent chance (0-100)?", "int", [], 25))
 def s_chance(obj, world, a):
@@ -852,6 +862,26 @@ def a_give_item(obj, world, a, it):
         return
     current = victim.inventory.get(item, 0)
     victim.inventory[item] = max(0, current + a["amount"])
+
+
+@action("lead", "make {target} follow me",
+        Param("target", "Recruit whom?", "choice", ["it", "self"], "it"))
+def a_lead(obj, world, a, it):
+    """Set someone's leader to whoever runs this tile -- always me, the
+    one recruiting, never the one being recruited. Authored on the
+    recruiter's own brain: "WHEN touching companion DO lead it" makes
+    the companion follow *me*, not the other way around."""
+    who = it if a["target"] == "it" else obj
+    if who is not None:
+        who.leader = obj
+
+
+@action("dismiss", "make {target} stop following anyone",
+        Param("target", "Dismiss whom?", "choice", ["it", "self"], "it"))
+def a_dismiss(obj, world, a, it):
+    who = it if a["target"] == "it" else obj
+    if who is not None:
+        who.leader = None
 
 
 @action("open", "open {object} at {target}",

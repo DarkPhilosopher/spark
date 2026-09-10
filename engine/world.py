@@ -76,6 +76,11 @@ class Thing:
         # local-play-only UI in world3d.html; this is just the data half,
         # carried by both engines so it survives a save/load either way.
         self.harvest = template.get("harvest", None)
+        # Who I follow/obey, or None -- see the lead/dismiss/has_leader
+        # tiles. A Thing reference, not a name, so "move toward it" (the
+        # ordinary move tile, unchanged) already knows how to chase it the
+        # moment a sensor hands that Thing back as `it`.
+        self.leader = None
 
 
 class World:

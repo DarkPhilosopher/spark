@@ -24,7 +24,8 @@
             "s",
             "d",
             "e",
-            "f"
+            "f",
+            "r"
           ],
           "default": "up"
         }
@@ -121,6 +122,11 @@
           "default": 1
         }
       ]
+    },
+    {
+      "id": "has_leader",
+      "label": "someone has recruited me",
+      "params": []
     },
     {
       "id": "chance",
@@ -655,6 +661,38 @@
       ]
     },
     {
+      "id": "lead",
+      "label": "make {target} follow me",
+      "params": [
+        {
+          "name": "target",
+          "prompt": "Recruit whom?",
+          "kind": "choice",
+          "choices": [
+            "it",
+            "self"
+          ],
+          "default": "it"
+        }
+      ]
+    },
+    {
+      "id": "dismiss",
+      "label": "make {target} stop following anyone",
+      "params": [
+        {
+          "name": "target",
+          "prompt": "Dismiss whom?",
+          "kind": "choice",
+          "choices": [
+            "it",
+            "self"
+          ],
+          "default": "it"
+        }
+      ]
+    },
+    {
       "id": "open",
       "label": "open {object} at {target}",
       "params": [
@@ -931,6 +969,7 @@
     "s",
     "d",
     "e",
-    "f"
+    "f",
+    "r"
   ]
 }

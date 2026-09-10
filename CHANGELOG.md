@@ -14,6 +14,85 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ## Unreleased
 
+### Added
+
+- **A game can carry its own "how to play," shown any time with `/help`
+  in chat** — requested directly, right after simulating a playthrough
+  of `outpost`: "add to spark > outpost instructions how to play also
+  accessible later with /help." `/help` already existed as a chat
+  command (it listed the OTHER chat commands); it now also prints a
+  game's own `help` field first, if it has one — a plain multi-line
+  string on the game JSON itself, alongside `name`/`world`/
+  `characters`, round-tripping through save/load with no engine change
+  needed since `brain.load`/`brain.save` were already schema-free
+  `json.loads`/`json.dumps` on the whole project. A game with no `help`
+  field just goes straight to the command legend, unchanged from
+  before. Works whether or not the server's running (unlike sending a
+  message, showing your own local text needs nothing else), so it's
+  reachable in local play too, not just `LIVE` games. `games/outpost.json`
+  is the first game to actually carry one, covering movement, recruiting
+  (`e`)/releasing (`r`) a companion, fighting, gathering, and Build mode.
+  Also added `"r"` to the shared `KEYS` list (the `key` tile's own
+  choices) — `outpost`'s own release key, which worked already (the
+  engine only ever checks membership, never the suggested-choices list)
+  but wasn't a real pick in the tile editor's own dropdown until now.
+
+  `tests/chat.test.js` extended (+3 checks, 13 total): a game's help
+  text shows in full ahead of the command legend, a game with no help
+  field skips straight to the legend, both checked with the exact
+  `outpost.json` data through the real code path (not just a mocked
+  string). Validated with `node --check`, a full `html.parser` pass,
+  and the full existing suite, all green.
+
+- **`lead`/`dismiss`/`has_leader`: recruit a companion by touching it, and
+  it follows you** — requested directly: an RTS/Kenshi-style "command
+  units" mechanic, "with when do code" (tile-authored, not bespoke UI
+  logic the way Harvest is). `lead` sets whoever you touch to follow
+  *you* — always the recruiter, never the one recruited, so it only
+  does the right thing authored on the recruiter's own brain ("WHEN
+  touching companion DO lead it"). `dismiss` clears it again. A
+  recruited companion finds out through its own new `has_leader`
+  sensor, which hands its leader back as `it` — so "WHEN has_leader DO
+  move toward it" (the ordinary `move` tile, completely unchanged, the
+  same "toward it" the `see`/`touch` sensors already drive chasing
+  with) is all a companion's own brain needs to actually follow along.
+  A leader who has since died reads the same as never having had one,
+  so nobody chases a corpse. New `Thing.leader` field (both engines) --
+  a Thing reference, not a name, following the same "per-Thing, not
+  world-shared" reasoning `inventory` and `harvest` already established.
+
+  New demo game, `games/outpost.json`: a small frontier camp with a
+  player hero, three recruitable companions, wandering bandits, and
+  `harvestable` ore veins (the existing tile from the harvest work
+  above) standing in for Kenshi's ore nodes. Companions fight whatever
+  bandit they see nearest and chase it down on their own (`see`/`touch`
+  + `damage`, no new tiles needed for that part), and slowly gather
+  from any ore tile they stand next to into their own inventory
+  (`timer` + `touch` + `give_item`) -- the "worker" and "soldier" roles
+  from the request, authored as ordinary brain rows rather than any new
+  engine-level unit type. Build mode (already generic, any game) is how
+  you'd wall the camp in — a buildable `wall` kind (count 0, solid,
+  placeable) is included for exactly that. Recruiting/dismissing is
+  bound to `e`/`r` while touching a companion. No new UI: this plays
+  through the existing terminal menus (`python3 spark.py`) and
+  world3d.html exactly like any other Spark game.
+
+  `tests/check_lead.py` (11 checks) and `tests/lead.test.js` (13
+  checks, same cases) cover the new tiles directly, the way
+  `check_harvest.py`/`harvest_tiles.test.js` already do for
+  `give_item`/`has_item`/`harvestable` -- deliberately not folded into
+  `check_engines.py`'s shared snapshot harness, same reasoning as that
+  file's own long comment gives. `games/outpost.json` itself, though,
+  needed no new test file at all: `check_engines.py` already discovers
+  every game under `games/*.json` and replays it seeded in both
+  engines, so it started covering `outpost`'s own recruiting, chasing,
+  gathering, and its "chance"-driven random wander automatically,
+  confirmed bit-for-bit identical between the two engines across four
+  seeds. Also validated by loading and stepping it directly (500 ticks,
+  several seeds, no crashes) and via `spark.py play games/outpost.json`
+  headless. Not seen running in either the terminal or world3d.html
+  yet.
+
 ### Fixed
 
 - **Text doubling on the terminal selection menu** — reported directly

@@ -1344,6 +1344,11 @@ class Thing {
     // survives a save/load either way and behaves the same in both
     // engines.
     this.harvest = template.harvest || null;
+    // Who I follow/obey, or null -- see the lead/dismiss/has_leader
+    // tiles. A Thing reference, not a name, so the ordinary move tile's
+    // own "toward it" already knows how to chase it once a sensor hands
+    // that Thing back as `it`.
+    this.leader = null;
   }
 }
 
@@ -1364,6 +1369,10 @@ const SENSORS = {
     const item = String(a.item === undefined ? "" : a.item).trim();
     return (obj.inventory[item] || 0) >= num(a.amount, 1);
   },
+  // True while I have a leader, with that leader as `it` -- a leader
+  // who has since died reads the same as never having had one, rather
+  // than chasing a corpse for ever.
+  has_leader: (obj) => (obj.leader && obj.leader.alive) ? obj.leader : false,
   chance: (obj, world, a) => world.rng.randrange(100) < num(a.percent, 25),
   at_edge: (obj, world) =>
     obj.x === 0 || obj.x === world.width - 1 ||
@@ -1544,6 +1553,18 @@ const ACTIONS = {
     if (!item) return;
     const current = victim.inventory[item] || 0;
     victim.inventory[item] = Math.max(0, current + num(a.amount, 1));
+  },
+  // Sets someone's leader to whoever runs this tile -- always me, the
+  // recruiter, never the one being recruited. Authored on the
+  // recruiter's own brain: "WHEN touching companion DO lead it" makes
+  // the companion follow *me*, not the other way around.
+  lead: (obj, world, a, it) => {
+    const who = a.target === "it" ? it : obj;
+    if (who) who.leader = obj;
+  },
+  dismiss: (obj, world, a, it) => {
+    const who = a.target === "it" ? it : obj;
+    if (who) who.leader = null;
   },
   open: (obj, world, a) => {
     // The one tile that reaches outside the game. A browser tab cannot hand a
@@ -5037,7 +5058,17 @@ async function sendChatText(text) {
 }
 
 const CHAT_COMMANDS = {
+  // A game's own "how to play" -- an optional plain-text field on the
+  // game JSON itself (project.help), same idea as its name or world
+  // size: written once by whoever built the game, not a chat feature of
+  // its own. Works whether or not the server's running -- unlike saying
+  // something to others, showing your own local text needs nothing but
+  // this tab.
   help() {
+    if (project && project.help) {
+      for (const line of String(project.help).split("\n")) chatLine("", line, "sys");
+      chatLine("", "—", "sys");
+    }
     chatLine("", "/who — who is connected.  /clear — empty this log", "sys");
     chatLine("", "anything else is said to the others, if the server is running", "sys");
   },

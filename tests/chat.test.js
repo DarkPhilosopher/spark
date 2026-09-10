@@ -54,10 +54,11 @@ function load() {
       chatLine, showNewChat, runChatSaid, sendChatText, CHAT_COMMANDS,
       getSeenChat: () => seenChat, setSeenChat: v => { seenChat = v; },
       setLive: (v, snap) => { live = v; liveSnapshot = snap; },
+      setProject: p => { project = p; },
     };
   `;
-  new Function("module", "$", "document", "authHeaders", "fetch", "live", "liveSnapshot", body)(
-    mod, $, documentStub, () => ({}), fakeFetch, false, null);
+  new Function("module", "$", "document", "authHeaders", "fetch", "live", "liveSnapshot", "project", body)(
+    mod, $, documentStub, () => ({}), fakeFetch, false, null, null);
   return {api: mod.exports, log, fetchCalls};
 }
 
@@ -119,7 +120,30 @@ console.log("\nrunChatSaid: commands dispatch, plain text is chat, unknown comma
     ok("plain text (no leading /) is sent as chat, not treated as a command",
        fetchCalls.length === 1 && fetchCalls[0].url === "api/chat", fetchCalls);
 
-    console.log("\n" + pass + " passed, " + fail + " failed");
-    process.exit(fail ? 1 : 0);
+    runHelpTests();
   });
+}
+
+console.log("\n/help: shows the loaded game's own instructions, when it has any");
+function runHelpTests() {
+  {
+    const {api, log} = load();
+    api.setProject({name: "outpost", help: "line one\nline two"});
+    api.runChatSaid("/help");
+    ok("both lines of the game's own help text show up",
+       rendered(log).some(l => l.includes("line one")) &&
+       rendered(log).some(l => l.includes("line two")), rendered(log));
+    ok("the chat-command legend still shows too, after it",
+       rendered(log).some(l => l.includes("/who")), rendered(log));
+  }
+  {
+    const {api, log} = load();
+    api.setProject({name: "chase"});   // no help field at all
+    api.runChatSaid("/help");
+    ok("a game with no help field just skips straight to the command legend",
+       rendered(log)[0].includes("/who"), rendered(log));
+  }
+
+  console.log("\n" + pass + " passed, " + fail + " failed");
+  process.exit(fail ? 1 : 0);
 }

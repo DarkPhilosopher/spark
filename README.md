@@ -20,8 +20,8 @@ is a list of rows. Every row reads the same way:
 
     WHEN something is true   DO something
 
-That is the whole idea, and it is the idea Kodu and Project Spark used. Fifteen
-WHEN tiles crossed with thirty DO tiles is four hundred and fifty
+That is the whole idea, and it is the idea Kodu and Project Spark used. Sixteen
+WHEN tiles crossed with thirty-two DO tiles is five hundred and twelve
 different sentences, and rows can hold more than one tile each, so the real
 number is much larger. One of those tiles is **your own**: fold any row up under
 a name and it joins the palette like the rest.
@@ -783,6 +783,18 @@ whatever's drawing it keeps asking. The Harvest panel above uses this
 same line for the beam it shows between you and whatever you're
 mid-harvest on.
 
+Two more, `lead` and `dismiss`, turn a touch into recruiting: touch a
+companion and run `lead` to make it follow you, or `dismiss` it to let
+it go. `lead` makes whoever you touch follow you.
+`dismiss` makes whoever you touch stop following anyone.
+A companion knows it's been recruited through its own `has_leader`
+sensor: it reads true once someone has recruited it, and hands back
+whoever that is as `it`, so its own "WHEN has_leader DO move toward it"
+is all it takes to actually follow along — the ordinary `move` tile,
+unchanged. What a recruited companion does once it's near you (fight,
+gather, stand guard) is just whatever rows you give it; recruiting only
+decides who it tags along with.
+
 **Backpack, Properties, Mesh Creator, Build, and the Object Inspector share
 one shape**: up to six large buttons filling most of the screen, a box off
 to the side for whatever those buttons don't cover — live readouts, a
@@ -805,13 +817,18 @@ Build mode, the Inspector, Merge, expanding worlds, and harvesting all only
 work in the local, in-browser engine (`RUNNING HERE`, below) — they edit the
 live JavaScript world directly, which has no meaning for a game somebody
 else is hosting. Chat (💬) is the one exception that runs the other way:
-it only means anything in `LIVE` mode, since a local, single-tab copy of
-the game has nobody else in it to talk to. It talks to the exact same
-`api/chat` the browser editor's own box already uses — one shared chat
-per hosted game, not a separate one per client — with a small set of
-text commands (`/who`, `/clear`; `/help` lists them) rather than the
+saying something to everyone else only means anything in `LIVE` mode,
+since a local, single-tab copy of the game has nobody else in it to talk
+to, but its handful of `/` commands (`/who`, `/clear`, `/help`) work
+either way. It talks to the exact same `api/chat` the browser editor's
+own box already uses — one shared chat per hosted game, not a separate
+one per client — with a small set of text commands rather than the
 browser editor's full navigation set, since there is nothing here for
-`/play` or `/editor` to navigate to.
+`/play` or `/editor` to navigate to. A game can carry its own "how to
+play" too — a plain `help` string on the game's own JSON — and `/help`
+shows it first, ahead of the command list itself, whether or not
+anyone else is around to talk to: `games/outpost.json` is the first
+game written with one.
 
 👁, its own small button that always stays put regardless (top right,
 below the bar), hides every other button and panel on screen at once for
@@ -927,6 +944,8 @@ Once `python3 spark.py install` has been run, every one of these works as plain
 | `node tests/harvest_tiles.test.js` | check give_item/has_item/harvestable in the JavaScript engine |
 | `python3 tests/check_draw_line.py` | check draw_line/world.lines in the Python engine |
 | `node tests/draw_line.test.js` | check draw_line/world.lines and pushLine's own geometry |
+| `python3 tests/check_lead.py` | check lead/dismiss/has_leader in the Python engine |
+| `node tests/lead.test.js` | check lead/dismiss/has_leader in the JavaScript engine |
 | `node tests/button_position.test.js` | check saved button positions survive a resize/rotation |
 | `node tests/chat.test.js` | check the 3D view's own chat: dedup and command dispatch |
 | `python3 tests/check_docs.py` | check this README still matches the code |

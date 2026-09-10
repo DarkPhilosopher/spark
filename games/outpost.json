@@ -1,0 +1,430 @@
+{
+  "name": "outpost",
+  "help": "Outpost -- a small frontier camp.\nMove: arrow keys.\nRecruit: touch a companion (c), press e -- it follows you and fights/gathers on its own.\nRelease: touch a recruited companion, press r.\nFight: walk into a bandit (x) -- yours and theirs both do it automatically once adjacent.\nGather: stand next to an ore vein (o) for the harvest countdown, or let a recruited\ncompanion slowly mine one on its own just by standing next to it.\nBuild: open Build mode (top bar) to place walls (#) around the camp.\nType /help any time to see this again.",
+  "world": {
+    "width": 50,
+    "height": 30,
+    "wrap": false,
+    "speed": 8
+  },
+  "characters": [
+    {
+      "kind": "hero",
+      "glyph": "@",
+      "color": "cyan",
+      "health": 12,
+      "role": "player",
+      "count": 1,
+      "solid": false,
+      "brain": [
+        {
+          "when": [
+            {
+              "tile": "key",
+              "args": {
+                "key": "up"
+              }
+            }
+          ],
+          "do": [
+            {
+              "tile": "move",
+              "args": {
+                "dir": "up"
+              }
+            }
+          ]
+        },
+        {
+          "when": [
+            {
+              "tile": "key",
+              "args": {
+                "key": "down"
+              }
+            }
+          ],
+          "do": [
+            {
+              "tile": "move",
+              "args": {
+                "dir": "down"
+              }
+            }
+          ]
+        },
+        {
+          "when": [
+            {
+              "tile": "key",
+              "args": {
+                "key": "left"
+              }
+            }
+          ],
+          "do": [
+            {
+              "tile": "move",
+              "args": {
+                "dir": "left"
+              }
+            }
+          ]
+        },
+        {
+          "when": [
+            {
+              "tile": "key",
+              "args": {
+                "key": "right"
+              }
+            }
+          ],
+          "do": [
+            {
+              "tile": "move",
+              "args": {
+                "dir": "right"
+              }
+            }
+          ]
+        },
+        {
+          "when": [
+            {
+              "tile": "key",
+              "args": {
+                "key": "e"
+              }
+            },
+            {
+              "tile": "touch",
+              "args": {
+                "kind": "companion"
+              }
+            }
+          ],
+          "do": [
+            {
+              "tile": "lead",
+              "args": {
+                "target": "it"
+              }
+            },
+            {
+              "tile": "say",
+              "args": {
+                "text": "recruited!"
+              }
+            }
+          ]
+        },
+        {
+          "when": [
+            {
+              "tile": "key",
+              "args": {
+                "key": "r"
+              }
+            },
+            {
+              "tile": "touch",
+              "args": {
+                "kind": "companion"
+              }
+            }
+          ],
+          "do": [
+            {
+              "tile": "dismiss",
+              "args": {
+                "target": "it"
+              }
+            },
+            {
+              "tile": "say",
+              "args": {
+                "text": "released."
+              }
+            }
+          ]
+        },
+        {
+          "when": [
+            {
+              "tile": "touch",
+              "args": {
+                "kind": "bandit"
+              }
+            }
+          ],
+          "do": [
+            {
+              "tile": "damage",
+              "args": {
+                "target": "it",
+                "amount": 2
+              }
+            }
+          ]
+        },
+        {
+          "when": [
+            {
+              "tile": "health_below",
+              "args": {
+                "value": 1
+              }
+            }
+          ],
+          "do": [
+            {
+              "tile": "lose",
+              "args": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "companion",
+      "glyph": "c",
+      "color": "yellow",
+      "health": 8,
+      "role": "prop",
+      "count": 3,
+      "solid": false,
+      "brain": [
+        {
+          "when": [
+            {
+              "tile": "has_leader",
+              "args": {}
+            }
+          ],
+          "do": [
+            {
+              "tile": "move",
+              "args": {
+                "dir": "toward it"
+              }
+            }
+          ]
+        },
+        {
+          "when": [
+            {
+              "tile": "see",
+              "args": {
+                "kind": "bandit",
+                "range": 6
+              }
+            }
+          ],
+          "do": [
+            {
+              "tile": "move",
+              "args": {
+                "dir": "toward it"
+              }
+            }
+          ]
+        },
+        {
+          "when": [
+            {
+              "tile": "touch",
+              "args": {
+                "kind": "bandit"
+              }
+            }
+          ],
+          "do": [
+            {
+              "tile": "damage",
+              "args": {
+                "target": "it",
+                "amount": 2
+              }
+            }
+          ]
+        },
+        {
+          "when": [
+            {
+              "tile": "timer",
+              "args": {
+                "every": 6
+              }
+            },
+            {
+              "tile": "touch",
+              "args": {
+                "kind": "ore"
+              }
+            }
+          ],
+          "do": [
+            {
+              "tile": "give_item",
+              "args": {
+                "target": "self",
+                "item": "ore",
+                "amount": 1
+              }
+            }
+          ]
+        },
+        {
+          "when": [
+            {
+              "tile": "chance",
+              "args": {
+                "percent": 15
+              }
+            }
+          ],
+          "do": [
+            {
+              "tile": "move",
+              "args": {
+                "dir": "random"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "bandit",
+      "glyph": "x",
+      "color": "red",
+      "health": 6,
+      "role": "prop",
+      "count": 4,
+      "solid": false,
+      "brain": [
+        {
+          "when": [
+            {
+              "tile": "see",
+              "args": {
+                "kind": "hero",
+                "range": 6
+              }
+            }
+          ],
+          "do": [
+            {
+              "tile": "move",
+              "args": {
+                "dir": "toward it"
+              }
+            }
+          ]
+        },
+        {
+          "when": [
+            {
+              "tile": "see",
+              "args": {
+                "kind": "companion",
+                "range": 6
+              }
+            }
+          ],
+          "do": [
+            {
+              "tile": "move",
+              "args": {
+                "dir": "toward it"
+              }
+            }
+          ]
+        },
+        {
+          "when": [
+            {
+              "tile": "touch",
+              "args": {
+                "kind": "hero"
+              }
+            }
+          ],
+          "do": [
+            {
+              "tile": "damage",
+              "args": {
+                "target": "it",
+                "amount": 1
+              }
+            }
+          ]
+        },
+        {
+          "when": [
+            {
+              "tile": "touch",
+              "args": {
+                "kind": "companion"
+              }
+            }
+          ],
+          "do": [
+            {
+              "tile": "damage",
+              "args": {
+                "target": "it",
+                "amount": 1
+              }
+            }
+          ]
+        },
+        {
+          "when": [
+            {
+              "tile": "chance",
+              "args": {
+                "percent": 20
+              }
+            }
+          ],
+          "do": [
+            {
+              "tile": "move",
+              "args": {
+                "dir": "random"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "ore",
+      "glyph": "o",
+      "color": "gold",
+      "health": 1,
+      "role": "prop",
+      "count": 8,
+      "solid": false,
+      "brain": [],
+      "harvest": {
+        "item": "ore",
+        "amount": 5,
+        "seconds": 3,
+        "flashes": 3
+      }
+    },
+    {
+      "kind": "wall",
+      "glyph": "#",
+      "color": "grey",
+      "health": 20,
+      "role": "prop",
+      "count": 0,
+      "solid": true,
+      "brain": []
+    }
+  ]
+}
