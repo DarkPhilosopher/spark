@@ -9,6 +9,84 @@ outcome) stays together.
 
 ## Tasks
 
+- [x] **(noted 2026-09-09):** "make a game 2d asc in termux... had ores and
+  build mode also command units rts game kenshi" — first built as a
+  standalone ASCII RTS (`~/ascirts`, its own separate git repo, Python
+  + `curses`, not part of Spark), then redirected: "make it an game
+  save into spark make aame thing with when do code" — same idea,
+  rebuilt as an actual Spark game authored in WHEN/DO tiles instead of
+  bespoke Python.
+  **How it went (2026-09-09 → 2026-09-10), across several follow-up
+  messages in the same thread:**
+  - Three new general-purpose tiles (both engines): `lead`/`dismiss`
+    (recruit/release whoever you touch — sets/clears a new per-Thing
+    `leader` field, same "per-Thing, not `world.memory`" reasoning
+    `inventory`/`harvest` already established) and `has_leader` (hands
+    the leader back as `it`, so the *existing*, unchanged `move` tile's
+    own "toward it" direction is all a recruited companion needs to
+    follow along — no new movement code at all). Later, `recruit`:
+    spawns a `{kind}` at the recruiter's own spot already led by them
+    — the "buy a unit" tile, since a separate `spawn` then `lead` in
+    one row can never target what `spawn` just made (a row's DO tiles
+    all share the WHEN half's one `it`).
+  - `games/outpost.json` (new): a small frontier camp — a hero,
+    touch-to-recruit companions, wandering bandits (autonomous
+    `see`/`touch`+`damage` — no new tiles needed for that part),
+    `harvestable` ore (the existing tile) for world3d.html's flashy
+    Harvest panel, buyable `worker`/`soldier` units via `recruit` (ore
+    cost, `1`/`2` keys), and a buildable `wall` for the already-generic
+    Build mode. Added `"r"`/`"1"`/`"2"` to the shared `KEYS` list so
+    they're real tile-editor dropdown choices, not just working by
+    accident (the engine only ever checks key membership).
+  - **Real bug, reported and fixed same thread:** the hero itself had
+    *no* gathering rule at all — only recruited companions/workers did,
+    and the Harvest countdown panel is deliberately world3d.html-only
+    JS, never in the plain terminal player — so touching ore as the
+    hero in `spark.py play` did nothing whatsoever. Fixed with one row,
+    `WHEN timer(5) AND touch(ore) DO give_item(self, ore, 1)`, the same
+    pattern the companion/worker already use, so it works in both
+    engines with no JS-only dependency.
+  - The plain terminal player (`engine/runner.py`) gained its own `/`
+    command line — pressing `/` during play calls new
+    `Keyboard.pause()`/`.resume()` (thin wrappers around the existing
+    termios `__exit__`/`__enter__`) to hand the terminal back to normal
+    cooked `input()` for one line — a real text box, not gameplay's
+    one-key-at-a-time swallowing — runs it as a command, and shows the
+    result as its own screen until any key dismisses it. `/help` reads
+    a new optional `help` string field on the game JSON itself
+    (`brain.load`/`.save` already round-trip it for free, being
+    schema-free `json.loads`/`json.dumps`) — the exact same field
+    world3d.html's own (pre-existing) `/help` chat command was extended
+    to read first too, so writing one `help` string covers both
+    surfaces. `/mine <x> <y>` (added last, both places a command can be
+    typed) gathers from ore at an exact coordinate instead of walking
+    up to it blind — still one square away at most, refuses rather than
+    mining across the map; needed `runChatSaid`/`run_local_command` to
+    start threading a typed line's *rest* through to its command, which
+    nothing before `/mine` had needed.
+  - New tests throughout, run alongside the full existing suite every
+    step: `tests/check_lead.py`/`tests/lead.test.js` (16/17 checks),
+    `tests/check_chat_break.py` (20 checks, real-pty end to end — same
+    trick `check_menu.py` already uses, since a plain pipe can't tell
+    apart from a real terminal and this feature only engages on one),
+    `tests/chat.test.js` extended (20 checks total). `check_engines.py`
+    auto-discovers every `games/*.json`, so `outpost` itself needed no
+    dedicated parity test — confirmed bit-for-bit identical between
+    Python and JS across four seeds throughout, on every change.
+  - Also fixed, unrelated but same thread: the terminal's own
+    arrow-key/big-picture menu (`builder._render_menu`) doubled/garbled
+    text on a narrow phone terminal — the built-in control-hint line
+    (59 characters) or a long option label could wrap onto a second
+    physical row, desyncing the fixed cursor-up-by-N-rows redraw math.
+    Fixed with `_fit()`, truncating every line to the real terminal
+    width first. First theory (cbreak leaving terminal echo on) was
+    wrong and was tested, disproven, and discarded rather than shipped.
+  - Not seen running on a real device at any point in this thread —
+    every "confirmed" claim above is from driving the real engine
+    and/or a real pty directly (including a full simulated playthrough:
+    recruit → follow → gather → fight → dismiss, walking a hero there
+    with injected keypresses), never an actual screen.
+
 - [x] **(noted 2026-09-03):** "make each page before progression a 6
   panel largest button to fit screen besides chat on side, same as
   before" — the 3D view's five modals (Backpack, Properties, Mesh
