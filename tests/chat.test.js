@@ -48,7 +48,7 @@ class FakeEl {
 // last added/removed, and the SAME object comes back every time $ is
 // asked for "#chat-modal" (a fresh literal each call couldn't remember
 // anything between one $() and the next). That's enough to check
-// openChat/closeChat/xchat's real effect, not just that they don't throw.
+// openChat's real effect, not just that it doesn't throw.
 class FakeModal {
   constructor() {
     const on = new Set();
@@ -74,7 +74,7 @@ function load() {
   const body = src + `
     module.exports = {
       chatLine, showNewChat, runChatSaid, sendChatText, CHAT_COMMANDS,
-      openChat, closeChat,
+      openChat,
       getSeenChat: () => seenChat, setSeenChat: v => { seenChat = v; },
       setLive: (v, snap) => { live = v; liveSnapshot = snap; },
       setProject: p => { project = p; },
@@ -551,24 +551,11 @@ function runPageTests() {
        !rendered(log).some(l => l === "before clear"), rendered(log));
   }
 
-  console.log("\nopenChat/closeChat/xchat: the chat panel opens by default, and /xchat closes it");
+  console.log("\nopenChat: the chat panel opens by default, and stays open -- there is no closing it");
   {
     const {api, modal} = load();
     api.openChat(false);
     ok("openChat actually marks the modal open", modal.classList.contains("on"));
-  }
-  {
-    const {api, modal} = load();
-    api.openChat(false);
-    api.closeChat();
-    ok("closeChat marks it closed again", !modal.classList.contains("on"));
-  }
-  {
-    const {api, modal} = load();
-    api.openChat(false);
-    api.runChatSaid("/xchat");
-    ok("/xchat closes the panel the same way closeChat does",
-       !modal.classList.contains("on"));
   }
   {
     const {api, modal, fetchCalls} = load();
