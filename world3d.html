@@ -64,10 +64,15 @@
      object in the world to pick it (see setupObjectPicking()), or it
      follows whatever the touch-based inspect found. Projected the same
      way a glyph is, so it tracks the object exactly as the camera moves. */
+  /* z-index:4 (not auto) for the same reason #hud/#quickbar/etc. need
+     one now: these track an object's own screen position, which can
+     land anywhere, chat's now-permanent band over the map included,
+     and an explicit z-index is what keeps either ring on top of it
+     there rather than z-index:auto losing to chat's own z-index:3. */
   #select-highlight{position:absolute;top:0;left:0;width:46px;height:46px;
       margin:-23px 0 0 -23px;border-radius:50%;pointer-events:none;
       border:3px solid var(--accent);box-shadow:0 0 12px var(--accent);
-      display:none}
+      z-index:4;display:none}
   #select-highlight.on{display:block}
 
   /* One of these per object queued for 🧬 merge (see mergeSelection) --
@@ -76,7 +81,8 @@
      visibly different from the single Inspector selection ring above. */
   .merge-highlight{position:absolute;top:0;left:0;width:40px;height:40px;
       margin:-20px 0 0 -20px;border-radius:50%;pointer-events:none;
-      border:3px solid var(--good);box-shadow:0 0 10px var(--good)}
+      border:3px solid var(--good);box-shadow:0 0 10px var(--good);
+      z-index:4}
 
   /* top bar: the name and badge, then the buttons you press rarely */
   #bar{position:absolute;top:0;left:0;right:0;z-index:4;display:flex;
@@ -244,11 +250,18 @@
   /* Everything else -- every other floating panel/overlay in the file --
      hidden while body carries this class. #ui-toggle itself is
      deliberately not in this list. #bar takes the compass with it,
-     nested inside it (see its own CSS comment for why it lives there). */
+     nested inside it (see its own CSS comment for why it lives there).
+     #chat-modal joined this list once it became always-open and could
+     no longer be closed on its own -- before that, being on-screen at
+     all was already the deliberate result of a separate tap, so it was
+     never really part of "the UI clutter" this button clears; now it's
+     the single biggest thing sitting over the world, so a "clean,
+     unobstructed view" has to include it too. */
   body.ui-hidden #bar, body.ui-hidden #controls, body.ui-hidden .drawer,
   body.ui-hidden #quickbar, body.ui-hidden #hud, body.ui-hidden #say,
   body.ui-hidden #minimap, body.ui-hidden #harvest-panel,
-  body.ui-hidden #select-highlight, body.ui-hidden #merge-highlights{display:none}
+  body.ui-hidden #select-highlight, body.ui-hidden #merge-highlights,
+  body.ui-hidden #chat-modal{display:none}
   /* flex-direction:column *and* flex-wrap:wrap: a plain vertical list has
      no limit on how tall it gets, so a handful of custom bubbles (added
      with the + control) used to push the bottom ones -- often literally
@@ -5510,10 +5523,11 @@ async function runChatSaid(said) {
 // Requested directly, after briefly having a real close/reopen toggle:
 // "i need chat always open." There is no closeChat any more -- openChat
 // is the only state the panel is ever in, from the moment a game loads
-// until you leave the page. `focus` is false only for that initial
-// auto-open (below) -- stealing focus there would pop the on-screen
-// keyboard the instant a game opens, before anyone's asked for it.
-// Tapping the chat button later still focuses it, same as always.
+// until you leave the page, and this only actually runs once, right
+// here at setup -- see setupChat below for why the chat button no
+// longer calls this on every tap. `focus` is false only for that one
+// auto-open -- stealing focus there would pop the on-screen keyboard
+// the instant a game opens, before anyone's asked for it.
 function openChat(focus = true) {
   $("#chat-modal").classList.add("on");
   if (!live) chatLine("", "chat needs the server running -- switch to \"go live\" first", "sys");
@@ -5521,12 +5535,15 @@ function openChat(focus = true) {
 }
 
 function setupChat() {
-  // Always-open means there is nothing left for the chat button or the
-  // close button to toggle -- both just (re-)focus the input, which is
-  // the one thing still worth a tap once the panel's already on-screen.
+  // Always-open means there is nothing left for the chat button to
+  // toggle -- it used to call openChat() itself, but that also
+  // re-prints "chat needs the server running" into the permanent log
+  // every single tap, which is just noise once the panel can't
+  // actually be closed and reopened any more. Focusing the input
+  // directly is the one thing still worth a tap now.
   $("#chat-toggle").onclick = () => {
     if (editingButtons) return;   // the button editor owns taps for now
-    openChat();
+    $("#chat-input").focus();
   };
   const send = () => {
     const input = $("#chat-input");

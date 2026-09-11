@@ -227,6 +227,21 @@ Each entry says **what** changed and, where it is not obvious, **why**.
   reasoned through directly against the CSS variables and z-index
   values already in the file, not seen rendered for real.
 
+  Self-review afterward ("fix any issues") turned up three more loose
+  ends from that same change, all fixed the same way: (1) `#select-
+  highlight`/`.merge-highlight` (the Inspector's picked-object ring
+  and the merge-queue markers) had no `z-index` of their own, so an
+  object picked within chat's new band would have shown its ring
+  *behind* chat's opaque panel -- given `z-index:4`, matching every
+  other small tracking overlay; (2) `body.ui-hidden` (the 👁 "clean,
+  unobstructed view" toggle) didn't include `#chat-modal`, so hiding
+  everything else would have left the single biggest thing on screen
+  right where it was -- added to that list; (3) the chat button still
+  called the full `openChat()` on every tap, which reprints "chat
+  needs the server running" into the permanent log each time even
+  though nothing changed and the panel was already open -- it now
+  just focuses the input directly, the one thing left worth a tap.
+
 - **A plain chat message with no server running (or a failed send)
   vanished outright, saving nothing** — requested directly: "it wont
   take and save chat history [for] what is not a command." Both
