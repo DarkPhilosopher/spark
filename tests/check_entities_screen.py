@@ -141,13 +141,15 @@ try:
     check("both pages are offered", "existing entities" in out and "spawn a new entity" in out,
           out[-400:])
 
-    print("\nspawn a new entity: a separate page, every kind the game defines")
+    print("\nspawn a new entity: a separate page, every non-player kind the game defines")
     s.send(b"2")   # jump straight to "spawn a new entity"
     out = s.drain(0.4)
-    check("lists every kind in the roster", all(k in out for k in ("hero", "companion", "wall")),
+    check("lists the non-player kinds", all(k in out for k in ("companion", "wall")),
           out[-400:])
+    check("does NOT offer \"hero\" -- a spawned copy would move in lockstep with the real one",
+          "hero" not in out, out[-400:])
 
-    s.send(b"3")   # jump straight to "wall" (3rd kind listed)
+    s.send(b"2")   # jump straight to "wall" (2nd kind listed, now that hero is excluded)
     out = s.drain(0.4)
     check("a fresh wall actually spawns, and says so",
           "spawned a wall at (" in out, out[-400:])

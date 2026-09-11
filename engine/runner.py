@@ -671,12 +671,21 @@ def _pick_spawn_screen(builder, keyboard, project, world):
     once with different starting counts), pick one to spawn fresh --
     at the hero's own spot, the same "arrives standing on you" place
     the recruit tile already spawns a bought unit at, or an empty
-    square if there's no living hero to stand on."""
+    square if there's no living hero to stand on.
+
+    role "player" kinds are left off this list on purpose: a spawned
+    copy has no controller of its own (nothing here hands it one), and
+    an uncontrolled character answers to the very same keypresses the
+    real one does (see World.keys_for) -- so a second "hero" would not
+    sit there inertly, it would move in lockstep with the real one,
+    step for step, forever. Spawning more of whatever you already are
+    was never really "populating the world" the way a bandit or a
+    turret is."""
     kinds = []
     seen = set()
     for char in project.get("characters", []):
         kind = str(char.get("kind", "")).strip()
-        if kind and kind not in seen:
+        if kind and kind not in seen and char.get("role") != "player":
             seen.add(kind)
             kinds.append(kind)
     sys.stdout.write(HOME_CLEAR)

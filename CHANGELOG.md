@@ -33,10 +33,16 @@ Each entry says **what** changed and, where it is not obvious, **why**.
   `_do_attack`) aimed at the picked entity's own coordinates, so every
   existing rule and message ("too far away," "nothing recruitable
   there") is reused rather than reimplemented. **Spawn a new entity**
-  (`_pick_spawn_screen`) lists every kind the game's roster defines,
-  once each; picking one spawns a fresh one at the hero's own square,
-  the same "arrives standing on you" spot the `recruit` tile already
-  spawns a bought unit at. `p` is a new reserved key, deliberately not
+  (`_pick_spawn_screen`) lists every non-player kind the game's roster
+  defines, once each -- `role: player` kinds are deliberately left
+  off, caught on self-review ("fix anything wrong"): a spawned copy
+  has no controller of its own, and an uncontrolled character answers
+  to the very same keypresses the real one does (`World.keys_for`), so
+  a second "hero" would not sit there inertly, it would move in
+  lockstep with the real one, step for step, forever. Picking a kind
+  spawns a fresh one at the hero's own square, the same "arrives
+  standing on you" spot the `recruit` tile already spawns a bought
+  unit at. `p` is a new reserved key, deliberately not
   one of `tiles.py`'s own `KEYS` list (`up/down/left/right/space/w/a/
   s/d/e/f/r/m/1/2`) -- every one of those is available for a game's
   own `WHEN key` rows, so reusing one here could silently steal a key

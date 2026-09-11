@@ -157,10 +157,12 @@ typing a plain number 1-9 jumps straight to that choice. Two pages:
 recruit, dismiss, attack — reusing those commands' own exact rules
 (too far away, nothing recruitable there, and so on say the same
 things they always do). **Spawn a new entity** lists every kind this
-game defines; picking one spawns a fresh one at your own square, the
-same "arrives standing on you" spot a bought unit already appears at.
-`back` (or escape) steps back one page at a time, all the way out to
-the running game.
+game defines except the player's own (a spawned copy would have no
+controller of its own, so it would move in lockstep with you rather
+than sit there as its own thing); picking one spawns a fresh one at
+your own square, the same "arrives standing on you" spot a bought
+unit already appears at. `back` (or escape) steps back one page at a
+time, all the way out to the running game.
 
 Four commands act on an exact spot instead of making you walk there
 and touch it first — the same one square `touch` itself always means,
