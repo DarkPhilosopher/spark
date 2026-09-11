@@ -11,7 +11,8 @@ turning on the browser interface and GitHub.
 - [System requirements](#system-requirements)
 - [Controls: the deck (what the browser opens on)](#controls-the-deck-what-the-browser-opens-on)
 - [Controls: playing a game](#controls-playing-a-game)
-- [Controls: the terminal menus](#controls-the-terminal-menus)
+- [Controls: Spark as one ASCII display and chat](#controls-spark-as-one-ascii-display-and-chat)
+- [Controls: the terminal's arrow-key menus](#controls-the-terminals-arrow-key-menus)
 - [Controls: the browser editor](#controls-the-browser-editor)
 - [Controls: the 3D view](#controls-the-3d-view)
 - [Placeholders: the exact rules](#placeholders-the-exact-rules)
@@ -197,7 +198,69 @@ good, and later pages shift down and renumber to fill the gap.
 
 ---
 
-## Controls: the terminal menus
+## Controls: Spark as one ASCII display and chat
+
+Requested directly, after confirming full scope ("everything, editor
+included"): "make so spark entirely is just one ASC display and chat
+entirely but launches different programs using always same chat log
+never deleting it and uses chat commands to navigate." This is what
+`spark.py` (bare, or with a game path) opens now — the arrow-key
+menus described further down this page still exist and still work,
+but are no longer what starts by default; see the note at the top of
+that section for how to still reach them.
+
+The screen is one ASCII block-letter **SPARK** logo, a breadcrumb
+saying where you are, and a chat log underneath that **never gets
+cleared** for as long as the process runs — everything you typed and
+everything Spark said back, scrolled through with `/page [n]` (the
+latest page if you leave the number off; a fixed 10 lines per page,
+Spark's own established convention, same as `/log` during play).
+Playing a game (`/play`) is a different "program" in the same sense
+`spark.py play` always was, but launched from right here, and it
+shares this exact log rather than starting a fresh one — coming back
+with `q` picks the conversation up exactly where it left off, not a
+blank screen.
+
+Commands, by where you are:
+
+- **Top level** (nothing open): `/games` (what's saved), `/new <name>`,
+  `/open <name>`.
+- **A game open**: `/characters`, `/character <kind>` (focus one),
+  `/newchar <kind>` (make one, focuses it), `/world width=.. height=..
+  speed=.. wrap=..` (any subset; read them back with no arguments at
+  all), `/rename <name>`, `/save`, `/play`, `/back` (closes the game).
+- **A character focused**: `/glyph <c>`, `/color <name>`, `/role
+  player|prop`, `/count <n>`, `/health <n>`, `/solid yes|no`, `/rows`
+  (list its brain), `/newrow`, `/delrow <n>`, `/back`.
+- **Building a row** (after `/newrow`): `/tiles` lists every tile id
+  you can use; `/when <tile> [args]` and `/do <tile> [args]` add one
+  to whichever half — arguments are `name=value`, comma-separated so a
+  value can hold spaces without quoting (`/do move dir=toward it`);
+  anything left out uses that tile's own default, the same as leaving
+  a question blank in the old menus did. `/done` saves the row to the
+  character's brain (an empty row is quietly thrown away instead);
+  `/cancel` (or `/back`) throws it away outright.
+- **Anywhere**: `/help` (what fits here specifically), `/page [n]`,
+  `/quit`.
+
+**What this first pass does not cover yet**, on purpose, said plainly
+rather than left to be discovered by a missing command: GitHub
+push/pull and inviting someone to play, the connected-players list,
+the multi-cell sprite/frames editor, folding a row into a named tile
+of your own, and approving Python tiles you wrote yourself. Those
+still work exactly as before, just from the arrow-key menus directly
+rather than from here — `python3 -c "from engine import builder,
+brain; builder.push_screen(brain.load('games/x.json'))"`, e.g. — not
+yet reachable by a chat command of their own.
+
+## Controls: the terminal's arrow-key menus
+
+Still here, and still what `check_menu.py` and its own kin test
+directly — but no longer what `spark.py` opens on its own; reach it
+explicitly instead: `python3 -c "from engine import builder, brain;
+builder.main_menu(brain.load('games/x.json') if <a game already
+exists> else None)"`, or just call the individual screen you want
+(`builder.push_screen(project)`, e.g.) the same way.
 
 A big **SPARK** title screen, one option highlighted at a time — a game menu,
 not a numbered list, on any real terminal:

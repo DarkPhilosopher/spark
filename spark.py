@@ -5,7 +5,7 @@
     python3 spark.py update                pull the newest Spark from GitHub
     python3 spark.py update --check        say what an update would bring, and stop
     python3 spark.py tutorial              learn it by building a game, offline
-    python3 spark.py                       open the menu
+    python3 spark.py                       open Spark -- one ASCII display, one chat log
     python3 spark.py edit [port]           open the drag-and-drop editor (8765)
     python3 spark.py host [port]           same, but open to others on this wifi
     python3 spark.py host --public         ...and to anyone, through a tunnel
@@ -17,7 +17,7 @@
     python3 spark.py status                print the flags and the player count
     python3 spark.py players               who is connected, first to join first
     python3 spark.py export                refresh tiles.json and games/index.json
-    python3 spark.py games/chase.json      open the menu on that game
+    python3 spark.py games/chase.json      open Spark with that game already loaded
 
 See README.md for the guide and CHANGELOG.md for what changed when.
 """
@@ -120,8 +120,9 @@ def main():
         ticks = int(args[2]) if len(args) > 2 else None
         runner.play(brain.load(args[1]), max_ticks=ticks)
         return
+    from engine import chatshell
     project = brain.load(args[0]) if args else None
-    builder.main_menu(project)
+    chatshell.run(project)
 
 
 if __name__ == "__main__":

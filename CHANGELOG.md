@@ -16,6 +16,77 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ### Added
 
+- **`engine/chatshell.py` — Spark as one ASCII display and one
+  never-cleared chat log, `spark.py`'s own default now instead of
+  `builder.main_menu`** — requested directly, after a follow-up
+  question nailed down the full scope ("everything, editor included"):
+  "make so spark entirely is just one ASC display and chat entirely
+  but launches different programs using always same chat log never
+  deleting it and uses chat commands to navigate." A genuinely new
+  interface, not a reskin of the arrow-key one: `/games`, `/new`,
+  `/open` at the top; `/characters`, `/character <kind>`, `/newchar
+  <kind>`, `/world width=.. height=.. speed=.. wrap=..`, `/rename`,
+  `/save`, `/play` with a game open; `/glyph`, `/color`, `/role`,
+  `/count`, `/health`, `/solid`, `/rows`, `/newrow`, `/delrow <n>`
+  with a character focused; `/when <tile> [args]` / `/do <tile>
+  [args]` (comma-separated `name=value` pairs, so a value like "toward
+  it" can hold a space without quoting — see `parse_args_text`/
+  `fill_tile_args`) / `/tiles` / `/done` / `/cancel` while building a
+  row; `/page [n]` (a fixed 10 lines, matching `/log`'s own convention)
+  and `/help` (context-sensitive to wherever you are) everywhere.
+  `/play` launches `runner.play()` with **this same log** (`play()`
+  gained a new optional `history=` argument for exactly this — a
+  caller's own running list instead of always starting a fresh one)
+  so a running game's own `/mine`/`/list`/etc. results, and coming
+  back afterward, land in the very same never-cleared scroll rather
+  than a separate screen — "launches different programs using always
+  same chat log never deleting it," literally. `/help`, `/page` and
+  `/log` are deliberately not themselves logged, matching the exact
+  reasoning `runner.py`'s own `_do_log` already gives for the same
+  choice there.
+
+  **Said plainly, not left to be discovered by a missing command:**
+  this is a first pass, not a 1:1 port of every `builder.py` screen.
+  GitHub push/pull, inviting someone to play, the connected-players
+  list, the multi-cell sprite/frames editor, folding a row into a
+  named tile of your own, and Python "your own tiles" approval are
+  not yet reachable from here — `builder.py`'s own screens for all of
+  those are untouched and still work exactly as before, just not
+  wired into a chat command yet. The arrow-key menu system itself is
+  entirely intact too (`builder.main_menu` and everything under it),
+  simply no longer what `spark.py` opens on its own — `check_menu.py`
+  and the several other test files that drive it call it directly,
+  unaffected by this change, confirmed by rerunning the full suite.
+
+  Every command is a plain function of `(state, rest)`, independent of
+  any terminal, so `tests/check_chatshell.py` (86 checks: 76 pure
+  logic, 10 through a real pty) tests almost all of it directly, the
+  same split `runner.py`/`termux_chat.py` already use — building a
+  full character with a brain row from scratch by typed command alone,
+  saving it for real, launching `/play`, confirming the world actually
+  renders, coming back and finding the same log still there, and
+  quitting cleanly, all through one real pty session. `MANUAL.md`
+  gained a new section for it, with the old arrow-key one relabelled
+  and given a note on how to still reach it directly.
+
+  Two real issues caught on self-review before calling it done: (1)
+  `run()`'s own `input()` loop only caught `EOFError` (Ctrl-D), not
+  `KeyboardInterrupt` -- Ctrl-C would have crashed out with a
+  traceback instead of leaving cleanly the way `/quit` does, fixed by
+  catching it explicitly (a real pty confirms Ctrl-D; Ctrl-C itself
+  isn't pty-testable here for the same reason `~/termux-chat`'s own
+  `test_pty.py` already documents -- this pty is never made the
+  child's controlling terminal, so the kernel has no foreground
+  process group to deliver the real SIGINT to, confirmed directly:
+  the byte is silently swallowed). (2) `_draw()` never truncated a
+  long history line to the terminal's own width, and always showed a
+  fixed 15 lines regardless of how tall the terminal actually was --
+  both fixed, recomputed from the live terminal size every redraw
+  (`shutil.get_terminal_size()`), the same lesson this whole project's
+  other screens already learned the hard way.
+
+  Not seen running on a real device yet.
+
 - **The terminal's own entities menu — press `p`** — requested
   directly: "menu selector for existing and also separate page
   potential entity to manipulate or spawn into the world... menus

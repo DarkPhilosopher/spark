@@ -993,6 +993,7 @@ Once `python3 spark.py install` has been run, every one of these works as plain
 | `python3 tests/check_frames_screen.py` | check the terminal builder's own Frames screen |
 | `python3 tests/check_chat_break.py` | check the terminal's "/" command line: every command, and that it stays open |
 | `python3 tests/check_entities_screen.py` | check the terminal's own entities menu (press p): act on one, or spawn a new one |
+| `python3 tests/check_chatshell.py` | check Spark as one ASCII display and one chat log: games, characters, brain rows, world settings, save, play, all by typed command |
 | `python3 tests/check_status_line.py` | check the terminal's own score/health/tick/position status line |
 | `node tests/button_position.test.js` | check saved button positions survive a resize/rotation |
 | `node tests/chat.test.js` | check the 3D view's own chat: dedup, command dispatch, paginated log |
@@ -1074,7 +1075,10 @@ inert, exactly as it would arriving any other way.
     engine/updater.py    `/update spark` -- pulls from GitHub, keeping your games
     engine/world.py      the grid, the characters, and the rule engine
     engine/brain.py      reading and writing game files
-    engine/builder.py    the terminal menus
+    engine/builder.py    the terminal's arrow-key menus (still used by check_menu.py and
+                          friends directly; no longer what spark.py itself opens by default)
+    engine/chatshell.py  spark.py's own default now: one ASCII display, one never-cleared
+                          chat log, everything reached by typed command
     engine/tutorial.py   the ten guided lessons
     engine/launcher.py   writes the `spark` command into your bin folders
     engine/runner.py     the keyboard and the drawing
@@ -1099,6 +1103,8 @@ inert, exactly as it would arriving any other way.
     tests/check_engines.py      plays every game twice, once per engine, and compares
     tests/check_menu.py         drives the terminal's menu through a real pty: arrow keys,
                                  digits, escape, and the fallback with no terminal at all
+    tests/check_chatshell.py    drives engine/chatshell.py through a real pty: build a
+                                 game entirely by typed command, save it, play it, come back
     tests/check_harvest.py      checks give_item/has_item/harvestable in the Python engine
     tests/check_draw_line.py    checks draw_line/world.lines in the Python engine
     tests/mesh_merge.test.js    checks the 3D view's merge-objects arithmetic: offsets,

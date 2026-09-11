@@ -754,8 +754,15 @@ def entities_screen(project, keyboard, world, history):
             _pick_spawn_screen(builder, keyboard, project, world)
 
 
-def play(project, max_ticks=None):
-    """Run a project. With max_ticks set, runs headless -- handy for testing."""
+def play(project, max_ticks=None, history=None):
+    """Run a project. With max_ticks set, runs headless -- handy for testing.
+
+    `history` lets a caller hand in its own running log instead of this
+    call starting a fresh one -- see engine/chatshell.py, which launches
+    play() as one "program" among several sharing a single log that is
+    never cleared across the whole session, requested directly: "launches
+    different programs using always same chat log never deleting it."
+    """
     world = World(project)
     speed = max(1, project.get("world", {}).get("speed", 6))
     delay = 1.0 / speed
@@ -763,7 +770,9 @@ def play(project, max_ticks=None):
     # You are playing your own game on your own phone, so the `open` tile is
     # allowed here. live.Session deliberately leaves it off.
     world.may_open = not headless
-    chat_history = []   # /mine, /units, /name results, for /log and /forget
+    # /mine, /units, /name results, for /log and /forget -- a caller's own
+    # list if it gave one, else a fresh one just for this call, same as always.
+    chat_history = history if history is not None else []
 
     with Keyboard() as keyboard:
         if not headless:
