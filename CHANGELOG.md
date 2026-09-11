@@ -312,6 +312,31 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ### Fixed
 
+- **`engine/chatshell.py`, two more real bugs caught on a second
+  self-review pass** ("fix anything wrong," asked again the next day):
+  (1) `/world width=50, height=abc` reported "need plain numbers" —
+  correctly refusing the command — but had already mutated `width` to
+  50 in place before hitting the bad `height` value, so the refusal
+  was a lie: something *did* change. Fixed by parsing and clamping
+  every given field into a scratch dict first, `state`'s own settings
+  untouched until every one of them is confirmed valid, so a bad
+  value anywhere refuses the whole command atomically, not just the
+  field after it. (2) Switching which character was focused — or
+  which game was open at all — while a row was still being built
+  (`/newrow` without a following `/done`/`/cancel`) left
+  `state["building"]` pointing at the OLD character's half-finished
+  row; a `/done` typed afterward silently attached it to whichever
+  character happened to be focused by then instead, sometimes in a
+  completely different game. Fixed: `/newchar`, `/character <kind>`
+  (unless re-focusing the one you're already on), `/new` and `/open`
+  now all discard a pending row when they actually change focus or
+  project, and say so plainly when they do — a failed `/open` (game
+  doesn't exist) still leaves it untouched, since nothing really
+  changed there. `tests/check_chatshell.py` (+7 checks) covers both
+  directly, confirming the row lands on neither character rather than
+  the wrong one, and that re-focusing the same character mid-build
+  doesn't discard anything unnecessarily.
+
 - **The always-open chat panel blocked the whole game while open, movement
   pad included, with no way to close it and get it back** — a real
   regression from making chat always-open the same day, caught and

@@ -102,6 +102,43 @@ check("focusing an existing character works", s["focus"] == "bandit")
 out = say(s, "/character nope")
 check("focusing one that doesn't exist says so", "no character called" in out[0], out)
 
+print("\nswitching focus mid-row-build discards the row -- a real bug caught on self-review")
+print("(it used to silently attach the half-built row to whichever character ended up")
+print("focused next, regardless of who it was actually being built for)")
+s = chatshell.new_state()
+say(s, "/new probe3b_%d" % os.getpid())
+say(s, "/newchar hero")
+say(s, "/newrow")
+say(s, "/when touch kind=anything")
+out = say(s, "/newchar bandit")
+check("switching to a newly-made character discards the pending row, and says so",
+      s["building"] is None and any("discarded" in l for l in out), out)
+say(s, "/done")
+hero = next(c for c in s["project"]["characters"] if c["kind"] == "hero")
+bandit = next(c for c in s["project"]["characters"] if c["kind"] == "bandit")
+check("the row landed on NEITHER character -- it's really gone, not misattached",
+      hero["brain"] == [] and bandit["brain"] == [], (hero["brain"], bandit["brain"]))
+
+say(s, "/character hero")
+say(s, "/newrow")
+say(s, "/when touch kind=anything")
+out = say(s, "/character hero")   # re-focusing the SAME character, mid-build
+check("re-focusing the character you're ALREADY on doesn't discard anything",
+      s["building"] is not None and not any("discarded" in l for l in out), out)
+say(s, "/do say text=hi")
+say(s, "/done")
+check("...and the row completes normally, attached to the right character",
+      len(hero["brain"]) == 1, hero["brain"])
+
+say(s, "/newrow")
+say(s, "/when touch kind=anything")
+out = say(s, "/open definitely_not_a_real_game_xyz")   # fails, but happens BEFORE the check
+check("a failed /open doesn't touch the pending row at all",
+      s["building"] is not None, s["building"])
+out = say(s, "/new probe3c_%d" % os.getpid())
+check("but a REAL /open or /new (switching games entirely) does discard it, and says so",
+      s["building"] is None and any("discarded" in l for l in out), out)
+
 print("\ncharacter fields: glyph/color/role/count/health/solid, each validated")
 s = chatshell.new_state()
 say(s, "/new probe4_%d" % os.getpid())
@@ -158,6 +195,13 @@ say(s, "/world wrap=yes")
 check("wrap accepted", w["wrap"] is True)
 out = say(s, "/world width=abc")
 check("a non-numeric value is refused, nothing crashes", "plain numbers" in out[0], out)
+
+before = dict(w)
+say(s, "/world width=50, height=abc")
+check("a bad value refuses the WHOLE command atomically -- a good value earlier "
+      "in the same line (width) must not silently apply while the command as a "
+      "whole reports failure (caught on self-review, real bug: it used to)",
+      dict(w) == before, (before, dict(w)))
 
 print("\nbrain rows: /newrow, /when, /do, /tiles, /done, /cancel, /delrow")
 s = chatshell.new_state()

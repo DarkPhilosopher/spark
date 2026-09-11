@@ -164,15 +164,33 @@ def cmd_games(state, rest):
             + ["  " + p.stem for p in games])
 
 
+def _drop_building(state):
+    """Clears any row still being built, and says so if one really was
+    lost -- caught on self-review, a real bug: switching which
+    character (or which game entirely) was focused used to leave
+    state["building"] pointing at the OLD character's half-finished
+    row, so a /done typed afterward silently attached it to whichever
+    character happened to be focused by then instead, not the one it
+    was actually being built for. Called by every command that changes
+    state["focus"] or state["project"]. Returns a warning line, or
+    None if nothing was actually lost."""
+    if state["building"] is None:
+        return None
+    state["building"] = None
+    return "(a row you were building for someone else was discarded)"
+
+
 def cmd_new(state, rest):
     name = rest.strip()
     if not name:
         return ["try: /new <name>"]
     if (brain.GAMES_DIR / (name + ".json")).exists():
         return ["a game called '%s' already exists -- /open %s instead" % (name, name)]
+    warning = _drop_building(state)
     state["project"] = brain.new_project(name)
     state["focus"] = None
-    return ["started a new game called '%s' -- /save to write it to disk" % name]
+    lines = ["started a new game called '%s' -- /save to write it to disk" % name]
+    return lines + [warning] if warning else lines
 
 
 def cmd_open(state, rest):
@@ -182,9 +200,11 @@ def cmd_open(state, rest):
     path = brain.GAMES_DIR / (name + ".json")
     if not path.exists():
         return ["no game called '%s' -- /games to see what's saved" % name]
+    warning = _drop_building(state)
     state["project"] = brain.load(path)
     state["focus"] = None
-    return ["opened '%s' (%d characters)" % (name, len(state["project"]["characters"]))]
+    lines = ["opened '%s' (%d characters)" % (name, len(state["project"]["characters"]))]
+    return lines + [warning] if warning else lines
 
 
 def cmd_save(state, rest):
@@ -237,10 +257,14 @@ def cmd_newchar(state, rest):
     chars = state["project"]["characters"]
     if any(c["kind"] == name for c in chars):
         return ["'%s' already exists -- /character %s to edit it" % (name, name)]
+    # A brand new kind can never be the one already focused, so this is
+    # always a genuine switch away from whoever (if anyone) that was.
+    warning = _drop_building(state)
     char = brain.new_character(name, name[0])
     chars.append(char)
     state["focus"] = name
-    return ["made '%s' -- /glyph, /color, /role, /count to fine-tune it" % name]
+    lines = ["made '%s' -- /glyph, /color, /role, /count to fine-tune it" % name]
+    return lines + [warning] if warning else lines
 
 
 def cmd_character(state, rest):
@@ -250,8 +274,12 @@ def cmd_character(state, rest):
     char = next((c for c in state["project"]["characters"] if c["kind"] == name), None)
     if char is None:
         return ["no character called '%s' -- /characters to see what's there" % name]
+    # Re-focusing the SAME character you're already on (e.g. mid-row-build)
+    # isn't a real switch -- nothing to lose, nothing to warn about.
+    warning = _drop_building(state) if name != state["focus"] else None
     state["focus"] = name
-    return [_describe_char(char)]
+    lines = [_describe_char(char)]
+    return lines + [warning] if warning else lines
 
 
 def cmd_glyph(state, rest):
@@ -416,25 +444,27 @@ def cmd_world(state, rest):
         return ["width %d, height %d, speed %d, wrap %s"
                 % (settings["width"], settings["height"], settings.get("speed", 6),
                    "yes" if settings.get("wrap") else "no")]
-    changed = []
+    # Parse and clamp into a scratch dict first, settings itself untouched --
+    # a bad value anywhere (caught here on self-review: "/world width=50,
+    # height=abc" was silently leaving width changed even while reporting
+    # failure) must refuse the WHOLE command, not apply everything that
+    # happened to come before the bad one.
+    new = {}
     try:
         if "width" in kv:
-            settings["width"] = max(5, min(70, int(kv["width"])))
-            changed.append("width")
+            new["width"] = max(5, min(70, int(kv["width"])))
         if "height" in kv:
-            settings["height"] = max(5, min(20, int(kv["height"])))
-            changed.append("height")
+            new["height"] = max(5, min(20, int(kv["height"])))
         if "speed" in kv:
-            settings["speed"] = max(1, min(30, int(kv["speed"])))
-            changed.append("speed")
+            new["speed"] = max(1, min(30, int(kv["speed"])))
     except ValueError:
-        return ["width/height/speed need plain numbers"]
+        return ["width/height/speed need plain numbers -- nothing changed"]
     if "wrap" in kv:
-        settings["wrap"] = kv["wrap"].strip().lower() in ("yes", "true", "1", "on")
-        changed.append("wrap")
-    if not changed:
+        new["wrap"] = kv["wrap"].strip().lower() in ("yes", "true", "1", "on")
+    if not new:
         return ["try: /world width=.. height=.. speed=.. wrap=.."]
-    return ["updated: " + ", ".join(changed)]
+    settings.update(new)
+    return ["updated: " + ", ".join(sorted(new))]
 
 
 def cmd_play(state, rest):
