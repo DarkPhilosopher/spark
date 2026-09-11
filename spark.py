@@ -122,7 +122,18 @@ def main():
         return
     from engine import chatshell
     project = brain.load(args[0]) if args else None
-    chatshell.run(project)
+    try:
+        chatshell.run(project)
+    except Exception:
+        # chatshell.run() already catches everything it reasonably can
+        # around its own loop; this is the last resort in case something
+        # slips out anyway (or something before the loop even starts).
+        # Printed and paused rather than left to crash the window shut
+        # before it can be read -- indistinguishable, from outside, from
+        # the whole thing having simply stopped responding.
+        import traceback
+        traceback.print_exc()
+        input("\nspark crashed -- the error is above. press enter to close. ")
 
 
 if __name__ == "__main__":

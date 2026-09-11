@@ -431,5 +431,31 @@ s2.send(b"\x04")
 s2.close()
 check("clean exit, code 0", s2.proc.returncode == 0, s2.proc.returncode)
 
+print("\na command that genuinely raises doesn't take the whole session down")
+# A silent crash and "nothing is responding" look identical from outside
+# a real terminal -- this is the actual failure mode a real bug report
+# ("nothing responding or prompting in chat at all for spark") could be
+# describing, so it's worth a real pty check, not just trusting the
+# try/except reads correctly. /explode is injected only for this probe.
+crash_probe = (
+    "import sys; sys.path.insert(0, %r)\n"
+    "from engine import chatshell\n"
+    "chatshell.COMMANDS['explode'] = lambda state, rest: 1 / 0\n"
+    "chatshell.run()\n"
+) % str(ROOT)
+s3 = Session(crash_probe)
+s3.drain(0.3)
+s3.send(b"/explode\r")
+out = s3.drain(0.4)
+check("the error lands right in the log, readable, not a bare crash",
+      "something went wrong" in out and "ZeroDivisionError" in out, out[-500:])
+s3.send(b"/games\r")
+out = s3.drain(0.4)
+check("...and ordinary commands still work right after",
+      "saved game" in out or "no saved games" in out, out[-400:])
+s3.send(b"/quit\r")
+s3.close()
+check("still exits cleanly afterward", s3.proc.returncode == 0, s3.proc.returncode)
+
 print("\n%d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

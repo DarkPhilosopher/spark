@@ -312,6 +312,33 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ### Fixed
 
+- **`engine/chatshell.py`/`spark.py`: a crash anywhere in the shell
+  used to be indistinguishable from Spark simply not responding at
+  all** — reported directly: "nothing responding or prompting in chat
+  at all for spark." Nothing here has been seen running on a real
+  device even once, so a bug that only shows up there (device-specific
+  data, a narrower terminal, anything) has always been a real risk;
+  the actual fix is making that risk visible instead of silent, not a
+  specific root cause found, since nothing reproduced the report in
+  this sandbox. Three layers now, each catching what the one before it
+  couldn't: (1) `run()`'s own loop wraps `run_command()` (and the
+  `/play` launch) in a `try/except Exception` — a bug in a single
+  command lands right in the chat log as plain, readable text (and
+  the session keeps going, further commands still work) instead of
+  taking the whole process down; (2) it separately wraps `_draw()`
+  itself, falling back to a bare, nothing-fancy `print()` of the
+  traceback if the normal display is what's actually broken, since a
+  failure at that exact spot is what would look most like "nothing
+  responding" of all of them; (3) `spark.py`'s own call to
+  `chatshell.run()` is wrapped one level further out still, printing
+  and pausing on anything that slips past both of those, or fails
+  before the loop even starts. `tests/check_chatshell.py` (+3 checks)
+  injects a command that genuinely raises through a real pty and
+  confirms the error shows up in the log, in plain text, and that the
+  session is still alive and answering ordinary commands right after.
+  If this doesn't fix the actual report, the error text it now shows
+  instead of nothing is itself the next real clue.
+
 - **`engine/chatshell.py`, two more real bugs caught on a second
   self-review pass** ("fix anything wrong," asked again the next day):
   (1) `/world width=50, height=abc` reported "need plain numbers" —

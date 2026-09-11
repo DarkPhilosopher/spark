@@ -35,6 +35,7 @@ termux_chat.py both already use.
 
 import shutil
 import sys
+import traceback
 
 from . import brain, builder, runner, tiles
 from .runner import HOME_CLEAR
@@ -603,7 +604,17 @@ def run(project=None):
                                  % (project["name"], len(project["characters"])))
     state["history"].append("type /help any time to see what you can do")
     while True:
-        _draw(state)
+        try:
+            _draw(state)
+        except Exception:
+            # Bare-bones fallback, no logo/truncation/anything fancy that
+            # could itself be what broke -- the goal here is only ever
+            # "show SOMETHING," since a silent failure at this exact spot
+            # would look identical to the process having simply stopped
+            # responding, with no way to tell the difference or report it.
+            print(HOME_CLEAR)
+            print("(the normal display broke -- this is a fallback)\n")
+            print(traceback.format_exc())
         try:
             said = input("\n> ")
         except EOFError:
@@ -615,11 +626,22 @@ def run(project=None):
             # swallowed -- leave the same way /quit does, not a traceback.
             print()
             break
-        result = run_command(state, said)
-        if isinstance(result, dict):
-            if result["action"] == "quit":
-                break
-            if result["action"] == "play":
-                runner.play(state["project"], history=state["history"])
-                state["history"].append("back from playing '%s'" % state["project"]["name"])
+        try:
+            result = run_command(state, said)
+            if isinstance(result, dict):
+                if result["action"] == "quit":
+                    break
+                if result["action"] == "play":
+                    runner.play(state["project"], history=state["history"])
+                    state["history"].append("back from playing '%s'" % state["project"]["name"])
+        except Exception:
+            # One bad command must never take the whole session down --
+            # "always same chat log never deleting it" means the log has
+            # to survive a real bug in a single command too, not just
+            # normal use. The error itself lands right in the log, plain
+            # to read (and to report back), instead of a traceback that
+            # scrolls past and looks indistinguishable from the process
+            # having simply stopped responding.
+            state["history"].append("something went wrong running that -- " + said)
+            state["history"].extend(traceback.format_exc().rstrip("\n").split("\n"))
     print("bye")
