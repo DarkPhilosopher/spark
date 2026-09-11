@@ -16,6 +16,41 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ### Added
 
+- **The terminal's own entities menu — press `p`** — requested
+  directly: "menu selector for existing and also separate page
+  potential entity to manipulate or spawn into the world... menus
+  work also with arrows and blue highlight in termux but also number
+  for which choice." A real arrow-key alternative to typing `/list`,
+  `/name`, `/recruit`, `/dismiss` and `/attack`'s coordinates by hand,
+  built entirely on `builder.menu()` — the exact same
+  arrow+highlight+digit-jump menu every terminal screen already uses
+  (no second menu component invented for this). Two pages:
+  **existing entities** (`_pick_existing_screen`) lists everything
+  alive, in `/list`'s own line format (`_entity_line`, shared so the
+  two never drift apart); picking one opens a small action menu --
+  name/recruit/dismiss/attack -- that calls those exact same chat-
+  command functions (`_do_name`/`_do_recruit`/`_do_dismiss`/
+  `_do_attack`) aimed at the picked entity's own coordinates, so every
+  existing rule and message ("too far away," "nothing recruitable
+  there") is reused rather than reimplemented. **Spawn a new entity**
+  (`_pick_spawn_screen`) lists every kind the game's roster defines,
+  once each; picking one spawns a fresh one at the hero's own square,
+  the same "arrives standing on you" spot the `recruit` tile already
+  spawns a bought unit at. `p` is a new reserved key, deliberately not
+  one of `tiles.py`'s own `KEYS` list (`up/down/left/right/space/w/a/
+  s/d/e/f/r/m/1/2`) -- every one of those is available for a game's
+  own `WHEN key` rows, so reusing one here could silently steal a key
+  a game already binds; picking an unused one avoids that entirely,
+  same reasoning `/` itself already followed. `builder.menu()` needs
+  no `Keyboard.pause()/.resume()` around it here, unlike `chat_break`'s
+  cooked `input()` line -- it wants the same raw/cbreak mode gameplay
+  is already in; only the one text prompt (naming something) and the
+  "enter to continue" pauses need that dance. `tests/
+  check_entities_screen.py` (new, 14 checks) drives a real pty through
+  both pages, a spawn, an action, and backing all the way out to
+  confirm the running game survives untouched. `games/outpost.json`'s
+  own `help` text and `MANUAL.md` both mention it now.
+
 - **The 3D view's chat panel is always open** — requested directly,
   first as "make so [out]post game has chat opened already... chat to
   close [th]an reopen also by [the] slash button but [s]end message

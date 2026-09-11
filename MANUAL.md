@@ -116,6 +116,7 @@ While a game is running (`spark.py play ...`, or **play it** in the menus):
 | space | usually shoot — again, whatever the brain says |
 | w a s d, e, f, r, m, 1, 2 | available as tiles, if you build rows that use them |
 | `/` | a command line — see below |
+| `p` | the entities menu — see below |
 | `q` | quit back to the menu |
 | Ctrl-C | quit |
 
@@ -145,6 +146,21 @@ reference on its own — add `description` too (`/help commands
 description`) for what each one does; bare `/help commands` is names
 and syntax only. An unrecognised command says so rather than doing
 nothing.
+
+**`p`** opens the entities menu — a real arrow-key alternative to typing
+`/list`, `/name`, `/recruit`, `/dismiss` and `/attack`'s coordinates by
+hand, in the exact same one-option-highlighted-at-a-time menu every
+terminal screen in the builder already uses: ↑↓ move, enter picks,
+typing a plain number 1-9 jumps straight to that choice. Two pages:
+**existing entities** lists everything currently alive, the same as
+`/list`; picking one opens a small menu of what to do to it — name,
+recruit, dismiss, attack — reusing those commands' own exact rules
+(too far away, nothing recruitable there, and so on say the same
+things they always do). **Spawn a new entity** lists every kind this
+game defines; picking one spawns a fresh one at your own square, the
+same "arrives standing on you" spot a bought unit already appears at.
+`back` (or escape) steps back one page at a time, all the way out to
+the running game.
 
 Four commands act on an exact spot instead of making you walk there
 and touch it first — the same one square `touch` itself always means,

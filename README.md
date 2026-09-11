@@ -992,6 +992,7 @@ Once `python3 spark.py install` has been run, every one of these works as plain
 | `node tests/targets.test.js` | check mark_target/recall_target in the JavaScript engine |
 | `python3 tests/check_frames_screen.py` | check the terminal builder's own Frames screen |
 | `python3 tests/check_chat_break.py` | check the terminal's "/" command line: every command, and that it stays open |
+| `python3 tests/check_entities_screen.py` | check the terminal's own entities menu (press p): act on one, or spawn a new one |
 | `python3 tests/check_status_line.py` | check the terminal's own score/health/tick/position status line |
 | `node tests/button_position.test.js` | check saved button positions survive a resize/rotation |
 | `node tests/chat.test.js` | check the 3D view's own chat: dedup, command dispatch, paginated log |

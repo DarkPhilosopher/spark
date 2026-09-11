@@ -109,7 +109,7 @@ def draw(world, speed):
     pos = "%d,%d" % (player.x, player.y) if player is not None else "-,-"
     out.append("score %-5d  health %-4d tick %-6d  pos %s" % (world.score, hearts, world.tick, pos))
     out.append((world.message or "")[:world.width + 2])
-    out.append("arrows/wasd move . space acts . q quits . / for chat")
+    out.append("arrows/wasd move . space acts . q quits . / for chat . p for entities")
     sys.stdout.write("\n".join(out) + "\n")
     sys.stdout.flush()
 
@@ -596,6 +596,155 @@ def chat_break(project, keyboard, world, history):
     return False
 
 
+def _entity_line(t):
+    """One entity's own line, in /list's exact format -- kept as one
+    spot so the menu and the chat command never drift apart."""
+    name = ("%s (%s)" % (t.label, t.kind)) if t.label else t.kind
+    return "%s at (%d, %d) -- health %d" % (name, t.x, t.y, t.health)
+
+
+def _act_on_screen(builder, keyboard, world, target, history):
+    """Do what to the entity just picked -- the same four verbs /name,
+    /recruit, /dismiss and /attack already are, just aimed by picking
+    from a menu instead of typing coordinates by hand. Reuses those
+    exact functions (and so their exact validation/messages -- "too
+    far away", "nothing recruitable there", and so on) rather than
+    a second copy of the same rules."""
+    coord = "%d %d" % (target.x, target.y)
+    while target.alive:
+        sys.stdout.write(HOME_CLEAR)
+        print(_entity_line(target) + "\n")
+        idx = builder.menu(["name it", "recruit it", "dismiss it", "attack it"],
+                            prompt="do what?", back_label="back")
+        if idx is None:
+            return
+        if idx == 0:
+            sys.stdout.write(SHOW)
+            keyboard.pause()
+            new_name = input("call it what? ")
+            keyboard.resume()
+            sys.stdout.write(HIDE)
+            lines = (_do_name(world, coord + " " + new_name) if new_name.strip()
+                      else ["give it an actual name"])
+        elif idx == 1:
+            lines = _do_recruit(world, coord)
+        elif idx == 2:
+            lines = _do_dismiss(world, coord)
+        else:
+            lines = _do_attack(world, coord)
+        _history_add(history, lines)
+        sys.stdout.write(HOME_CLEAR)
+        print("\n".join(lines))
+        sys.stdout.write(SHOW)
+        keyboard.pause()
+        input("\nenter to continue ")
+        keyboard.resume()
+        sys.stdout.write(HIDE)
+
+
+def _pick_existing_screen(builder, keyboard, world, history):
+    """Page one: every entity currently in the world (the same list
+    /list prints), pick one to act on."""
+    while True:
+        things = sorted((t for t in world.things if t.alive),
+                         key=lambda t: (t.kind, t.x, t.y))
+        sys.stdout.write(HOME_CLEAR)
+        if not things:
+            print("nothing in the world")
+            sys.stdout.write(SHOW)
+            keyboard.pause()
+            input("\nenter to go back ")
+            keyboard.resume()
+            sys.stdout.write(HIDE)
+            return
+        print("pick one to act on\n")
+        idx = builder.menu([_entity_line(t) for t in things],
+                            prompt="", back_label="back")
+        if idx is None:
+            return
+        _act_on_screen(builder, keyboard, world, things[idx], history)
+
+
+def _pick_spawn_screen(builder, keyboard, project, world):
+    """Page two: every kind this game's roster defines (in the order
+    the roster lists them, each kind once even if it appears more than
+    once with different starting counts), pick one to spawn fresh --
+    at the hero's own spot, the same "arrives standing on you" place
+    the recruit tile already spawns a bought unit at, or an empty
+    square if there's no living hero to stand on."""
+    kinds = []
+    seen = set()
+    for char in project.get("characters", []):
+        kind = str(char.get("kind", "")).strip()
+        if kind and kind not in seen:
+            seen.add(kind)
+            kinds.append(kind)
+    sys.stdout.write(HOME_CLEAR)
+    if not kinds:
+        print("this game has no characters defined")
+        sys.stdout.write(SHOW)
+        keyboard.pause()
+        input("\nenter to go back ")
+        keyboard.resume()
+        sys.stdout.write(HIDE)
+        return
+    print("spawn which kind?\n")
+    idx = builder.menu(kinds, prompt="", back_label="back")
+    if idx is None:
+        return
+    kind = kinds[idx]
+    hero = next((t for t in world.things if t.role == "player" and t.alive), None)
+    thing = (world.spawn(kind, hero.x, hero.y) if hero is not None
+             else world.spawn_somewhere(kind))
+    sys.stdout.write(HOME_CLEAR)
+    print("spawned a %s at (%d, %d)" % (thing.kind, thing.x, thing.y) if thing is not None
+          else "could not spawn a %s" % kind)
+    sys.stdout.write(SHOW)
+    keyboard.pause()
+    input("\nenter to continue ")
+    keyboard.resume()
+    sys.stdout.write(HIDE)
+
+
+def entities_screen(project, keyboard, world, history):
+    """Pressed "p" during play: an arrow-key alternative to typing
+    /list, /name, /recruit, /dismiss and /attack's coordinates by
+    hand -- requested directly, "menu selector for existing and also
+    separate page potential entity to manipulate or spawn into the
+    world... menus work also with arrows and blue highlight... but
+    also number for which choice." Reuses builder.menu() exactly, the
+    same arrow+highlight+digit-jump menu every terminal screen already
+    uses, rather than a second menu component of its own.
+
+    No keyboard.pause()/.resume() needed around builder.menu() itself
+    -- it wants the same raw/cbreak mode gameplay is already in, unlike
+    chat_break's cooked input() line. Only the name prompt and the
+    "enter to continue" pauses need that dance, same as chat_break.
+
+    One known, narrow gap: SPARK_PLAIN (or any terminal builder.menu()
+    itself decides can't do arrows) falls back to a numbered, typed
+    list -- normally fine, but that fallback never touches Keyboard
+    mode at all, so here specifically it would run with the ambient
+    mode still cbreak (echo off, no line editing) rather than properly
+    cooked. Accepted rather than fixed: SPARK_PLAIN is already a
+    documented, explicit opt-out for exotic terminals, and pressing
+    "p" while it's set is a narrow combination on top of an already
+    narrow one.
+    """
+    from . import builder   # deferred: builder.py itself imports this module
+    while True:
+        sys.stdout.write(HOME_CLEAR)
+        print("entities\n")
+        choice = builder.menu(["existing entities", "spawn a new entity"],
+                               prompt="entities", back_label="back to the game")
+        if choice is None:
+            return
+        if choice == 0:
+            _pick_existing_screen(builder, keyboard, world, history)
+        else:
+            _pick_spawn_screen(builder, keyboard, project, world)
+
+
 def play(project, max_ticks=None):
     """Run a project. With max_ticks set, runs headless -- handy for testing."""
     world = World(project)
@@ -620,6 +769,9 @@ def play(project, max_ticks=None):
                 if "/" in world.keys and not headless:
                     if chat_break(project, keyboard, world, chat_history):
                         break
+                    continue   # this tick's own keys are stale by now
+                if "p" in world.keys and not headless:
+                    entities_screen(project, keyboard, world, chat_history)
                     continue   # this tick's own keys are stale by now
                 world.step()
                 if not headless:
