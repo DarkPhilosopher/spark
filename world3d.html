@@ -444,18 +444,56 @@
      Backpack used to be a deliberate Windows-Explorer-styled exception
      (see CHANGELOG); folded into the same shell and theme on request. */
   #backpack-modal,#properties-modal,#mesh-modal,#palette-modal,#inspect-modal,
-  #inventory-modal,#chat-modal{
+  #inventory-modal{
       position:fixed;inset:6vh 6vw;z-index:17;display:none;flex-direction:column;
       background:var(--modal-bg);border:1px solid var(--line);border-radius:12px;
       overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.35);
       backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
   #backpack-modal.on,#properties-modal.on,#mesh-modal.on,#palette-modal.on,
-  #inspect-modal.on,#inventory-modal.on,#chat-modal.on{display:flex}
+  #inspect-modal.on,#inventory-modal.on{display:flex}
   /* Inventory has no .mgrid/.mkeys -- nothing to act on, just a list --
      so its box needs the margin .mgrid would otherwise have given it. */
   #inventory-box{margin:10px;flex:1 1 auto;overflow-y:auto;touch-action:pan-y}
 
-  /* Chat: a scrolling log filling most of the modal, a typed line and a
+  /* Chat used to share the inset-card shell above with the other five
+     modals, back when it was something you opened, read, and closed.
+     Requested directly, once it became always-open and so would
+     otherwise sit permanently on top of the pad, blocking movement
+     entirely: "i need to see chat for outpost spark covering whole
+     screen besides game map." So it's its own shape now -- edge to
+     edge left/right, and reaching exactly from the bottom of the top
+     bar (--bar-h) down to exactly the top of the movement pad
+     (--pad), both already the same live-measured variables the bar
+     and pad position themselves against, so this stays correct on
+     every screen size and after every resize/rotation without a
+     number of its own to keep in sync. No inset, no rounded card --
+     the map is still there behind the bar and pad either side of it,
+     the same "everything floats over the world" idea as those two,
+     just a much bigger float now that it can't be dismissed.
+
+     z-index 3, not the other five modals' 17: those are full takeovers,
+     meant to sit above literally everything while open. Chat isn't --
+     it needs to sit only above the bare world (#gl has no z-index of
+     its own, so anything above 0 clears it), and BELOW the bar/HUD/
+     say/quickbar/drawer/pad (all z-index 4 or 6), which otherwise
+     share this exact same vertical band and would vanish behind an
+     always-open panel that outranked them. This way every one of
+     those keeps working and stays visible, poking through above
+     chat's own background, exactly as if chat were just more of the
+     world showing through the gaps between them -- nothing about any
+     of them needed to change. */
+  #chat-modal{
+      /* +20px clears #controls' own padding/safe-area around the pad
+         (see its own CSS) without needing to repeat that exact formula
+         here too -- a plain constant is fine for a small safety margin
+         like this one, unlike --bar-h/--pad themselves. */
+      position:fixed;left:0;right:0;top:var(--bar-h);bottom:calc(var(--pad) + 20px);
+      z-index:3;display:none;flex-direction:column;
+      background:var(--modal-bg);border-top:1px solid var(--line);
+      border-bottom:1px solid var(--line);overflow:hidden}
+  #chat-modal.on{display:flex}
+
+  /* Chat: a scrolling log filling most of the panel, a typed line and a
      send button pinned under it -- the one panel here shaped like a
      conversation instead of a tool. */
   #chat-log{flex:1 1 auto;margin:10px 10px 0;overflow-y:auto;touch-action:pan-y;

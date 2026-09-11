@@ -200,6 +200,33 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ### Fixed
 
+- **The always-open chat panel blocked the whole game while open, movement
+  pad included, with no way to close it and get it back** — a real
+  regression from making chat always-open the same day, caught and
+  reported directly: "i need to see chat for outpost spark covering
+  whole screen besides game map." The panel had kept sharing the same
+  small, inset floating-card shell as Backpack/Properties/Mesh Creator/
+  Build/the Inspector (`inset:6vh 6vw`, `z-index:17`) — fine for
+  something you open, read, and close, but chat could no longer be
+  closed at all, so that shell permanently sat on top of the movement
+  pad and most of the map. Given its own shape instead: edge to edge
+  left and right, reaching exactly from the bottom of the top bar
+  (`--bar-h`) down to exactly the top of the movement pad (`--pad`) --
+  both the same live-measured CSS variables the bar and pad already
+  position themselves against, so this stays correct on every screen
+  size and after every resize/rotation without a number of its own to
+  keep in sync. Its z-index also dropped from 17 (the other five
+  modals' "cover literally everything" level, right for a takeover
+  screen) to 3 -- above the bare map, but below the bar/HUD/say/
+  quickbar/drawer/pad (all z-index 4 or 6), which share that same
+  vertical band and would otherwise have vanished behind an
+  always-open panel that outranked them. Every one of those keeps
+  working exactly as before; nothing about any of them needed to
+  change. Not something the existing test suite can check (pure CSS
+  geometry, nothing behavioral to assert against a DOM stub) --
+  reasoned through directly against the CSS variables and z-index
+  values already in the file, not seen rendered for real.
+
 - **A plain chat message with no server running (or a failed send)
   vanished outright, saving nothing** — requested directly: "it wont
   take and save chat history [for] what is not a command." Both
