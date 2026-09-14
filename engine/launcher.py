@@ -32,6 +32,7 @@ TERMUX_BIN = Path("/data/data/com.termux/files/usr/bin")
 TERMUX_SH = TERMUX_BIN / "sh"
 
 SCRIPT = """#!{shell}
+# CATALOG: Spark -- build and play your own text/ASCII games (opens chatshell; /help once it's up)
 # Spark -- written by `python3 spark.py install`
 SPARK_DIR="{root}"
 cd "$SPARK_DIR" || {{ echo "Spark is not at $SPARK_DIR" >&2; exit 1; }}
@@ -48,6 +49,7 @@ exit 1
 # `/update spark` and `update spark`. The word after it may be "spark" and is
 # otherwise refused, so a typo says so instead of quietly updating anyway.
 UPDATE_SCRIPT = """#!{shell}
+# CATALOG: update -- pull Spark's latest version
 # Spark's updater -- written by `python3 spark.py install`
 SPARK_DIR="{root}"
 case "${{1:-spark}}" in
