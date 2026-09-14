@@ -16,6 +16,14 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ### Added
 
+- **`engine/launcher.py`'s generated `spark`/`update` shims now carry a
+  `# CATALOG: ...` tag line** — requested indirectly, as part of a new
+  device-wide `programs` command (lives in `~/bin`, outside this repo)
+  that lists every one of Gabe's own Termux commands and how to start
+  each one, live, by scanning `$PREFIX/bin` for that tag — so Spark's
+  own commands show up there automatically, with nothing in this repo
+  needing to know `programs` exists.
+
 - **`engine/chatshell.py` — Spark as one ASCII display and one
   never-cleared chat log, `spark.py`'s own default now instead of
   `builder.main_menu`** — requested directly, after a follow-up
