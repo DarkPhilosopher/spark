@@ -67,6 +67,31 @@ out = say(s2, "/open definitely_not_a_real_game_xyz")
 check("opening a game that doesn't exist says so, not a crash",
       "no game called" in out[0], out)
 
+print("\n/new2d, /new3d: kind is saved, /new stays the 2d alias, /editor exists")
+s = chatshell.new_state()
+say(s, "/new2d " + ("probe2d_%d" % os.getpid()))
+check("/new2d defaults to kind 2d", s["project"]["world"]["kind"] == "2d", s["project"])
+check("2d breadcrumb says so", "(2d)" in chatshell._breadcrumb(s))
+
+s = chatshell.new_state()
+out = say(s, "/new3d " + ("probe3d_%d" % os.getpid()))
+check("/new3d sets kind 3d", s["project"]["world"]["kind"] == "3d", s["project"])
+check("3d breadcrumb says so", "(3d)" in chatshell._breadcrumb(s))
+check("3d creation mentions world3d.html", "world3d.html" in out[0], out)
+
+s = chatshell.new_state()
+say(s, "/new " + ("probe_alias_%d" % os.getpid()))
+check("bare /new is still the 2d alias, unchanged for anyone already using it",
+      s["project"]["world"]["kind"] == "2d", s["project"])
+
+s = chatshell.new_state()
+out = say(s, "/editor")
+check("/editor with nothing open says so", "open a game first" in out[0], out)
+say(s, "/new2d " + ("probe_editor_%d" % os.getpid()))
+out = say(s, "/editor")
+check("/editor with a game open hands back the usual editing commands",
+      "/newchar" in " ".join(out) and "editor mode" in out[0], out)
+
 print("\n/back walks out one level at a time: row -> character -> game -> top")
 s = chatshell.new_state()
 say(s, "/new probe2_%d" % os.getpid())

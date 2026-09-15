@@ -223,12 +223,20 @@ blank screen.
 
 Commands, by where you are:
 
-- **Top level** (nothing open): `/games` (what's saved), `/new <name>`,
-  `/open <name>`.
+- **Top level** (nothing open): `/games` (what's saved), `/new2d
+  <name>` (an ASCII terminal world), `/new3d <name>` (a world you open
+  in a browser via `world3d.html` instead — same file format either
+  way, this only picks which one Spark points you at afterward; `/new
+  <name>` still works too, as a plain alias for `/new2d`), `/open
+  <name>`.
 - **A game open**: `/characters`, `/character <kind>` (focus one),
   `/newchar <kind>` (make one, focuses it), `/world width=.. height=..
   speed=.. wrap=..` (any subset; read them back with no arguments at
-  all), `/rename <name>`, `/save`, `/play`, `/back` (closes the game).
+  all), `/rename <name>`, `/save`, `/editor` (the command list right
+  here, said explicitly — mostly useful as the answer to "how do I get
+  back to building this" for a 3D game, where the *other* thing to do
+  with it is opening it in a browser instead), `/play`, `/back`
+  (closes the game).
 - **A character focused**: `/glyph <c>`, `/color <name>`, `/role
   player|prop`, `/count <n>`, `/health <n>`, `/solid yes|no`, `/rows`
   (list its brain), `/newrow`, `/delrow <n>`, `/back`.

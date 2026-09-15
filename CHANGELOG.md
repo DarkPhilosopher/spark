@@ -16,6 +16,27 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ### Added
 
+- **`/new2d`/`/new3d` (chatshell), an explicit `/editor` command, and a
+  `kind` saved on every game's world settings** — requested directly:
+  "make so in spark there is a first page option to choose for new 2d
+  ASC world an[d] one more for new 3d wor[l]d," then "make so in the 2d
+  new world there is a command to go into editor mode." `brain.new_project`
+  takes an optional `kind` ("2d", the default, or "3d"), stored at
+  `world["kind"]` — both kinds are the exact same game-file shape
+  underneath (`world3d.html` can already open any Spark game; nothing
+  about the file format itself changes), `kind` is only a label chatshell
+  uses to decide what to tell you afterward: a `/new3d` game says to open
+  `world3d.html` in a browser once saved, instead of the usual "/save
+  to write it to disk" line, and `/open`-ing one repeats that reminder.
+  `/new` still works, unchanged, as a plain alias for `/new2d`, so
+  nothing already relying on it breaks. `/editor` — available with any
+  game open, in any focus state — just hands back the same command list
+  `/help` already would there, said explicitly; its real point is
+  symmetry with `/play`, especially for a 3D game where the *other*
+  thing you might do with it is opening a browser instead of typing
+  anything else in here at all. The breadcrumb now says `(2d)`/`(3d)`
+  next to the game's name too. `tests/check_chatshell.py`: 104/104.
+
 - **`engine/chatshell.py` — Spark as one ASCII display and one
   never-cleared chat log, `spark.py`'s own default now instead of
   `builder.main_menu`** — requested directly, after a follow-up

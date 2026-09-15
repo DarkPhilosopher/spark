@@ -8,10 +8,17 @@ from . import tiles
 GAMES_DIR = Path(__file__).resolve().parent.parent / "games"
 
 
-def new_project(name):
+def new_project(name, kind="2d"):
+    """kind is "2d" (the default -- an ASCII terminal world, played with
+    runner.py) or "3d" (played by opening world3d.html in a browser
+    instead). Both are the exact same game-file shape underneath --
+    kind is only a label, saved in world settings, that tells chatshell
+    which one to point you at -- so a "3d" game can still be opened and
+    played in the terminal too, nothing stops that, it's just not the
+    one chatshell suggests first."""
     return {
         "name": name,
-        "world": {"width": 30, "height": 14, "wrap": False, "speed": 6},
+        "world": {"width": 30, "height": 14, "wrap": False, "speed": 6, "kind": kind},
         "characters": [],
     }
 

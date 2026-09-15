@@ -150,10 +150,12 @@ def cmd_help(state, rest):
     if state["project"] is not None:
         return ["/characters  /character <kind>  /newchar <kind>",
                 "/world width=.. height=.. speed=.. wrap=..",
-                "/rename <name>  /save  /play",
+                "/rename <name>  /save  /editor  /play",
                 "/back -- close this game",
                 "/page [n]  /quit"]
-    return ["/games -- what's saved  /new <name>  /open <name>",
+    return ["/games -- what's saved  /open <name>",
+            "/new2d <name> -- a new ASCII terminal world",
+            "/new3d <name> -- a new world you open in a browser (world3d.html)",
             "/page [n]  /quit"]
 
 
@@ -181,17 +183,29 @@ def _drop_building(state):
     return "(a row you were building for someone else was discarded)"
 
 
-def cmd_new(state, rest):
+def _do_new(state, rest, kind, tried_as):
     name = rest.strip()
     if not name:
-        return ["try: /new <name>"]
+        return ["try: /%s <name>" % tried_as]
     if (brain.GAMES_DIR / (name + ".json")).exists():
         return ["a game called '%s' already exists -- /open %s instead" % (name, name)]
     warning = _drop_building(state)
-    state["project"] = brain.new_project(name)
+    state["project"] = brain.new_project(name, kind=kind)
     state["focus"] = None
-    lines = ["started a new game called '%s' -- /save to write it to disk" % name]
+    if kind == "3d":
+        lines = ["started a new 3D game called '%s' -- /save, then open world3d.html "
+                  "in a browser to see it (/editor still works here to build it)" % name]
+    else:
+        lines = ["started a new game called '%s' -- /save to write it to disk" % name]
     return lines + [warning] if warning else lines
+
+
+def cmd_new2d(state, rest):
+    return _do_new(state, rest, "2d", "new2d")
+
+
+def cmd_new3d(state, rest):
+    return _do_new(state, rest, "3d", "new3d")
 
 
 def cmd_open(state, rest):
@@ -204,8 +218,25 @@ def cmd_open(state, rest):
     warning = _drop_building(state)
     state["project"] = brain.load(path)
     state["focus"] = None
-    lines = ["opened '%s' (%d characters)" % (name, len(state["project"]["characters"]))]
+    kind = state["project"].get("world", {}).get("kind", "2d")
+    note = " -- open world3d.html in a browser to play it" if kind == "3d" else ""
+    lines = ["opened '%s' (%d characters)%s" % (name, len(state["project"]["characters"]), note)]
     return lines + [warning] if warning else lines
+
+
+def cmd_editor(state, rest):
+    """Requested directly, for symmetry with /play: an explicit way to
+    say "I want to build/edit this," not play or view it -- most
+    meaningful for a "3d" game, where the natural next step otherwise
+    is opening world3d.html in a browser instead of anything in here.
+    Just hands back the same command list /help already would with a
+    project open (there's no other "mode" this needs to switch out of
+    internally -- chatshell only ever leaves this view for /play's
+    real-time terminal session, which already returns here on its
+    own)."""
+    if state["project"] is None:
+        return ["open a game first -- /open <name>, /new2d <name>, or /new3d <name>"]
+    return ["editor mode -- '%s':" % state["project"]["name"]] + cmd_help(state, rest)
 
 
 def cmd_save(state, rest):
@@ -505,14 +536,15 @@ def cmd_page(state, rest):
 
 
 COMMANDS = {
-    "help": cmd_help, "games": cmd_games, "new": cmd_new, "open": cmd_open,
+    "help": cmd_help, "games": cmd_games,
+    "new": cmd_new2d, "new2d": cmd_new2d, "new3d": cmd_new3d, "open": cmd_open,
     "characters": cmd_characters, "character": cmd_character, "newchar": cmd_newchar,
     "glyph": cmd_glyph, "color": cmd_color, "role": cmd_role, "count": cmd_count,
     "health": cmd_health, "solid": cmd_solid,
     "rows": cmd_rows, "newrow": cmd_newrow, "delrow": cmd_delrow,
     "when": cmd_when, "do": cmd_do, "tiles": cmd_tiles, "done": cmd_done, "cancel": cmd_cancel,
     "world": cmd_world, "rename": cmd_rename, "save": cmd_save,
-    "back": cmd_back, "play": cmd_play,
+    "back": cmd_back, "editor": cmd_editor, "play": cmd_play,
     "page": cmd_page, "log": cmd_page,
     "quit": cmd_quit, "q": cmd_quit,
 }
@@ -555,7 +587,8 @@ def run_command(state, said):
 def _breadcrumb(state):
     if state["project"] is None:
         return "top level"
-    parts = ["editing '%s'" % state["project"]["name"]]
+    kind = state["project"].get("world", {}).get("kind", "2d")
+    parts = ["editing '%s' (%s)" % (state["project"]["name"], kind)]
     if state["focus"] is not None:
         parts.append("character '%s'" % state["focus"])
     if state["building"] is not None:
