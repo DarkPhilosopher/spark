@@ -21,8 +21,8 @@ is a list of rows. Every row reads the same way:
     WHEN something is true   DO something
 
 That is the whole idea, and it is the idea Kodu and Project Spark used.
-Nineteen WHEN tiles crossed with thirty-seven DO tiles is seven hundred and
-three different sentences, and rows can hold more than one tile each, so the real
+Nineteen WHEN tiles crossed with thirty-eight DO tiles is seven hundred and
+twenty-two different sentences, and rows can hold more than one tile each, so the real
 number is much larger. One of those tiles is **your own**: fold any row up under
 a name and it joins the palette like the rest.
 

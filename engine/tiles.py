@@ -1156,6 +1156,24 @@ def a_place_here(obj, world, a, it):
         spot["x"], spot["y"] = clamp(obj.x), clamp(obj.y)
 
 
+@action("place_it", "copy it's place into vector {who}",
+        Param("who", "Which placeholder?", "text", [], "home"))
+def a_place_it(obj, world, a, it):
+    """Same as place_here, but for whatever a WHEN tile actually found
+    (a `look` down a line of sight, `see`, `touch`, ...) instead of
+    self -- the "point of contact" itself, not where I am. Leaves z
+    alone too, same reason place_here does: neither a Thing nor
+    painted terrain carries real elevation yet, so there is nothing
+    genuine to write there -- x and y already come out as real floats
+    (clamp() always returns one), it's z that's still empty ground to
+    build on, whenever that's asked for."""
+    if it is None:
+        return
+    spot = place(world, a.get("who"))
+    if spot is not None:
+        spot["x"], spot["y"] = clamp(it.x), clamp(it.y)
+
+
 @action("place_jump", "jump to vector {who}",
         Param("who", "Which placeholder?", "text", [], "home"))
 def a_place_jump(obj, world, a, it):

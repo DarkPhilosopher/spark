@@ -82,14 +82,25 @@ check("README.md" in CHANGELOG,
 
 flowed = " ".join(README.split())          # the sentence may wrap across lines
 claim = re.search(r"([\w-]+) WHEN tiles crossed with ([\w-]+) DO tiles", flowed)
-numbers = {"nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13,
-           "fourteen": 14, "fifteen": 15, "sixteen": 16, "seventeen": 17,
-           "eighteen": 18, "nineteen": 19, "twenty": 20,
-           "twenty-one": 21, "twenty-two": 22, "twenty-three": 23,
-           "twenty-four": 24, "twenty-five": 25, "twenty-six": 26,
-           "twenty-seven": 27, "twenty-eight": 28, "twenty-nine": 29,
-           "thirty": 30, "thirty-one": 31, "thirty-two": 32, "thirty-three": 33,
-           "thirty-four": 34, "thirty-five": 35, "thirty-six": 36, "thirty-seven": 37}
+
+# Generated, not hand-extended -- this line needed a manual bump twice in one
+# session (37, then 38) before it became worth just covering the number
+# space properly. Good up to 99, which is a lot of tiles away from mattering.
+_ONES = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight",
+         "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen",
+         "sixteen", "seventeen", "eighteen", "nineteen"]
+_TENS = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy",
+         "eighty", "ninety"]
+
+
+def _word(n):
+    if n < 20:
+        return _ONES[n]
+    tens, ones = divmod(n, 10)
+    return _TENS[tens] + ("-" + _ONES[ones] if ones else "")
+
+
+numbers = {_word(n): n for n in range(100)}
 if claim:
     said = (numbers.get(claim.group(1).lower()), numbers.get(claim.group(2).lower()))
     check(said == (len(tiles.SENSORS), len(tiles.ACTIONS)),

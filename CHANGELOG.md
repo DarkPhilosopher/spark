@@ -16,6 +16,21 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ### Added
 
+- **`place_it`** — `copy it's place into vector <who>`, the natural sibling
+  `place_here` didn't have: that one only ever copied where *I* am standing,
+  with no way to capture a line-of-sight target's own position instead.
+  Requested directly, as a "point of contact... find xyz... in float,
+  besides actual motion direction and collision" follow-up to `look`: a
+  `WHEN looking forward I see enemy within 8` row can now feed straight into
+  `place_it`, capturing exactly the square it found. x/y come out as real
+  floats (`clamp()` always returns one) — z is left alone, honestly, same as
+  `place_here` already does: neither a Thing nor painted terrain carries
+  real elevation yet, so there's nothing genuine to write there until that
+  exists. Also: `tests/check_docs.py`'s tile-count number dictionary had
+  needed a manual bump twice in one session (37, then 38) — replaced the
+  hand-typed word list with a small number-to-words generator good up to 99,
+  so a future tile addition won't need a third.
+
 - **A ground layer, separate from what's standing on it** — `paint_terrain`
   (DO: `paint the ground <where> as <kind>`, where is `here`/`it`, kind is
   `grass`/`rock`/`sand`/`water`/`lava`/`snow`) and `terrain_is` (WHEN: `the

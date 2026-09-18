@@ -1737,6 +1737,11 @@ const ACTIONS = {
     const spot = place(world, a.who);
     if (spot) { spot.x = clamp(obj.x); spot.y = clamp(obj.y); }
   },
+  place_it: (obj, world, a, it) => {
+    if (!it) return;
+    const spot = place(world, a.who);
+    if (spot) { spot.x = clamp(it.x); spot.y = clamp(it.y); }
+  },
   place_jump: (obj, world, a) => {
     const spot = placed(world, a.who);
     if (!spot) return;
