@@ -21,8 +21,8 @@ is a list of rows. Every row reads the same way:
     WHEN something is true   DO something
 
 That is the whole idea, and it is the idea Kodu and Project Spark used.
-Seventeen WHEN tiles crossed with thirty-six DO tiles is six hundred and
-twelve different sentences, and rows can hold more than one tile each, so the real
+Eighteen WHEN tiles crossed with thirty-six DO tiles is six hundred and
+forty-eight different sentences, and rows can hold more than one tile each, so the real
 number is much larger. One of those tiles is **your own**: fold any row up under
 a name and it joins the palette like the rest.
 
@@ -273,6 +273,7 @@ who arrived before you started a game — they are connected and waiting.
 | key `<key>` is pressed | face `<bearing>` — the eight compass points, or toward / away from it |
 | I see `<kind>` within `<n>` | shoot `<direction>` up to `<n>` squares, for `<n>` ticks |
 | I am touching `<kind>` | say "`<text>`" |
+| looking `<direction>` I see `<kind>` within `<n>` | |
 | every `<n>` ticks | change the score by `<n>` |
 | my health is below `<n>` | hurt it / self by `<n>` |
 | the score is at least `<n>` | heal myself by `<n>` |
@@ -701,8 +702,16 @@ you like — have it explode into something, or bounce, or score.
 
 The seeing tile finds an apple and hands it to the moving tile. That one word is
 what makes tiles stick together instead of just sitting next to each other. The
-tiles that produce an "it" are *I see* and *I am touching*; the ones that use it
-are *move* and *face toward/away from it*, *hurt it*, and *make it disappear*.
+tiles that produce an "it" are *I see*, *I am touching*, and *looking...I see*;
+the ones that use it are *move* and *face toward/away from it*, *hurt it*, and
+*make it disappear*.
+
+*I see* looks in every direction at once, out to a distance — the nearest match
+anywhere within reach. *looking `<direction>` I see* looks along one specific
+line instead — it can find something far away that's directly ahead while
+missing something right next door that isn't on that line, and it can miss
+entirely where *I see* wouldn't. Reach for *looking...I see* when which way
+something's facing should matter, not just how close it is.
 
 If a row has no sensor that found something, "it" is empty and those actions do
 nothing rather than misfiring.

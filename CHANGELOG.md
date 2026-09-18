@@ -16,6 +16,30 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ### Added
 
+- **A new WHEN tile, `look`** — `looking <direction> I see <kind> within
+  <n>`, a ray, not a radius. Requested directly: "update the when do
+  tiles to... include also all of what project spark team dakota of
+  microsoft 2014 does have" — Project Spark's own Kode brains had this
+  as their own distinct "ray cast" sensor, alongside (not instead of)
+  a radius one, and this README already credits Kodu/Project Spark as
+  the whole WHEN/DO idea's own inspiration (see "The tiles" section).
+  Existing `see` finds the nearest match in *any* direction within
+  reach; `look` only finds something sitting directly along *one*
+  specific line — it can hit something far away while missing
+  something right next door that isn't on that line, and vice versa.
+  Verified three ways: a direct, position-controlled check of the ray
+  logic itself (confirmed it finds what's on the line and correctly
+  ignores a closer thing that isn't, where `see` would have found the
+  closer one instead); a real cross-engine parity trace (Python vs the
+  JS mirror in `world3d.html`, 4 seeds, identical results); and the
+  full `check_docs.py`/`check_engines.py` regression suite (54 tiles,
+  34/34 engine parity). A literal, full port of everything Project
+  Spark ever shipped isn't attempted here — it ran to "hundreds of
+  tiles," many tied to console-specific systems (terrain painting,
+  physics, a whole Camera category) this engine doesn't have an
+  equivalent of yet; this is the one clear, cleanly-fitting gap found
+  by comparing the two systems' own documented sensor categories.
+
 - **`/new2d`/`/new3d` (chatshell), an explicit `/editor` command, and a
   `kind` saved on every game's world settings** — requested directly:
   "make so in spark there is a first page option to choose for new 2d

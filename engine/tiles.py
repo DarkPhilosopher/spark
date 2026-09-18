@@ -462,6 +462,38 @@ def s_touch(obj, world, a):
     return world.nearest(obj, a["kind"], 1)
 
 
+@sensor("look", "looking {dir} I see {kind} within {range}",
+        Param("dir", "Look which way?", "choice", DIRECTIONS, "forward"),
+        Param("kind", "Look for what?", "kind", [], "anything"),
+        Param("range", "How many squares away?", "int", [], 6))
+def s_look(obj, world, a):
+    """A ray, not a radius -- unlike `see` (nearest of kind, any
+    direction, within reach), this only finds something sitting
+    directly along one specific line: it can hit something far away
+    while missing something right next to obj that isn't on that line.
+    Project Spark's own Kode brains had this as their own distinct
+    "ray cast" sensor, alongside (not instead of) a radius one -- same
+    split kept here. `it` is always None going into resolve_step: there
+    is no target yet while a WHEN side is still being evaluated, so
+    "toward it"/"away from it" just fall through to its own (0, 0)
+    no-op, same as every other direction-taking tile handles that."""
+    dx, dy = resolve_step(a["dir"], obj, None, world.rng)
+    if not (dx or dy):
+        return None
+    x, y = obj.x, obj.y
+    for _ in range(max(0, a["range"])):
+        x, y = x + dx, y + dy
+        if not world.in_bounds(x, y):
+            break
+        hit = next((t for t in world.at(x, y)
+                    if t is not obj and t is not obj.owner
+                    and not (obj.owner is not None and t.owner is obj.owner)
+                    and matches(t, a["kind"])), None)
+        if hit is not None:
+            return hit
+    return None
+
+
 @sensor("timer", "every {every} ticks",
         Param("every", "How many ticks between firings?", "int", [], 4))
 def s_timer(obj, world, a):

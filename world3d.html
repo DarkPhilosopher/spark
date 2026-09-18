@@ -1419,6 +1419,25 @@ const SENSORS = {
   key: (obj, world, a) => world.keysFor(obj).has(a.key),
   see: (obj, world, a) => world.nearest(obj, a.kind, num(a.range, 6)),
   touch: (obj, world, a) => world.nearest(obj, a.kind, 1),
+  // A ray, not a radius -- mirror of s_look in tiles.py, see its own
+  // docstring there for why (Project Spark's own Kode had this as its
+  // own distinct "ray cast" sensor, alongside a radius one).
+  look: (obj, world, a) => {
+    const [dx, dy] = resolveStep(a.dir, obj, null, world.rng);
+    if (!dx && !dy) return null;
+    let x = obj.x, y = obj.y;
+    const range = Math.max(0, num(a.range, 6));
+    for (let i = 0; i < range; i++) {
+      x += dx; y += dy;
+      if (!world.inBounds(x, y)) break;
+      const hit = world.at(x, y).find(t =>
+        t !== obj && t !== obj.owner &&
+        !(obj.owner !== null && t.owner === obj.owner) &&
+        matches(t, a.kind));
+      if (hit) return hit;
+    }
+    return null;
+  },
   timer: (obj, world, a) => world.tick % Math.max(1, num(a.every, 4)) === 0,
   health_below: (obj, world, a) => obj.health < num(a.value, 2),
   score_at_least: (obj, world, a) => world.score >= num(a.value, 10),
