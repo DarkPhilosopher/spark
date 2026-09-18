@@ -1176,6 +1176,11 @@ const STEPS = {
 // Same twelve, same order as tiles.STEP_LIST -- seeded `move random` depends on it.
 const STEP_LIST = Object.keys(STEPS).map(k => STEPS[k]);
 const OPEN_COOLDOWN = 30;
+// Mirror of world.py's TERRAIN_TYPES/TERRAIN_DAMAGE_PER_TICK -- TERRAIN_BG
+// (colours) lives further down, near COLOR_RGB/COLOR_CSS, since that half
+// is 3D-rendering-only and has no Python twin to stay in step with.
+const TERRAIN_TYPES = ["grass", "rock", "sand", "water", "lava", "snow"];
+const TERRAIN_DAMAGE_PER_TICK = {lava: 1};
 
 const has = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
 const num = (v, fallback) => (v === undefined || v === null || v === "" ? fallback : Number(v));
@@ -1438,6 +1443,8 @@ const SENSORS = {
     }
     return null;
   },
+  terrain_is: (obj, world, a) =>
+    (world.terrain[obj.x + "," + obj.y] || "grass") === a.kind,
   timer: (obj, world, a) => world.tick % Math.max(1, num(a.every, 4)) === 0,
   health_below: (obj, world, a) => obj.health < num(a.value, 2),
   score_at_least: (obj, world, a) => world.score >= num(a.value, 10),
@@ -1702,6 +1709,16 @@ const ACTIONS = {
     const spot = world.emptyCell();
     if (spot) { obj.x = spot[0]; obj.y = spot[1]; }
   },
+  // Mirror of a_paint_terrain/s_terrain_is in tiles.py -- see its own
+  // comment there for the design (own alternative, not a Project Spark
+  // copy) and why "it" is never an option for the sensor.
+  paint_terrain: (obj, world, a, it) => {
+    const target = a.where === "it" ? it : obj;
+    if (!target) return;
+    const key = target.x + "," + target.y;
+    if (a.kind === "grass") delete world.terrain[key];
+    else world.terrain[key] = a.kind;
+  },
   place_name: (obj, world, a) => {
     const spot = place(world, a.who);
     if (spot) spot.name = String(a.text === undefined ? "" : a.text);
@@ -1774,6 +1791,10 @@ class World {
     // step(), so a line only shows for as long as whatever's drawing it
     // keeps asking every tick.
     this.lines = [];
+    // "x,y" -> terrain type name; missing means "grass", the default.
+    // Mirror of self.terrain in world.py -- see its own comment there
+    // for why this is runtime-only, not saved with the game.
+    this.terrain = {};
     this.status = null;
     this.keys = new Set();
     this.playerKeys = {};
@@ -1905,6 +1926,15 @@ class World {
     }
     this.things = this.things.filter(t => t.alive);
 
+    for (const thing of this.things) {
+      const dmg = TERRAIN_DAMAGE_PER_TICK[this.terrain[thing.x + "," + thing.y]];
+      if (dmg) {
+        thing.health -= dmg;
+        if (thing.health <= 0) thing.alive = false;
+      }
+    }
+    this.things = this.things.filter(t => t.alive);
+
     const players = this.things.filter(t => t.role === "player");
     const wanted = (this.project.characters || []).some(c => c.role === "player");
     if (!players.length && wanted) this.status = "lose";
@@ -1938,6 +1968,13 @@ const COLOR_CSS = {
   pink: "#ed8cae", orange: "#f28c26", purple: "#9459bf", brown: "#8c613d",
   black: "#1a1a1f", lime: "#a6e640", teal: "#33a69e", navy: "#243373",
   maroon: "#73242e", gold: "#d9b333", silver: "#bfc4cc",
+};
+// Terrain floor tints -- "grass" (the default) deliberately has no entry
+// here, same reason engine/world.py's TERRAIN_BG leaves it out: an
+// unpainted square keeps looking exactly like it always did.
+const TERRAIN_RGB = {
+  rock: [0.45, 0.47, 0.50], sand: [0.82, 0.72, 0.45], water: [0.30, 0.55, 0.75],
+  lava: [0.80, 0.30, 0.15], snow: [0.92, 0.93, 0.95],
 };
 
 // -- the smallest amount of matrix maths that will do ----------------------
@@ -2375,7 +2412,7 @@ class Renderer {
      rebuild and startLocal()/startLive()'s initial call). Every other
      game never passes them, so this behaves exactly as it always has for
      everything except a game that explicitly opts in. */
-  buildFloor(width, height, cx, cy) {
+  buildFloor(width, height, cx, cy, terrain) {
     const data = [];
     const windowed = cx !== undefined;
     const RADIUS = 26;
@@ -2386,7 +2423,13 @@ class Renderer {
     for (let y = y0; y < y1; y++)
       for (let x = x0; x < x1; x++) {
         const dark = (x + y) % 2 === 0;
-        const shade = dark ? [0.42, 0.46, 0.52] : [0.50, 0.54, 0.60];
+        // A painted square's own colour wins outright over the plain
+        // checkerboard -- terrain replaces the shading entirely rather
+        // than tinting it, so "lava" reads as lava, not a dim red
+        // checker square.
+        const kind = terrain && terrain[x + "," + y];
+        const shade = (kind && TERRAIN_RGB[kind])
+          || (dark ? [0.42, 0.46, 0.52] : [0.50, 0.54, 0.60]);
         pushBox(data, x, -0.35, y, 1, 0.35, 1, shade, [FACES[0]]);
       }
     // a low wall, only where the current window actually reaches a true
@@ -2647,12 +2690,12 @@ function startLocal() {
     scatteredChunks.clear();   // a fresh world -- forget what was already scattered
     const player = world.things.find(t => t.role === "player");
     floorCenter = player ? [player.x, player.y] : [world.width / 2, world.height / 2];
-    renderer.buildFloor(world.width, world.height, floorCenter[0], floorCenter[1]);
+    renderer.buildFloor(world.width, world.height, floorCenter[0], floorCenter[1], world.terrain);
     renderer.centre = [floorCenter[0], 0, floorCenter[1]];
     renderer.frameBoard();
   } else {
     floorCenter = null;
-    renderer.buildFloor(world.width, world.height);
+    renderer.buildFloor(world.width, world.height, undefined, undefined, world.terrain);
   }
   setSource("local", "RUNNING HERE");
   $("#mode").textContent = forcedLocal ? "go live" : "reload";
@@ -2735,7 +2778,7 @@ function maybeExpandFloor(me) {
   if (!me || !world || live || !project.world || !project.world.expanding) return;
   if (floorCenter && Math.hypot(me.x - floorCenter[0], me.y - floorCenter[1]) < FLOOR_REBUILD_DIST) return;
   floorCenter = [me.x, me.y];
-  renderer.buildFloor(world.width, world.height, me.x, me.y);
+  renderer.buildFloor(world.width, world.height, me.x, me.y, world.terrain);
   scatterNewChunks(me.x, me.y);
 }
 

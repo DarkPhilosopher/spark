@@ -19,6 +19,19 @@ COLORS = {
     "teal": 96, "navy": 34, "maroon": 31, "gold": 93, "silver": 97,
 }
 
+# Ground, separate from anything standing on it -- an own-alternative take
+# on Project Spark's own paintable terrain layer (Gabe: "the real project
+# spark is long gone this will be my own alternative"), not a copy of it.
+# "grass" is the default and deliberately renders as plain empty ground
+# (no tint) -- only a square someone has actually painted something else
+# onto looks different, so nothing already-built changes how it looks.
+TERRAIN_TYPES = ["grass", "rock", "sand", "water", "lava", "snow"]
+TERRAIN_BG = {"rock": 100, "sand": 43, "water": 44, "lava": 41, "snow": 107}
+# What standing on it does, checked once a tick in World.step() -- the one
+# terrain type with a built-in effect so painting terrain is more than a
+# coat of paint. Others are free to gain their own later the same way.
+TERRAIN_DAMAGE_PER_TICK = {"lava": 1}
+
 # Every shape a character can be. Only world3d.html actually draws these
 # (see its own matching SHAPES and the push*() functions each name is
 # backed by) -- kept here too, in the same order, so the `shape` tile
@@ -131,6 +144,12 @@ class World:
         # the two engines agree on what a game *asked* to have drawn, even
         # though only one of them can show it.
         self.lines = []
+        # (x, y) -> terrain type name; a square with no entry is "grass",
+        # the default -- see TERRAIN_TYPES/TERRAIN_BG/TERRAIN_DAMAGE_PER_TICK.
+        # Runtime-only, the same as `things`/`lines` -- painted terrain
+        # doesn't persist into the saved game file, it's something a
+        # playing game does to itself, not part of authoring one.
+        self.terrain = {}
         self.status = None          # None | "win" | "lose"
         self.keys = set()           # keys at this device, for solo play
         self.player_keys = {}       # player id -> keys, for a shared world
@@ -293,6 +312,14 @@ class World:
 
         self.things = [t for t in self.things if t.alive]
 
+        for thing in self.things:
+            dmg = TERRAIN_DAMAGE_PER_TICK.get(self.terrain.get((thing.x, thing.y)))
+            if dmg:
+                thing.health -= dmg
+                if thing.health <= 0:
+                    self.remove(thing)
+        self.things = [t for t in self.things if t.alive]
+
         players = [t for t in self.things if t.role == "player"]
         if not players and any(c.get("role") == "player"
                                for c in self.project.get("characters", [])):
@@ -302,6 +329,7 @@ class World:
 
     def render(self, color=True):
         grid = [[" "] * self.width for _ in range(self.height)]
+        drawn = [[False] * self.width for _ in range(self.height)]
         for thing in self.things:
             for x, y, glyph, thing_color in self._pixels(thing):
                 if self.in_bounds(x, y):
@@ -309,6 +337,15 @@ class World:
                     if color:
                         cell = "\033[%dm%s\033[0m" % (COLORS.get(thing_color, 37), cell)
                     grid[y][x] = cell
+                    drawn[y][x] = True
+        # Terrain shows through only on a square nothing was just drawn
+        # onto -- painted ground is a backdrop, never painted over
+        # whatever's actually standing there.
+        if color and self.terrain:
+            for (x, y), kind in self.terrain.items():
+                bg = TERRAIN_BG.get(kind)
+                if bg and self.in_bounds(x, y) and not drawn[y][x]:
+                    grid[y][x] = "\033[%dm \033[0m" % bg
         lines = ["+" + "-" * self.width + "+"]
         lines += ["|" + "".join(row) + "|" for row in grid]
         lines.append("+" + "-" * self.width + "+")

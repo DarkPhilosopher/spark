@@ -21,8 +21,8 @@ is a list of rows. Every row reads the same way:
     WHEN something is true   DO something
 
 That is the whole idea, and it is the idea Kodu and Project Spark used.
-Eighteen WHEN tiles crossed with thirty-six DO tiles is six hundred and
-forty-eight different sentences, and rows can hold more than one tile each, so the real
+Nineteen WHEN tiles crossed with thirty-seven DO tiles is seven hundred and
+three different sentences, and rows can hold more than one tile each, so the real
 number is much larger. One of those tiles is **your own**: fold any row up under
 a name and it joins the palette like the rest.
 
@@ -274,6 +274,7 @@ who arrived before you started a game — they are connected and waiting.
 | I see `<kind>` within `<n>` | shoot `<direction>` up to `<n>` squares, for `<n>` ticks |
 | I am touching `<kind>` | say "`<text>`" |
 | looking `<direction>` I see `<kind>` within `<n>` | |
+| the ground I'm on is `<kind>` | paint the ground `<where>` as `<kind>` |
 | every `<n>` ticks | change the score by `<n>` |
 | my health is below `<n>` | hurt it / self by `<n>` |
 | the score is at least `<n>` | heal myself by `<n>` |
@@ -715,6 +716,24 @@ something's facing should matter, not just how close it is.
 
 If a row has no sensor that found something, "it" is empty and those actions do
 nothing rather than misfiring.
+
+---
+
+### Ground, separate from what's standing on it
+
+`paint the ground <where> as <kind>` colours a square itself, independent of
+anything placed there — `<where>` is `here` (your own square) or `it` (whatever
+the row's sensor found), `<kind>` is `grass` (the plain default — painting a
+square back to grass just erases the paint, nothing is remembered about it),
+`rock`, `sand`, `water`, `lava`, or `snow`. `the ground I'm on is <kind>`
+reads it back — self only, there's no "it" yet to check the ground under while
+a WHEN side is still being worked out.
+
+Painted ground is part of how a *game* runs, not part of what's saved when you
+build one — like `things`, it starts empty every time a game is played, not
+restored from the file. `lava` is the one kind with a built-in effect so far:
+standing on it costs 1 health every tick. Nothing stops a WHEN tile from
+checking `the ground I'm on is lava` and reacting before that happens.
 
 ---
 

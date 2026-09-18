@@ -1048,6 +1048,40 @@ def a_teleport(obj, world, a, it):
         obj.x, obj.y = spot
 
 
+# Ground, separate from what's standing on it -- an own-alternative take on
+# Project Spark's own paintable terrain layer, not a copy of it (real
+# Project Spark is long gone; see world.py's own TERRAIN_TYPES/TERRAIN_BG
+# for the full note). _TERRAIN kept as tiles.py's own small local copy of
+# the type names, the same reason _COLORS above is its own copy rather than
+# reaching into world.py for one -- world.py already imports this module,
+# so this module reaching back for a constant would be circular.
+_TERRAIN = ["grass", "rock", "sand", "water", "lava", "snow"]
+
+
+@action("paint_terrain", "paint the ground {where} as {kind}",
+        Param("where", "Paint where?", "choice", ["here", "it"], "here"),
+        Param("kind", "Paint it what?", "choice", _TERRAIN, "grass"))
+def a_paint_terrain(obj, world, a, it):
+    target = obj if a["where"] == "here" else it
+    if target is None:
+        return
+    if a["kind"] == "grass":
+        world.terrain.pop((target.x, target.y), None)   # grass is the default -- nothing to remember
+    else:
+        world.terrain[(target.x, target.y)] = a["kind"]
+
+
+@sensor("terrain_is", "the ground I'm on is {kind}",
+        Param("kind", "Which terrain?", "choice", _TERRAIN, "lava"))
+def s_terrain_is(obj, world, a):
+    """Self only, unlike paint_terrain's own {where} -- a WHEN tile has
+    no "it" yet to check the ground under (that's what a sensor like
+    this one is for producing in the first place), the same reason
+    `look`'s own dir resolution always passes it=None."""
+    kind = world.terrain.get((obj.x, obj.y), "grass")
+    return kind == a["kind"]
+
+
 @action("combo", "the tile called \"{name}\"",
         Param("name", "Which of your own tiles?", "text", [], ""))
 def a_combo(obj, world, a, it):

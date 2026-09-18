@@ -16,6 +16,39 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ### Added
 
+- **A ground layer, separate from what's standing on it** — `paint_terrain`
+  (DO: `paint the ground <where> as <kind>`, where is `here`/`it`, kind is
+  `grass`/`rock`/`sand`/`water`/`lava`/`snow`) and `terrain_is` (WHEN: `the
+  ground I'm on is <kind>`, self only -- no "it" exists yet on a WHEN side).
+  Requested directly, as a follow-up to the `look` tile below: "i need 100%
+  of that what you said they have" (Project Spark's own paintable terrain),
+  clarified immediately after as "the real project spark is long gone this
+  will be my own alternative" — so this is an own design taking the same
+  idea (a ground you can paint, separate from placed objects, with real
+  gameplay effects), not an attempt at a byte-for-byte clone of a product
+  that no longer exists to check against. `lava` is the one built-in effect
+  so far: 1 health lost per tick standing on it, checked once in `World.step()`
+  right alongside the existing dying/win-lose bookkeeping. Terrain is
+  runtime-only, the same as `things`/`lines` -- a played game paints it,
+  a saved game file never carries it. Both engines: the terminal colours an
+  otherwise-empty painted square's background (never painting over whatever's
+  actually drawn there); `world3d.html`'s floor was already built one
+  coloured box per grid cell (just a checkerboard pattern before this), so a
+  painted square's own colour replacing that shading outright turned out to
+  be a small addition, not the large WebGL rendering project this looked
+  like it would need going in. `tests/check_docs.py`'s own tile-count word
+  dictionary needed "thirty-seven" added -- didn't go that high before.
+  Verified: a direct, position-controlled Python check (paint, sense, take
+  lava damage tick by tick, die on schedule, repainting grass forgets the
+  paint, render shows the right ANSI background on an empty painted square
+  and never overwrites a square something is actually standing on); a real
+  cross-engine parity trace against a purpose-built test game across 4 seeds
+  (paint-sense-damage-death, byte-identical both engines); the full
+  `check_docs.py`/`check_engines.py` regression suite (56 tiles, 34/34); and
+  `node --check` on the whole extracted `<script>` block, not just the
+  engine-marked section the parity trace already covers, since the floor/
+  rendering half of this change lives outside those markers.
+
 - **A new WHEN tile, `look`** — `looking <direction> I see <kind> within
   <n>`, a ray, not a radius. Requested directly: "update the when do
   tiles to... include also all of what project spark team dakota of
