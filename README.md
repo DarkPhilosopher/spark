@@ -997,6 +997,8 @@ Once `python3 spark.py install` has been run, every one of these works as plain
 | `python3 spark.py people NAME` | let a GitHub user edit your games |
 | `python3 spark.py play games/chase.json` | play a game straight away |
 | `python3 spark.py play games/chase.json 200` | run 200 ticks with no display, for testing |
+| `python3 spark.py browser` | open `world3d.html` in your own browser app |
+| `python3 spark.py browser games/chase.json` | ...with that game already picked |
 | `python3 spark.py status` | print the Github / Browser / Local / Cloudflare line |
 | `python3 spark.py players` | list who is connected, whoever joined first at the top |
 | `python3 spark.py export` | rewrite `tiles.json` and `games/index.json` |

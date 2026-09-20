@@ -16,6 +16,18 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ### Added
 
+- **`spark.py browser [game]`** — opens `world3d.html` in your phone's own
+  browser app via `termux-open`, optionally with a game already picked
+  (`spark browser games/chase.json` turns into `?game=chase` in the URL,
+  the same query param `world3d.html` already reads). Requested directly,
+  a standalone top-level command rather than anything routed through
+  chatshell -- `overseer`'s own "any real command's name just runs it"
+  fallback already forwards trailing arguments, so `spark browser` typed
+  inside `overseer` works with no changes needed there at all. Not
+  verified end to end -- `termux-open` reaches Termux:API the same way
+  `termux-notification` does, which hangs from this sandbox; the URL
+  construction itself is checked directly.
+
 - **`place_it`** — `copy it's place into vector <who>`, the natural sibling
   `place_here` didn't have: that one only ever copied where *I* am standing,
   with no way to capture a line-of-sight target's own position instead.

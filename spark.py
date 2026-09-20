@@ -12,6 +12,7 @@
     python3 spark.py people                who else can get at your GitHub repo
     python3 spark.py people NAME [--player]  let a GitHub user in as editor/player
     python3 spark.py play games/chase.json [ticks]   skip straight to playing
+    python3 spark.py browser [games/chase.json]  open world3d.html in your browser
     python3 spark.py push [game ...]       overwrite games on GitHub with these
     python3 spark.py pull [game ...]       overwrite games here with GitHub's
     python3 spark.py status                print the flags and the player count
@@ -119,6 +120,24 @@ def main():
             sys.exit("say which game: spark.py play games/chase.json")
         ticks = int(args[2]) if len(args) > 2 else None
         runner.play(brain.load(args[1]), max_ticks=ticks)
+        return
+    if args and args[0] == "browser":
+        import subprocess
+        url = str((Path(__file__).resolve().parent / "world3d.html"))
+        if len(args) > 1:
+            name = args[1]
+            if name.startswith("games/"):
+                name = name[len("games/"):]
+            if name.endswith(".json"):
+                name = name[:-len(".json")]
+            url += "?game=" + name
+        try:
+            subprocess.run(["termux-open", url], check=True)
+        except FileNotFoundError:
+            sys.exit("termux-open not found -- needs Termux:API "
+                      "(pkg install termux-api, plus the Termux:API app)")
+        except subprocess.CalledProcessError as e:
+            sys.exit("couldn't open the browser: %s" % e)
         return
     from engine import chatshell
     project = brain.load(args[0]) if args else None
