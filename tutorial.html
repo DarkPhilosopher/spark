@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Spark: Understanding the Blocks</title>
+<style>
+  :root{
+    /* Same gray + light-blue palette as world3d.html -- see its own
+       :root and ~/spark/CLAUDE.md "design preference". */
+    --bg:#4a5058; --panel:#5b6169; --panel2:#666d76; --line:#838a94;
+    --ink:#f2f4f6; --dim:#c7ccd3; --accent:#8ecae6; --bad:#d99a94;
+    --good:#a8c9a0;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:15px/1.5 -apple-system,system-ui,sans-serif;
+       -webkit-tap-highlight-color:transparent}
+  header{padding:14px 16px 8px;text-align:center}
+  header h1{margin:0 0 4px;font-size:18px}
+  header p{margin:0;color:var(--dim);font-size:13px}
+
+  nav{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;
+      padding:10px 12px;background:var(--panel);border-bottom:1px solid var(--line)}
+  nav button{flex:1 1 auto;min-width:36px;padding:8px 4px;border:1px solid var(--line);
+             border-radius:8px;background:var(--panel2);color:var(--dim);
+             font:inherit;font-size:13px;cursor:pointer}
+  nav button.on{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}
+
+  main{max-width:640px;margin:0 auto;padding:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+        padding:14px;margin-bottom:14px}
+  .card h2{margin:0 0 8px;font-size:16px}
+  .card p{margin:0 0 10px;color:var(--ink)}
+  .card p.dim{color:var(--dim);font-size:13px}
+
+  .sandbox{display:flex;flex-direction:column;align-items:center;gap:10px;padding:8px 0}
+  .grid{display:grid;gap:2px;background:var(--line);padding:2px;border-radius:6px}
+  .cell{width:28px;height:28px;background:var(--panel2);border-radius:3px;
+        display:flex;align-items:center;justify-content:center;
+        font-size:16px;transition:background .15s,outline .15s}
+  .cell.lit{outline:2px solid var(--accent)}
+  .cell.bad{outline:2px solid var(--bad)}
+  .cell.good{outline:2px solid var(--good)}
+
+  .controls{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;align-items:center}
+  button.ctl{padding:8px 14px;border:1px solid var(--line);border-radius:8px;
+             background:var(--panel2);color:var(--ink);font:inherit;cursor:pointer}
+  button.ctl:active{background:var(--accent);color:var(--bg)}
+  button.ctl.active{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+  input[type=range]{width:160px}
+  .readout{font-size:13px;color:var(--accent);min-width:2.5em;text-align:center}
+  .sentence{text-align:center;font-size:14px;background:var(--bg);border:1px solid var(--line);
+            border-radius:8px;padding:8px 12px;margin-top:4px}
+  .sentence b{color:var(--accent)}
+
+  footer{display:flex;justify-content:space-between;gap:10px;max-width:640px;margin:0 auto;padding:4px 16px 24px}
+  footer button{flex:1;padding:12px;border:1px solid var(--line);border-radius:10px;
+                background:var(--panel2);color:var(--ink);font:inherit;font-size:15px;cursor:pointer}
+  footer button:disabled{opacity:.4}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Understanding the Blocks</h1>
+  <p>A visual companion to <code>spark.py tutorial</code> -- this one's about the
+     <em>numbers</em> inside a tile, not the WHEN/DO idea itself.</p>
+</header>
+
+<nav id="nav"></nav>
+<main id="main"></main>
+<footer>
+  <button id="prevBtn" class="ctl">&larr; back</button>
+  <button id="nextBtn" class="ctl">next &rarr;</button>
+</footer>
+
+<script>
+// ===========================================================================
+// A tiny shared grid helper -- every module gets its own, small, square.
+// ===========================================================================
+const SIZE = 7;
+
+function makeGrid(container, onCellClick) {
+  const grid = document.createElement("div");
+  grid.className = "grid";
+  grid.style.gridTemplateColumns = `repeat(${SIZE}, 28px)`;
+  const cells = [];
+  for (let y = 0; y < SIZE; y++) {
+    cells.push([]);
+    for (let x = 0; x < SIZE; x++) {
+      const c = document.createElement("div");
+      c.className = "cell";
+      if (onCellClick) c.addEventListener("click", () => onCellClick(x, y));
+      grid.appendChild(c);
+      cells[y].push(c);
+    }
+  }
+  container.appendChild(grid);
+  return cells;
+}
+
+function clearGrid(cells) {
+  for (const row of cells) for (const c of row) { c.textContent = ""; c.className = "cell"; }
+}
+
+function ctlButton(label, onClick) {
+  const b = document.createElement("button");
+  b.className = "ctl";
+  b.textContent = label;
+  b.addEventListener("click", onClick);
+  return b;
+}
+
+// ===========================================================================
+// The seven modules. Each builds its own sandbox into `box` and can update
+// a `sentence` line summarising "number of what, of whom, doing what."
+// ===========================================================================
+const MODULES = [
+
+{
+  title: "A pixel, and its square",
+  explain: `Everything in Spark lives on a grid. One square, one pixel --
+    this is the "whom": the thing every WHEN/DO row belongs to. Tap any
+    square to put it there.`,
+  setup(box) {
+    const cells = makeGrid(box);
+    const sentence = document.createElement("div");
+    sentence.className = "sentence";
+    box.appendChild(sentence);
+    let pos = [3, 3];
+    function draw() {
+      clearGrid(cells);
+      cells[pos[1]][pos[0]].textContent = "@";
+      cells[pos[1]][pos[0]].classList.add("lit");
+      sentence.innerHTML = `<b>I</b> am standing at <b>${pos[0]},${pos[1]}</b>.`;
+    }
+    // re-bind clicks now that we know `pos` -- simplest to rebuild on click
+    for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) {
+      cells[y][x].addEventListener("click", () => { pos = [x, y]; draw(); });
+    }
+    draw();
+  }
+},
+
+{
+  title: "A direction -- the simplest number",
+  explain: `A tile like "move {dir}" has one parameter: which way. Not a
+    count, not a target -- just a direction. Tap an arrow.`,
+  setup(box) {
+    const cells = makeGrid(box);
+    const sentence = document.createElement("div");
+    const ctls = document.createElement("div");
+    ctls.className = "controls";
+    let pos = [3, 3], dir = "up";
+    const DIRS = {up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0]};
+    function draw() {
+      clearGrid(cells);
+      const [dx, dy] = DIRS[dir];
+      const nx = Math.max(0, Math.min(SIZE - 1, pos[0] + dx));
+      const ny = Math.max(0, Math.min(SIZE - 1, pos[1] + dy));
+      cells[pos[1]][pos[0]].textContent = "@";
+      cells[pos[1]][pos[0]].classList.add("lit");
+      if (nx !== pos[0] || ny !== pos[1]) cells[ny][nx].classList.add("good");
+      sentence.innerHTML = `<b>move ${dir}</b> -- I'd go to <b>${nx},${ny}</b> next.`;
+    }
+    for (const d of ["up", "down", "left", "right"]) {
+      ctls.appendChild(ctlButton(d, () => { dir = d; draw(); }));
+    }
+    box.appendChild(ctls);
+    box.appendChild(sentence);
+    draw();
+    // actually commit the move on a second tap of the same direction
+    ctls.querySelectorAll("button").forEach(b => {
+      b.addEventListener("click", () => {
+        if (b.textContent !== dir) return;
+      });
+    });
+  }
+},
+
+{
+  title: "A count -- \"number of what\"",
+  explain: `"shoot {dir} up to {reach} squares" adds a second parameter: how
+    far. Drag the slider -- this is the clearest "number of what" there
+    is: a plain count of squares.`,
+  setup(box) {
+    const cells = makeGrid(box);
+    const sentence = document.createElement("div");
+    const ctls = document.createElement("div");
+    ctls.className = "controls";
+    const slider = document.createElement("input");
+    slider.type = "range"; slider.min = 0; slider.max = SIZE - 1; slider.value = 3;
+    const readout = document.createElement("span");
+    readout.className = "readout";
+    ctls.appendChild(slider); ctls.appendChild(readout);
+    function draw() {
+      clearGrid(cells);
+      const reach = Number(slider.value);
+      readout.textContent = reach;
+      const y = 3;
+      cells[y][0].textContent = "@";
+      cells[y][0].classList.add("lit");
+      for (let x = 1; x <= reach && x < SIZE; x++) cells[y][x].classList.add("good");
+      sentence.innerHTML = `<b>shoot right up to ${reach} squares</b> -- that many
+        squares, highlighted, is the entire meaning of this one number.`;
+    }
+    slider.addEventListener("input", draw);
+    box.appendChild(ctls);
+    box.appendChild(sentence);
+    draw();
+  }
+},
+
+{
+  title: "A target -- \"doing what to whom\"",
+  explain: `Most DO tiles take a target: self, or "it" (whatever a WHEN
+    tile found). Tap the other pixel to make it "it", then switch the
+    target to see who gets hurt.`,
+  setup(box) {
+    const cells = makeGrid(box);
+    const sentence = document.createElement("div");
+    const ctls = document.createElement("div");
+    ctls.className = "controls";
+    const me = [1, 3], themStart = [5, 3];
+    let itPos = null;
+    let target = "self";
+    function draw() {
+      clearGrid(cells);
+      cells[me[1]][me[0]].textContent = "@";
+      cells[me[1]][me[0]].classList.add("lit");
+      cells[themStart[1]][themStart[0]].textContent = "x";
+      if (itPos) cells[itPos[1]][itPos[0]].classList.add("lit");
+      const victimCell = target === "self" ? me : itPos;
+      if (victimCell) cells[victimCell[1]][victimCell[0]].classList.add("bad");
+      const who = target === "self" ? "myself" : (itPos ? "it (the x)" : "-- nothing marked yet");
+      sentence.innerHTML = `<b>hurt ${target}</b> -- right now that's <b>${who}</b>.`;
+    }
+    cells[themStart[1]][themStart[0]].addEventListener("click", () => { itPos = themStart; draw(); });
+    ctls.appendChild(ctlButton("target: self", () => { target = "self"; draw(); }));
+    ctls.appendChild(ctlButton("target: it", () => { target = "it"; draw(); }));
+    box.appendChild(ctls);
+    box.appendChild(sentence);
+    draw();
+  }
+},
+
+{
+  title: "A sensor firing -- WHEN, before anything happens",
+  explain: `A WHEN tile just asks a question, every tick, before DO ever
+    runs. Drag the other pixel around -- watch "I see x within 2" turn
+    on and off as it crosses the line, nothing else happening yet.`,
+  setup(box) {
+    const cells = makeGrid(box);
+    const sentence = document.createElement("div");
+    const me = [3, 3];
+    let them = [0, 3];
+    function dist(a, b) { return Math.max(Math.abs(a[0]-b[0]), Math.abs(a[1]-b[1])); }
+    function draw() {
+      clearGrid(cells);
+      const range = 2;
+      for (let y=0;y<SIZE;y++) for (let x=0;x<SIZE;x++)
+        if (dist([x,y], me) <= range) cells[y][x].classList.add("lit");
+      cells[me[1]][me[0]].textContent = "@";
+      cells[them[1]][them[0]].textContent = "x";
+      const seen = dist(me, them) <= range;
+      cells[them[1]][them[0]].classList.toggle("good", seen);
+      sentence.innerHTML = `<b>WHEN I see x within 2</b> is currently
+        <b>${seen ? "TRUE" : "false"}</b>. Tap a square to move the x.`;
+    }
+    for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) {
+      cells[y][x].addEventListener("click", () => {
+        if (x === me[0] && y === me[1]) return;
+        them = [x, y]; draw();
+      });
+    }
+    box.appendChild(sentence);
+    draw();
+  }
+},
+
+{
+  title: "An action firing -- DO, the effect",
+  explain: `Once WHEN is true, every DO on the row runs, in order. Here
+    the row is fixed: WHEN I see x within 2 DO move toward it. Tap
+    "tick" to step time forward once and watch it actually move.`,
+  setup(box) {
+    const cells = makeGrid(box);
+    const sentence = document.createElement("div");
+    const ctls = document.createElement("div");
+    ctls.className = "controls";
+    let me = [1, 3];
+    const them = [5, 3];
+    function dist(a, b) { return Math.max(Math.abs(a[0]-b[0]), Math.abs(a[1]-b[1])); }
+    function draw(fired) {
+      clearGrid(cells);
+      cells[me[1]][me[0]].textContent = "@";
+      cells[me[1]][me[0]].classList.add("lit");
+      cells[them[1]][them[0]].textContent = "x";
+      const seen = dist(me, them) <= 2;
+      cells[them[1]][them[0]].classList.toggle("good", seen);
+      sentence.innerHTML = fired
+        ? `<b>WHEN</b> true -> <b>DO move toward it</b> fired. I moved one square.`
+        : `<b>WHEN I see x within 2</b> is ${seen ? "true" : "false"} --
+           press tick to run one row, top to bottom.`;
+    }
+    ctls.appendChild(ctlButton("tick", () => {
+      const seen = dist(me, them) <= 2;
+      let fired = false;
+      if (seen) {
+        if (me[0] < them[0]) me[0]++; else if (me[0] > them[0]) me[0]--;
+        fired = true;
+      }
+      draw(fired);
+    }));
+    box.appendChild(ctls);
+    box.appendChild(sentence);
+    draw(false);
+  }
+},
+
+{
+  title: "Put together -- a whole WHEN/DO row",
+  explain: `Pick a sensor, pick an action, place both pixels, and press
+    fire -- this is the whole engine, one row at a time, exactly like
+    a real brain row.`,
+  setup(box) {
+    const cells = makeGrid(box);
+    const sentence = document.createElement("div");
+    const ctls = document.createElement("div");
+    ctls.className = "controls";
+    const slider = document.createElement("input");
+    slider.type = "range"; slider.min = 1; slider.max = SIZE - 1; slider.value = 2;
+    const readout = document.createElement("span");
+    readout.className = "readout";
+    let me = [1, 3], them = [5, 3];
+    let placing = null; // "me" | "them" | null
+    function dist(a, b) { return Math.max(Math.abs(a[0]-b[0]), Math.abs(a[1]-b[1])); }
+    function draw(result) {
+      clearGrid(cells);
+      const reach = Number(slider.value);
+      readout.textContent = reach;
+      for (let y=0;y<SIZE;y++) for (let x=0;x<SIZE;x++)
+        if (dist([x,y], me) <= reach) cells[y][x].classList.add("lit");
+      cells[me[1]][me[0]].textContent = "@";
+      cells[them[1]][them[0]].textContent = "x";
+      const seen = dist(me, them) <= reach;
+      cells[them[1]][them[0]].classList.toggle("good", seen);
+      sentence.innerHTML = `<b>WHEN I see x within ${reach} DO move toward it</b>` +
+        (result ? ` -- fired: ${result}` : "");
+    }
+    for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) {
+      cells[y][x].addEventListener("click", () => {
+        if (placing === "me") me = [x, y];
+        else if (placing === "them") them = [x, y];
+        draw();
+      });
+    }
+    ctls.appendChild(ctlButton("place @", () => { placing = "me"; }));
+    ctls.appendChild(ctlButton("place x", () => { placing = "them"; }));
+    ctls.appendChild(slider); ctls.appendChild(readout);
+    ctls.appendChild(ctlButton("fire", () => {
+      const reach = Number(slider.value);
+      const seen = dist(me, them) <= reach;
+      if (seen) {
+        if (me[0] < them[0]) me[0]++; else if (me[0] > them[0]) me[0]--;
+        draw("yes, I moved one square closer");
+      } else {
+        draw("no -- x is out of range, nothing happened");
+      }
+    }));
+    slider.addEventListener("input", () => draw());
+    box.appendChild(ctls);
+    box.appendChild(sentence);
+    draw();
+  }
+},
+
+];
+
+// ===========================================================================
+// Shell: nav, module switching, back/next
+// ===========================================================================
+let current = 0;
+const navEl = document.getElementById("nav");
+const mainEl = document.getElementById("main");
+const prevBtn = document.getElementById("prevBtn");
+const nextBtn = document.getElementById("nextBtn");
+
+function renderNav() {
+  navEl.innerHTML = "";
+  MODULES.forEach((m, i) => {
+    const b = document.createElement("button");
+    b.textContent = i + 1;
+    if (i === current) b.classList.add("on");
+    b.addEventListener("click", () => { current = i; render(); });
+    navEl.appendChild(b);
+  });
+}
+
+function render() {
+  renderNav();
+  mainEl.innerHTML = "";
+  const m = MODULES[current];
+  const card = document.createElement("div");
+  card.className = "card";
+  const h = document.createElement("h2");
+  h.textContent = `${current + 1}. ${m.title}`;
+  const p = document.createElement("p");
+  p.textContent = m.explain;
+  const box = document.createElement("div");
+  box.className = "sandbox";
+  card.appendChild(h); card.appendChild(p); card.appendChild(box);
+  mainEl.appendChild(card);
+  m.setup(box);
+  prevBtn.disabled = current === 0;
+  nextBtn.disabled = current === MODULES.length - 1;
+  nextBtn.textContent = current === MODULES.length - 1 ? "the end" : "next →";
+  window.scrollTo(0, 0);
+}
+
+prevBtn.addEventListener("click", () => { if (current > 0) { current--; render(); } });
+nextBtn.addEventListener("click", () => { if (current < MODULES.length - 1) { current++; render(); } });
+
+render();
+</script>
+</body>
+</html>

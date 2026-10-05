@@ -16,6 +16,23 @@ Each entry says **what** changed and, where it is not obvious, **why**.
 
 ### Added
 
+- **`tutorial.html`, and `spark.py tutorial browser`** — a browser companion
+  to the existing terminal `spark.py tutorial`, not a replacement for it. The
+  terminal tutorial teaches *what WHEN/DO means*; this one is scoped to the
+  gap Gabe named directly -- "number of what, of whom, doing what" -- making
+  tile *parameters* tangible by touch: a pixel and its square, a direction,
+  a count/range slider, self vs. `it` as a target, a sensor actually
+  switching true/false as you drag the other pixel, an action firing on a
+  manual tick, and a full WHEN/DO row assembled and fired by hand. Same
+  gray + light-blue theme as `world3d.html` (`--bg`/`--panel`/`--accent`/...),
+  no external libraries, one self-contained file, so it serves straight off
+  GitHub Pages exactly like `index.html` and `world3d.html` already do.
+  `spark.py tutorial browser` opens it via `termux-open`, mirroring how
+  `spark.py browser` already opens `world3d.html` -- not verified end to end
+  for the same reason `browser` itself isn't (`termux-open` hangs from this
+  sandbox); the file's own logic has no such dependency and was checked
+  directly.
+
 - **`spark.py browser [game]`** — opens `world3d.html` in your phone's own
   browser app via `termux-open`, optionally with a game already picked
   (`spark browser games/chase.json` turns into `?game=chase` in the URL,

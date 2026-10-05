@@ -100,6 +100,17 @@ def main():
             print("\n  nowhere writable found; keep using: python3 spark.py")
         return
     if args and args[0] == "tutorial":
+        if len(args) > 1 and args[1] == "browser":
+            import subprocess
+            url = str((Path(__file__).resolve().parent / "tutorial.html"))
+            try:
+                subprocess.run(["termux-open", url], check=True)
+            except FileNotFoundError:
+                sys.exit("termux-open not found -- needs Termux:API "
+                          "(pkg install termux-api, plus the Termux:API app)")
+            except subprocess.CalledProcessError as e:
+                sys.exit("termux-open failed: %s" % e)
+            return
         from engine import tutorial
         tutorial.run()
         return

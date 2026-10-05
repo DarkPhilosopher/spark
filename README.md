@@ -219,6 +219,19 @@ Arrow keys move, space shoots, `q` quits. Eat five apples to win; two bugs chase
 you and bite. Then open `chase` in either editor and change something — that is
 the fastest way to understand the whole system.
 
+### If the numbers inside a tile are the confusing part
+
+    python3 spark.py tutorial browser
+
+`tutorial.html` is a touch-based companion to the ten lessons above, not a
+replacement for them — it never explains what WHEN/DO *is*. It's for the part
+that's harder to show in text: what each tile's own parameters actually mean.
+Drag a direction, drag a count/range slider, watch a sensor flip true/false as
+you move the other pixel around, fire an action by hand, then build and fire a
+whole WHEN/DO row yourself. It's one plain HTML file with no libraries, so it
+also just works straight off your GitHub Pages link, same as `index.html` and
+`world3d.html` already do.
+
 ---
 
 ## Knowing where you are
@@ -988,6 +1001,7 @@ Once `python3 spark.py install` has been run, every one of these works as plain
 | `python3 spark.py update` | the same again, the long way |
 | `python3 spark.py update --check` | say what an update would bring, and stop |
 | `python3 spark.py tutorial` | ten guided lessons that build your first game |
+| `python3 spark.py tutorial browser` | a touch-based companion covering tile parameters: pixel, direction, count, target, sensor, action, a full row |
 | `python3 spark.py` | the terminal menus |
 | `python3 spark.py edit` | the browser editor on port 8765 |
 | `python3 spark.py edit 9000` | same, on a port you choose |
